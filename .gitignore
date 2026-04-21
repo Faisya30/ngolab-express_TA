@@ -4,17 +4,19 @@
 .env.development.local
 .env.test.local
 .env.production.local
+backend/.env
+backend/.env.local
 
 # Dependency directories
 node_modules/
+backend/node_modules/
 
 # Build output
 dist/
 dist-ssr/
 
 # Logs
-logs
-*.log
+lo*.log
 npm-debug.log*
 
 # Editor
