@@ -16,6 +16,7 @@ export interface Product {
   description: string;
   isRecommended: boolean;
   cashbackReward: number;
+  product_type?: 'kiosk' | 'cv';
 }
 
 export interface Voucher {

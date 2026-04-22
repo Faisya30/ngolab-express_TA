@@ -7,6 +7,17 @@ type BackendRequest = {
   body?: any;
 };
 
+function getCurrentAdminRole(): string {
+  try {
+    const rawAdmin = localStorage.getItem('current_admin');
+    if (!rawAdmin) return '';
+    const admin = JSON.parse(rawAdmin);
+    return String(admin?.role || '');
+  } catch (_error) {
+    return '';
+  }
+}
+
 function mapActionToBackendRequest(action: string, data?: any): BackendRequest | null {
   switch (action) {
     case 'getOrders':
@@ -69,6 +80,7 @@ export async function fetchFromSheet(action: string, data?: any, retryCount = 0)
     console.log(`[🚀 API CALL] Action: ${action} | Retry: ${retryCount}`, data ? '(with payload)' : '(no payload)');
 
     const url = `${BACKEND_URL}${backendRequest.path}`;
+    const adminRole = getCurrentAdminRole();
 
     const options: any = {
       method: backendRequest.method,
@@ -77,6 +89,7 @@ export async function fetchFromSheet(action: string, data?: any, retryCount = 0)
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
+        'x-admin-role': adminRole,
       },
     };
 

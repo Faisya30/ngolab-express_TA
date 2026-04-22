@@ -12,6 +12,7 @@ import Reports from './components/Reports';
 import { ViewType } from '../../types';
 import { fetchFromSheet } from '../../shared/services/api';
 import { API_ACTIONS } from '../../shared/constants';
+import { getProductTypeFromRole } from './utils/productScope';
 
 const AdminDashboard: React.FC = () => {
   const [currentView, setView] = useState<ViewType>('DASHBOARD');
@@ -26,6 +27,7 @@ const AdminDashboard: React.FC = () => {
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [memberLogs, setMemberLogs] = useState<any[]>([]);
+  const adminProductType = getProductTypeFromRole(user?.role);
 
   useEffect(() => {
     // Check if user is already logged in
@@ -99,6 +101,10 @@ const AdminDashboard: React.FC = () => {
     await loadDashboardData();
   };
 
+  const scopedProducts = adminProductType
+    ? products.filter((product: any) => String(product?.product_type || '').toLowerCase() === adminProductType)
+    : [];
+
   const setCurrentView = (view: ViewType) => {
     setView(view);
   };
@@ -142,9 +148,10 @@ const AdminDashboard: React.FC = () => {
           
           {currentView === 'PRODUCTS' && (
             <ProductManagement 
-              initialProducts={products}
+              initialProducts={scopedProducts}
               categories={categories}
               onUpdate={handleRefresh}
+              adminProductType={adminProductType}
             />
           )}
           

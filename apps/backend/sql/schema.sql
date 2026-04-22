@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS products (
   price DECIMAL(12,2) NOT NULL DEFAULT 0,
   image_url TEXT NULL,
   description TEXT NULL,
+  product_type ENUM('kiosk','cv') NOT NULL DEFAULT 'kiosk',
   is_recommended TINYINT(1) NOT NULL DEFAULT 0,
   cashback_reward INT NOT NULL DEFAULT 0,
   is_active TINYINT(1) NOT NULL DEFAULT 1,

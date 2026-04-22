@@ -2,14 +2,16 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Product, Category } from '../../../types';
 import { fetchFromSheet } from '../../../shared/services/api';
+import { ProductType } from '../utils/productScope';
 
 interface Props {
   initialProducts: Product[];
   categories: Category[];
   onUpdate: () => void;
+  adminProductType: ProductType | null;
 }
 
-const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpdate }) => {
+const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpdate, adminProductType }) => {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -91,6 +93,12 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
     e.preventDefault();
     setIsSaving(true);
     setSaveError(null);
+
+    if (!adminProductType) {
+      setSaveError('Role admin tidak diizinkan untuk mengelola produk.');
+      setIsSaving(false);
+      return;
+    }
     
     const formData = new FormData(e.currentTarget);
     const productId = editingProduct?.id || `PROD-${Date.now()}`;
@@ -104,6 +112,7 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
       description: formData.get('description') as string,
       isRecommended: formData.get('isRecommended') === 'on',
       cashbackReward: Number(formData.get('cashbackReward') || 0),
+      product_type: adminProductType,
     };
 
     if (!productData.name) {
@@ -361,6 +370,14 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
 
                   {/* Right: Text Inputs */}
                   <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Tipe Produk</label>
+                      <div className="inline-flex items-center px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-700">
+                        {adminProductType ? adminProductType.toUpperCase() : 'UNAUTHORIZED'}
+                      </div>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest ml-2 italic">*Otomatis dari role admin dan tidak bisa diubah</p>
+                    </div>
+
                     <div className="space-y-2">
                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Nama Produk</label>
                       <input name="name" required defaultValue={editingProduct?.name} className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-black text-slate-800 text-sm uppercase tracking-widest" placeholder="NAMA MENU" />

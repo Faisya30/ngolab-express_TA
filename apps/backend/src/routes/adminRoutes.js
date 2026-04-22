@@ -35,6 +35,17 @@ async function resolveCategoryId(categoryValue) {
   return rows[0]?.id ?? null;
 }
 
+function mapRoleToProductType(rawRole) {
+  const role = String(rawRole || '').toLowerCase();
+  if (role === 'kiosk_admin') return 'kiosk';
+  if (role === 'cv_admin') return 'cv';
+  return null;
+}
+
+function resolveRequestProductType(req) {
+  return mapRoleToProductType(req.headers['x-admin-role']);
+}
+
 router.get('/orders', async (_req, res) => {
   try {
     const usesMemberCode = await hasColumn('orders', 'member_code');
@@ -103,8 +114,18 @@ router.get('/order-details', async (_req, res) => {
   }
 });
 
-router.get('/products', async (_req, res) => {
+router.get('/products', async (req, res) => {
   try {
+    const requestProductType = resolveRequestProductType(req);
+    if (!requestProductType) {
+      return res.status(403).json({ success: false, error: 'Role admin tidak diizinkan mengakses produk.' });
+    }
+
+    const hasProductType = await hasColumn('products', 'product_type');
+    if (!hasProductType) {
+      return res.status(500).json({ success: false, error: 'Kolom product_type belum tersedia. Jalankan migrasi database terlebih dahulu.' });
+    }
+
     const usesCategoryCode = await hasColumn('products', 'category_code');
     const rows = usesCategoryCode
       ? await query(
@@ -115,11 +136,14 @@ router.get('/products', async (_req, res) => {
             price,
             COALESCE(image_url, '') AS image,
             COALESCE(description, '') AS description,
+            product_type,
             is_recommended AS isRecommended,
             cashback_reward AS cashbackReward,
             is_active AS isActive
           FROM products
-          ORDER BY created_at DESC`
+          WHERE product_type = ?
+          ORDER BY created_at DESC`,
+          [requestProductType]
         )
       : await query(
           `SELECT
@@ -129,12 +153,15 @@ router.get('/products', async (_req, res) => {
             p.price,
             COALESCE(p.image_url, '') AS image,
             COALESCE(p.description, '') AS description,
+            p.product_type,
             p.is_recommended AS isRecommended,
             p.cashback_reward AS cashbackReward,
             p.is_active AS isActive
           FROM products p
           LEFT JOIN categories c ON p.category_id = c.id
-          ORDER BY p.created_at DESC`
+          WHERE p.product_type = ?
+          ORDER BY p.created_at DESC`,
+          [requestProductType]
         );
     res.json(rows);
   } catch (error) {
@@ -242,6 +269,16 @@ router.get('/member-logs', async (_req, res) => {
 
 router.post('/products', async (req, res) => {
   try {
+    const requestProductType = resolveRequestProductType(req);
+    if (!requestProductType) {
+      return res.status(403).json({ success: false, error: 'Role admin tidak diizinkan menyimpan produk.' });
+    }
+
+    const hasProductType = await hasColumn('products', 'product_type');
+    if (!hasProductType) {
+      return res.status(500).json({ success: false, error: 'Kolom product_type belum tersedia. Jalankan migrasi database terlebih dahulu.' });
+    }
+
     const product = req.body?.product || req.body || {};
     const code = String(product.id || `PROD-${Date.now()}`);
 
@@ -250,15 +287,16 @@ router.post('/products', async (req, res) => {
     if (usesCategoryCode) {
       await query(
         `INSERT INTO products (
-          code, name, category_code, price, image_url, description,
+          code, name, category_code, price, image_url, description, product_type,
           is_recommended, cashback_reward, is_active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         ON DUPLICATE KEY UPDATE
           name = VALUES(name),
           category_code = VALUES(category_code),
           price = VALUES(price),
           image_url = VALUES(image_url),
           description = VALUES(description),
+          product_type = VALUES(product_type),
           is_recommended = VALUES(is_recommended),
           cashback_reward = VALUES(cashback_reward)`,
         [
@@ -268,6 +306,7 @@ router.post('/products', async (req, res) => {
           Number(product.price || 0),
           String(product.image || ''),
           String(product.description || ''),
+          requestProductType,
           product.isRecommended ? 1 : 0,
           Number(product.cashbackReward || 0),
         ]
@@ -280,15 +319,16 @@ router.post('/products', async (req, res) => {
 
       await query(
         `INSERT INTO products (
-          code, name, category_id, price, image_url, description,
+          code, name, category_id, price, image_url, description, product_type,
           is_recommended, cashback_reward, is_active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         ON DUPLICATE KEY UPDATE
           name = VALUES(name),
           category_id = VALUES(category_id),
           price = VALUES(price),
           image_url = VALUES(image_url),
           description = VALUES(description),
+          product_type = VALUES(product_type),
           is_recommended = VALUES(is_recommended),
           cashback_reward = VALUES(cashback_reward)`,
         [
@@ -298,6 +338,7 @@ router.post('/products', async (req, res) => {
           Number(product.price || 0),
           String(product.image || ''),
           String(product.description || ''),
+          requestProductType,
           product.isRecommended ? 1 : 0,
           Number(product.cashbackReward || 0),
         ]
@@ -312,7 +353,17 @@ router.post('/products', async (req, res) => {
 
 router.delete('/products/:id', async (req, res) => {
   try {
-    await query('DELETE FROM products WHERE code = ?', [req.params.id]);
+    const requestProductType = resolveRequestProductType(req);
+    if (!requestProductType) {
+      return res.status(403).json({ success: false, error: 'Role admin tidak diizinkan menghapus produk.' });
+    }
+
+    const hasProductType = await hasColumn('products', 'product_type');
+    if (!hasProductType) {
+      return res.status(500).json({ success: false, error: 'Kolom product_type belum tersedia. Jalankan migrasi database terlebih dahulu.' });
+    }
+
+    await query('DELETE FROM products WHERE code = ? AND product_type = ?', [req.params.id, requestProductType]);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
