@@ -6,7 +6,7 @@ Backend ini langsung terhubung ke database MySQL.
 ## 1. Setup
 
 1. Copy file environment:
-   - Dari `backend/.env.example` ke `backend/.env`
+  - Dari `apps/backend/.env.example` ke `apps/backend/.env`
 2. Isi nilai yang wajib:
   - `DB_HOST`
   - `DB_PORT`
@@ -54,8 +54,8 @@ Server default berjalan di `http://localhost:4000`.
 
 ## 4. Integrasi Frontend
 
-Set `VITE_BACKEND_URL` di root frontend:
+Set `VITE_BACKEND_URL` di frontend:
 
 - `VITE_BACKEND_URL=http://localhost:4000`
 
-Frontend service di `src/shared/services/api.ts` akan memakai backend ini untuk semua request admin dan kiosk.
+Frontend service di `apps/frontend/src/shared/services/api.ts` akan memakai backend ini untuk semua request admin dan kiosk.

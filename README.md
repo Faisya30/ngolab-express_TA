@@ -1,31 +1,44 @@
-# Ngolab Express Frontend
+# Ngolab Express
 
-Frontend untuk Admin Dashboard dan User Kiosk yang terhubung ke backend lokal (`backend/`) dan database MySQL.
+Struktur project sekarang dipisah menjadi dua aplikasi:
+
+- `apps/frontend` untuk Vite + React (Admin Dashboard dan User Kiosk)
+- `apps/backend` untuk Node.js + Express API
+
+## Struktur Folder
+
+```txt
+ngolab-express/
+├─ apps/
+│  ├─ frontend/
+│  └─ backend/
+├─ package.json
+├─ .gitignore
+└─ README.md
+```
 
 ## Prasyarat
 
 - Node.js 18+
-- Backend berjalan di `http://localhost:4000`
+- MySQL aktif untuk backend
 
-## Setup Frontend
+## Setup
 
-1. Install dependency:
-   - `npm install`
-2. Buat atau cek file `.env` di root frontend:
+1. Install dependency frontend:
+   - `npm install --prefix apps/frontend`
+2. Install dependency backend:
+   - `npm install --prefix apps/backend`
+3. Buat atau cek env frontend di `apps/frontend/.env`:
    - `VITE_BACKEND_URL=http://localhost:4000`
-3. Jalankan frontend:
-   - `npm run dev`
+4. Buat atau cek env backend di `apps/backend/.env` (DB host/user/password/db name dan lainnya).
 
-Frontend default berjalan di `http://localhost:3000`.
+## Menjalankan Aplikasi
 
-## Scripts
+- Frontend saja:
+  - `npm run dev:frontend`
+- Backend saja:
+  - `npm run dev:backend`
+- Keduanya sekaligus dari root:
+  - `npm run dev`
 
-- `npm run dev` - jalankan Vite dev server
-- `npm run build` - build production
-- `npm run preview` - preview hasil build
-- `npm run lint` - TypeScript check (`tsc --noEmit`)
-
-## Catatan
-
-- Seluruh alur data admin dan kiosk menggunakan backend lokal, tidak lagi menggunakan Apps Script.
-- Konfigurasi backend ada di `backend/.env`.
+Frontend default berjalan di `http://localhost:3000` dan backend di `http://localhost:4000`.
