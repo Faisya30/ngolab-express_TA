@@ -1,7 +1,5 @@
-import { Router } from 'express';
-import { query } from '../db/mysql.js';
+import { query } from '../config/db.js';
 
-const router = Router();
 const tableColumnsCache = new Map();
 
 async function getTableColumns(tableName) {
@@ -47,7 +45,7 @@ function resolveRequestProductType(req) {
   return mapRoleToProductType(req.headers['x-admin-role']);
 }
 
-router.get('/orders', async (_req, res) => {
+export async function getOrders(_req, res) {
   try {
     const usesMemberCode = await hasColumn('orders', 'member_code');
     const rows = usesMemberCode
@@ -82,9 +80,9 @@ router.get('/orders', async (_req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
-});
+}
 
-router.get('/order-details', async (_req, res) => {
+export async function getOrderDetails(_req, res) {
   try {
     const usesOrderCode = await hasColumn('order_items', 'order_code');
     const rows = usesOrderCode
@@ -113,9 +111,9 @@ router.get('/order-details', async (_req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
-});
+}
 
-router.get('/products', async (req, res) => {
+export async function getProducts(req, res) {
   try {
     const requestProductType = resolveRequestProductType(req);
     if (!requestProductType) {
@@ -197,9 +195,9 @@ router.get('/products', async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
-});
+}
 
-router.get('/categories', async (_req, res) => {
+export async function getCategories(_req, res) {
   try {
     const rows = await query(
       `SELECT
@@ -213,9 +211,9 @@ router.get('/categories', async (_req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
-});
+}
 
-router.get('/vouchers', async (_req, res) => {
+export async function getVouchers(_req, res) {
   try {
     const rows = await query(
       `SELECT
@@ -232,9 +230,9 @@ router.get('/vouchers', async (_req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
-});
+}
 
-router.get('/members', async (_req, res) => {
+export async function getMembers(_req, res) {
   try {
     const rows = await query(
       `SELECT
@@ -249,9 +247,9 @@ router.get('/members', async (_req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
-});
+}
 
-router.get('/member-logs', async (_req, res) => {
+export async function getMemberLogs(_req, res) {
   try {
     const usesMemberCode = await hasColumn('member_logs', 'member_code');
     const usesOrderCode = await hasColumn('member_logs', 'order_code');
@@ -295,9 +293,9 @@ router.get('/member-logs', async (_req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
-});
+}
 
-router.post('/products', async (req, res) => {
+export async function saveProduct(req, res) {
   try {
     const requestProductType = resolveRequestProductType(req);
     if (!requestProductType) {
@@ -331,7 +329,7 @@ router.post('/products', async (req, res) => {
           description = VALUES(description),
           product_type = VALUES(product_type),
           is_recommended = VALUES(is_recommended),
-          cashback_reward = VALUES(cashback_reward)`,
+          cashback_reward = VALUES(cashback_reward)` ,
         [
           code,
           String(product.name || ''),
@@ -363,7 +361,7 @@ router.post('/products', async (req, res) => {
           description = VALUES(description),
           product_type = VALUES(product_type),
           is_recommended = VALUES(is_recommended),
-          cashback_reward = VALUES(cashback_reward)`,
+          cashback_reward = VALUES(cashback_reward)` ,
         [
           code,
           String(product.name || ''),
@@ -382,9 +380,9 @@ router.post('/products', async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
-});
+}
 
-router.delete('/products/:id', async (req, res) => {
+export async function deleteProduct(req, res) {
   try {
     const requestProductType = resolveRequestProductType(req);
     if (!requestProductType) {
@@ -405,9 +403,9 @@ router.delete('/products/:id', async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
-});
+}
 
-router.post('/categories', async (req, res) => {
+export async function saveCategory(req, res) {
   try {
     const category = req.body?.category || req.body || {};
     const code = String(category.id || `CAT-${Date.now()}`);
@@ -425,18 +423,18 @@ router.post('/categories', async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
-});
+}
 
-router.delete('/categories/:id', async (req, res) => {
+export async function deleteCategory(req, res) {
   try {
     await query('DELETE FROM categories WHERE code = ?', [req.params.id]);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
-});
+}
 
-router.post('/vouchers', async (req, res) => {
+export async function saveVoucher(req, res) {
   try {
     const voucher = req.body?.voucher || req.body || {};
     const code = String(voucher.id || `VOU-${Date.now()}`);
@@ -462,15 +460,13 @@ router.post('/vouchers', async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
-});
+}
 
-router.delete('/vouchers/:id', async (req, res) => {
+export async function deleteVoucher(req, res) {
   try {
     await query('DELETE FROM vouchers WHERE code = ?', [req.params.id]);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
-});
-
-export default router;
+}
