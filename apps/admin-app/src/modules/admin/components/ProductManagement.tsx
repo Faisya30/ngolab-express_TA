@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Product, Category } from '../../../types';
-import { fetchFromSheet } from '../../../shared/services/api';
+import { fetchFromSheet } from '@ngolab/shared-lib';
 import { ProductType } from '../utils/productScope';
 
 interface Props {
@@ -18,6 +18,7 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [selectedProductType, setSelectedProductType] = useState<'kiosk' | 'cv'>('kiosk');
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -34,10 +35,15 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
   useEffect(() => {
     if (isModalOpen) {
       setImagePreview(editingProduct?.image || null);
+      setSelectedProductType(
+        (String(editingProduct?.product_type || '').toLowerCase() as 'kiosk' | 'cv') ||
+        adminProductType ||
+        'kiosk'
+      );
     } else {
       setImagePreview(null);
     }
-  }, [isModalOpen, editingProduct]);
+  }, [isModalOpen, editingProduct, adminProductType]);
 
   // Helper to get category name
   const getCategoryName = (catId: string) => {
@@ -94,14 +100,9 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
     setIsSaving(true);
     setSaveError(null);
 
-    if (!adminProductType) {
-      setSaveError('Role admin tidak diizinkan untuk mengelola produk.');
-      setIsSaving(false);
-      return;
-    }
-    
     const formData = new FormData(e.currentTarget);
     const productId = editingProduct?.id || `PROD-${Date.now()}`;
+    const productTypeToSave = adminProductType || selectedProductType;
     
     const productData = {
       id: productId,
@@ -112,7 +113,7 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
       description: formData.get('description') as string,
       isRecommended: formData.get('isRecommended') === 'on',
       cashbackReward: Number(formData.get('cashbackReward') || 0),
-      product_type: adminProductType,
+      product_type: productTypeToSave,
     };
 
     if (!productData.name) {
@@ -372,10 +373,21 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
                   <div className="space-y-6">
                     <div className="space-y-2">
                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Tipe Produk</label>
-                      <div className="inline-flex items-center px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-700">
-                        {adminProductType ? adminProductType.toUpperCase() : 'UNAUTHORIZED'}
-                      </div>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest ml-2 italic">*Otomatis dari role admin dan tidak bisa diubah</p>
+                      {adminProductType ? (
+                        <div className="inline-flex items-center px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-700">
+                          {adminProductType.toUpperCase()}
+                        </div>
+                      ) : (
+                        <select
+                          value={selectedProductType}
+                          onChange={(event) => setSelectedProductType(event.target.value as 'kiosk' | 'cv')}
+                          className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-black text-slate-700 text-[11px] uppercase tracking-widest"
+                        >
+                          <option value="kiosk">KIOSK</option>
+                          <option value="cv">CV</option>
+                        </select>
+                      )}
+                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest ml-2 italic">*Tipe produk dipakai untuk memisahkan menu Kiosk dan CV</p>
                     </div>
 
                     <div className="space-y-2">

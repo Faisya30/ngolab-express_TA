@@ -10,9 +10,29 @@ dotenv.config();
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
-const frontendOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+const frontendOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002',
+  ...(String(process.env.FRONTEND_ORIGIN || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)),
+]
+  .filter((origin, index, array) => array.indexOf(origin) === index)
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-app.use(cors({ origin: frontendOrigin, credentials: true }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (frontendOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error(`Origin tidak diizinkan oleh CORS: ${origin}`));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: '2mb' }));
 
 app.get('/health', async (_req, res) => {

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Category } from '../../../types';
-import { fetchFromSheet } from '../../../shared/services/api';
+import { fetchFromSheet } from '@ngolab/shared-lib';
 
 interface CategoryManagementProps {
   initialCategories: Category[];

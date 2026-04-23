@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Voucher } from '../../../types';
-import { fetchFromSheet } from '../../../shared/services/api';
+import { fetchFromSheet } from '@ngolab/shared-lib';
 
 interface Props {
   initialVouchers: Voucher[];

@@ -10,8 +10,7 @@ import TransactionList from './components/TransactionList';
 import MemberPoints from './components/MemberPoints';
 import Reports from './components/Reports';
 import { ViewType } from '../../types';
-import { fetchFromSheet } from '../../shared/services/api';
-import { API_ACTIONS } from '../../shared/constants';
+import { fetchFromSheet, API_ACTIONS } from '@ngolab/shared-lib';
 import { getProductTypeFromRole } from './utils/productScope';
 
 const AdminDashboard: React.FC = () => {
@@ -103,7 +102,7 @@ const AdminDashboard: React.FC = () => {
 
   const scopedProducts = adminProductType
     ? products.filter((product: any) => String(product?.product_type || '').toLowerCase() === adminProductType)
-    : [];
+    : products;
 
   const setCurrentView = (view: ViewType) => {
     setView(view);

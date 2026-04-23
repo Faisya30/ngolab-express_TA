@@ -58,4 +58,9 @@ Set `VITE_BACKEND_URL` di frontend:
 
 - `VITE_BACKEND_URL=http://localhost:4000`
 
+Untuk frontend terpisah:
+
+- Admin app: `http://localhost:3001`
+- User app: `http://localhost:3002`
+
 Frontend service di `apps/frontend/src/shared/services/api.ts` akan memakai backend ini untuk semua request admin dan kiosk.

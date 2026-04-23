@@ -1,8 +1,10 @@
 # Ngolab Express
 
-Struktur project sekarang dipisah menjadi dua aplikasi:
+Struktur project sekarang dipisah menjadi beberapa aplikasi yang saling terhubung:
 
-- `apps/frontend` untuk Vite + React (Admin Dashboard dan User Kiosk)
+- `apps/admin-app` untuk Vite + React (Super Admin Dashboard)
+- `apps/user-app` untuk Vite + React (User Kiosk)
+- `apps/shared-lib` untuk service dan konstanta yang dipakai bersama
 - `apps/backend` untuk Node.js + Express API
 
 ## Struktur Folder
@@ -10,7 +12,9 @@ Struktur project sekarang dipisah menjadi dua aplikasi:
 ```txt
 ngolab-express/
 ├─ apps/
-│  ├─ frontend/
+│  ├─ admin-app/
+│  ├─ user-app/
+│  ├─ shared-lib/
 │  └─ backend/
 ├─ package.json
 ├─ .gitignore
@@ -25,20 +29,36 @@ ngolab-express/
 ## Setup
 
 1. Install dependency frontend:
-   - `npm install --prefix apps/frontend`
+   - `npm install --prefix apps/admin-app`
+   - `npm install --prefix apps/user-app`
 2. Install dependency backend:
    - `npm install --prefix apps/backend`
-3. Buat atau cek env frontend di `apps/frontend/.env`:
+3. Buat atau cek env frontend di `apps/admin-app/.env` dan `apps/user-app/.env`:
    - `VITE_BACKEND_URL=http://localhost:4000`
-4. Buat atau cek env backend di `apps/backend/.env` (DB host/user/password/db name dan lainnya).
+4. Buat atau cek env backend di `apps/backend/.env`:
+   - `PORT=4000`
+   - `FRONTEND_ORIGIN=http://localhost:3001,http://localhost:3002`
+   - `DB_HOST=127.0.0.1`
+   - `DB_PORT=3306`
+   - `DB_USER=root`
+   - `DB_PASSWORD=`
+   - `DB_NAME=ngolab_express_system`
 
 ## Menjalankan Aplikasi
 
-- Frontend saja:
-  - `npm run dev:frontend`
+- Admin app saja:
+  - `npm run dev:admin`
+- User app saja:
+  - `npm run dev:user`
 - Backend saja:
   - `npm run dev:backend`
-- Keduanya sekaligus dari root:
+- Semua sekaligus dari root:
   - `npm run dev`
 
-Frontend default berjalan di `http://localhost:3000` dan backend di `http://localhost:4000`.
+Port default:
+
+- Admin app: `http://localhost:3001`
+- User app: `http://localhost:3002`
+- Backend API: `http://localhost:4000`
+
+Kedua frontend menggunakan backend API yang sama dan backend terhubung ke satu database MySQL yang sama.

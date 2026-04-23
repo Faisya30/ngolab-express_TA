@@ -5,7 +5,7 @@ interface AuthProps {
   onLogin: (user: any) => void;
 }
 
-const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000').replace(/\/$/, '');
 
 const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [formData, setFormData] = useState({ username: '', password: '' });
@@ -16,12 +16,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
-    if (!BACKEND_URL) {
-      setError('Backend URL belum dikonfigurasi. Isi VITE_BACKEND_URL di file .env frontend.');
-      setLoading(false);
-      return;
-    }
 
     try {
       const response = await fetch(`${BACKEND_URL}/api/auth/login`, {

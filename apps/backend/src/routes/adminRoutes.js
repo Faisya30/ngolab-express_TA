@@ -39,6 +39,7 @@ function mapRoleToProductType(rawRole) {
   const role = String(rawRole || '').toLowerCase();
   if (role === 'kiosk_admin') return 'kiosk';
   if (role === 'cv_admin') return 'cv';
+  if (role === 'super admin' || role === 'super_admin' || role === 'admin') return 'all';
   return null;
 }
 
@@ -129,39 +130,68 @@ router.get('/products', async (req, res) => {
     const usesCategoryCode = await hasColumn('products', 'category_code');
     const rows = usesCategoryCode
       ? await query(
-          `SELECT
-            code AS id,
-            name,
-            category_code AS category,
-            price,
-            COALESCE(image_url, '') AS image,
-            COALESCE(description, '') AS description,
-            product_type,
-            is_recommended AS isRecommended,
-            cashback_reward AS cashbackReward,
-            is_active AS isActive
-          FROM products
-          WHERE product_type = ?
-          ORDER BY created_at DESC`,
-          [requestProductType]
+          requestProductType === 'all'
+            ? `SELECT
+                code AS id,
+                name,
+                category_code AS category,
+                price,
+                COALESCE(image_url, '') AS image,
+                COALESCE(description, '') AS description,
+                product_type,
+                is_recommended AS isRecommended,
+                cashback_reward AS cashbackReward,
+                is_active AS isActive
+              FROM products
+              ORDER BY created_at DESC`
+            : `SELECT
+                code AS id,
+                name,
+                category_code AS category,
+                price,
+                COALESCE(image_url, '') AS image,
+                COALESCE(description, '') AS description,
+                product_type,
+                is_recommended AS isRecommended,
+                cashback_reward AS cashbackReward,
+                is_active AS isActive
+              FROM products
+              WHERE product_type = ?
+              ORDER BY created_at DESC`,
+          requestProductType === 'all' ? [] : [requestProductType]
         )
       : await query(
-          `SELECT
-            p.code AS id,
-            p.name,
-            COALESCE(c.code, '') AS category,
-            p.price,
-            COALESCE(p.image_url, '') AS image,
-            COALESCE(p.description, '') AS description,
-            p.product_type,
-            p.is_recommended AS isRecommended,
-            p.cashback_reward AS cashbackReward,
-            p.is_active AS isActive
-          FROM products p
-          LEFT JOIN categories c ON p.category_id = c.id
-          WHERE p.product_type = ?
-          ORDER BY p.created_at DESC`,
-          [requestProductType]
+          requestProductType === 'all'
+            ? `SELECT
+                p.code AS id,
+                p.name,
+                COALESCE(c.code, '') AS category,
+                p.price,
+                COALESCE(p.image_url, '') AS image,
+                COALESCE(p.description, '') AS description,
+                p.product_type,
+                p.is_recommended AS isRecommended,
+                p.cashback_reward AS cashbackReward,
+                p.is_active AS isActive
+              FROM products p
+              LEFT JOIN categories c ON p.category_id = c.id
+              ORDER BY p.created_at DESC`
+            : `SELECT
+                p.code AS id,
+                p.name,
+                COALESCE(c.code, '') AS category,
+                p.price,
+                COALESCE(p.image_url, '') AS image,
+                COALESCE(p.description, '') AS description,
+                p.product_type,
+                p.is_recommended AS isRecommended,
+                p.cashback_reward AS cashbackReward,
+                p.is_active AS isActive
+              FROM products p
+              LEFT JOIN categories c ON p.category_id = c.id
+              WHERE p.product_type = ?
+              ORDER BY p.created_at DESC`,
+          requestProductType === 'all' ? [] : [requestProductType]
         );
     res.json(rows);
   } catch (error) {
@@ -281,6 +311,9 @@ router.post('/products', async (req, res) => {
 
     const product = req.body?.product || req.body || {};
     const code = String(product.id || `PROD-${Date.now()}`);
+    const targetProductType = requestProductType === 'all'
+      ? String(product.product_type || product.productType || 'kiosk').toLowerCase()
+      : requestProductType;
 
     const usesCategoryCode = await hasColumn('products', 'category_code');
 
@@ -306,7 +339,7 @@ router.post('/products', async (req, res) => {
           Number(product.price || 0),
           String(product.image || ''),
           String(product.description || ''),
-          requestProductType,
+          targetProductType,
           product.isRecommended ? 1 : 0,
           Number(product.cashbackReward || 0),
         ]
@@ -338,7 +371,7 @@ router.post('/products', async (req, res) => {
           Number(product.price || 0),
           String(product.image || ''),
           String(product.description || ''),
-          requestProductType,
+          targetProductType,
           product.isRecommended ? 1 : 0,
           Number(product.cashbackReward || 0),
         ]
@@ -363,7 +396,11 @@ router.delete('/products/:id', async (req, res) => {
       return res.status(500).json({ success: false, error: 'Kolom product_type belum tersedia. Jalankan migrasi database terlebih dahulu.' });
     }
 
-    await query('DELETE FROM products WHERE code = ? AND product_type = ?', [req.params.id, requestProductType]);
+    if (requestProductType === 'all') {
+      await query('DELETE FROM products WHERE code = ?', [req.params.id]);
+    } else {
+      await query('DELETE FROM products WHERE code = ? AND product_type = ?', [req.params.id, requestProductType]);
+    }
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
