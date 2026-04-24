@@ -37,6 +37,8 @@ const CategoryManagement: React.FC<CategoryManagementProps> = ({ initialCategori
       if (result && result.success) {
         onUpdate();
         setConfirmDeleteId(null);
+      } else {
+        alert(result?.error || 'Gagal menghapus kategori.');
       }
     } finally {
       setIsDeleting(false);
@@ -59,6 +61,8 @@ const CategoryManagement: React.FC<CategoryManagementProps> = ({ initialCategori
         onUpdate();
         setIsModalOpen(false);
         setEditingCategory(null);
+      } else {
+        alert(result?.error || 'Gagal menyimpan kategori.');
       }
     } finally {
       setIsSaving(false);
