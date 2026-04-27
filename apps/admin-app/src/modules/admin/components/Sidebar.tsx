@@ -89,31 +89,33 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout }) => 
         </div>
       </div>
 
-      <nav className="flex-1 px-4 py-2 space-y-1 overflow-hidden">
-        <p className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] mb-1">Main Menu</p>
-        {menuItems.map((item) => {
-          const isActive = currentView === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setView(item.id)}
-              className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl transition-all duration-300 group ${
-                isActive
-                  ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20'
-                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-100'
-              }`}
-            >
-              <span className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110 opacity-70 group-hover:opacity-100'}`}>
-                {item.icon}
-              </span>
-              <span className={`font-semibold text-[13px] tracking-tight ${isActive ? 'translate-x-0.5' : 'group-hover:translate-x-0.5'} transition-transform`}>
-                {item.label}
-              </span>
-              {isActive && <div className="ml-auto w-1.5 h-1.5 bg-white/60 rounded-full animate-pulse" />}
-            </button>
-          );
-        })}
-      </nav>
+      <div className="sidebar-scroll flex-1 min-h-0 px-4 py-2 overflow-y-auto">
+        <nav className="space-y-1">
+          <p className="px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] mb-1">Main Menu</p>
+          {menuItems.map((item) => {
+            const isActive = currentView === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setView(item.id)}
+                className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl transition-all duration-300 group ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20'
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-100'
+                }`}
+              >
+                <span className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110 opacity-70 group-hover:opacity-100'}`}>
+                  {item.icon}
+                </span>
+                <span className={`font-semibold text-[13px] tracking-tight ${isActive ? 'translate-x-0.5' : 'group-hover:translate-x-0.5'} transition-transform`}>
+                  {item.label}
+                </span>
+                {isActive && <div className="ml-auto w-1.5 h-1.5 bg-white/60 rounded-full animate-pulse" />}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
 
       <div className="p-4 mt-auto shrink-0">
         <div className="bg-slate-800/30 rounded-2xl p-5 border border-slate-700/30">
@@ -136,6 +138,17 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout }) => 
         </div>
         <p className="mt-4 text-center text-[9px] text-slate-600 font-bold uppercase tracking-[0.2em]">v1.0.2 Stable</p>
       </div>
+
+      <style>{`
+        .sidebar-scroll::-webkit-scrollbar {
+          display: none;
+        }
+
+        .sidebar-scroll {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </aside>
   );
 };
