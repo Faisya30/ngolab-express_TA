@@ -68,7 +68,7 @@ const PaymentMethodScreen: React.FC<Props> = ({ total, member, onSelect, onBack 
             onClick={() => onSelect(PaymentMethod.QRIS)}
             className="flex-1 bg-white border-2 border-slate-100 rounded-[3rem] p-12 flex flex-col items-center gap-8 shadow-[0_20px_50px_rgba(0,0,0,0.03)] hover:shadow-[0_40px_80px_rgba(249,115,22,0.12)] hover:border-orange-500 transition-all duration-500 group active:scale-95"
           >
-            <div className="w-32 h-32 bg-slate-50 rounded-[2rem] flex items-center justify-center group-hover:bg-orange-500 group-hover:text-white text-slate-400 transition-all duration-500 p-6 shadow-inner">
+            <div className="w-32 h-32 bg-slate-50 rounded-4xl flex items-center justify-center group-hover:bg-orange-500 group-hover:text-white text-slate-400 transition-all duration-500 p-6 shadow-inner">
               <DetailedQRISIcon />
             </div>
             <div className="text-center">
@@ -82,7 +82,7 @@ const PaymentMethodScreen: React.FC<Props> = ({ total, member, onSelect, onBack 
             onClick={() => onSelect(PaymentMethod.CASH)}
             className="flex-1 bg-white border-2 border-slate-100 rounded-[3rem] p-12 flex flex-col items-center gap-8 shadow-[0_20px_50px_rgba(0,0,0,0.03)] hover:shadow-[0_40px_80px_rgba(16,185,129,0.12)] hover:border-emerald-500 transition-all duration-500 group active:scale-95"
           >
-            <div className="w-32 h-32 bg-slate-50 rounded-[2rem] flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white text-slate-400 transition-all duration-500 p-6 shadow-inner">
+            <div className="w-32 h-32 bg-slate-50 rounded-4xl flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white text-slate-400 transition-all duration-500 p-6 shadow-inner">
               <DetailedCashIcon />
             </div>
             <div className="text-center">

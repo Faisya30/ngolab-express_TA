@@ -159,7 +159,7 @@ const TransactionList: React.FC<Props> = ({ initialTransactions, allOrderDetails
       </div>
 
       {/* FILTER TABS */}
-      <div className="flex flex-wrap items-center gap-2 bg-slate-100/50 p-1.5 rounded-[1.5rem] w-fit border border-slate-200/50">
+      <div className="flex flex-wrap items-center gap-2 bg-slate-100/50 p-1.5 rounded-3xl w-fit border border-slate-200/50">
         <button 
           onClick={() => setActiveFilter('ALL')}
           className={`px-6 py-3 rounded-[1.1rem] text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3 ${activeFilter === 'ALL' ? 'bg-white text-slate-800 shadow-sm ring-1 ring-slate-200' : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'}`}
@@ -306,7 +306,7 @@ const TransactionList: React.FC<Props> = ({ initialTransactions, allOrderDetails
                    <span className="text-[10px] font-black text-blue-600 uppercase bg-blue-50 px-3 py-1 rounded-lg border border-blue-100">{currentDetails.length} Items</span>
                 </div>
                 
-                <div className="max-h-72 overflow-y-auto rounded-[2rem] border border-slate-100 custom-scrollbar">
+                <div className="max-h-72 overflow-y-auto rounded-4xl border border-slate-100 custom-scrollbar">
                   <table className="w-full text-left">
                     <thead className="sticky top-0 bg-white z-10 border-b border-slate-100 shadow-sm">
                       <tr className="bg-slate-50/50">
@@ -353,7 +353,7 @@ const TransactionList: React.FC<Props> = ({ initialTransactions, allOrderDetails
                      <p className="text-lg font-black text-rose-500 tracking-tight">-Rp {selectedTrx.discount.toLocaleString()}</p>
                    </div>
                 </div>
-                <div className="bg-slate-900 p-8 rounded-[2rem] text-center md:text-right shadow-xl shadow-slate-900/20">
+                <div className="bg-slate-900 p-8 rounded-4xl text-center md:text-right shadow-xl shadow-slate-900/20">
                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-2">Grand Total Dibayar</p>
                    <p className="text-4xl font-black text-white tracking-tighter">Rp {selectedTrx.total.toLocaleString()}</p>
                 </div>

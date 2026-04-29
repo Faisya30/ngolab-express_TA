@@ -161,7 +161,7 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
         <div>
           <h2 className="text-4xl font-black text-slate-800 tracking-tighter uppercase leading-none">Inventory <span className="text-blue-600">Master</span></h2>
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-2 flex items-center gap-2">
-            <span className="w-8 h-[1px] bg-slate-200"></span>
+            <span className="w-8 h-px bg-slate-200"></span>
             Kelola Produk & Menu Kiosk
           </p>
         </div>
@@ -308,7 +308,7 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
              {saveError && (
                <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex flex-col gap-3 animate-in fade-in slide-in-from-top-2">
                  <div className="flex items-center gap-3 text-rose-500">
-                   <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                   <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                    <p className="text-[11px] font-bold uppercase tracking-wider">{saveError}</p>
                  </div>
                  <button 
@@ -428,7 +428,7 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
 
                 <div className="flex gap-4 pt-4">
                    <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-5 bg-slate-100 rounded-3xl font-black text-slate-400 hover:bg-slate-200 transition-all uppercase tracking-widest text-[11px]">Batal</button>
-                   <button type="submit" disabled={isSaving} className="flex-[2] py-5 bg-blue-600 text-white rounded-3xl font-black shadow-2xl shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-[0.98] disabled:opacity-70 uppercase tracking-widest text-[11px] px-10">
+                   <button type="submit" disabled={isSaving} className="flex-2 py-5 bg-blue-600 text-white rounded-3xl font-black shadow-2xl shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-[0.98] disabled:opacity-70 uppercase tracking-widest text-[11px] px-10">
                      {isSaving ? 'Memproses...' : 'Simpan Data Produk'}
                    </button>
                 </div>

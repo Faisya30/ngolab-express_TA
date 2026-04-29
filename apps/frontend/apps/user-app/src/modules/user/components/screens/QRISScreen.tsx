@@ -55,7 +55,7 @@ const QRISScreen: React.FC<Props> = ({ total, onComplete, onBack }) => {
         </div>
 
         {/* BOX GAMBAR QRIS (Tempat Menempelkan Foto QRIS) */}
-          <div className="w-full aspect-square bg-white rounded-[2rem] p-3 shadow-inner border-2 border-slate-50 relative group mb-5 md:mb-6">
+          <div className="w-full aspect-square bg-white rounded-4xl p-3 shadow-inner border-2 border-slate-50 relative group mb-5 md:mb-6">
             <div className="w-full h-full rounded-[1.4rem] overflow-hidden border-2 border-orange-500/20 p-3 flex items-center justify-center bg-white relative">
               {/* 
                   ANDA DAPAT MENGGANTI URL DI BAWAH INI DENGAN PATH FOTO QRIS ANDA 
@@ -79,7 +79,7 @@ const QRISScreen: React.FC<Props> = ({ total, onComplete, onBack }) => {
         </div>
 
         {/* Info Total Tagihan */}
-          <div className="w-full bg-slate-50 rounded-[1.5rem] p-4 md:p-5 mb-5 md:mb-6 border border-slate-100 flex items-center justify-between">
+          <div className="w-full bg-slate-50 rounded-3xl p-4 md:p-5 mb-5 md:mb-6 border border-slate-100 flex items-center justify-between">
            <div className="text-left">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Tagihan</p>
               <p className="text-2xl md:text-3xl font-black text-slate-900 tracking-tighter">Rp {total.toLocaleString('id-ID')}</p>

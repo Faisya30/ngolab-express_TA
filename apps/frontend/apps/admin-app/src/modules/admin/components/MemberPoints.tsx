@@ -2,6 +2,13 @@
 import React, { useMemo, useState } from 'react';
 import { Member } from '../../../types';
 
+type NormalizedMember = {
+  code: string;
+  name: string;
+  points: number;
+  isAffiliate: boolean;
+};
+
 interface Props {
   members: Member[];
   rawLogs: any[];
@@ -46,7 +53,7 @@ const MemberPoints: React.FC<Props> = ({ members, rawLogs, onRefresh }) => {
   };
 
   // 1. Memproses Data Member (Master Saldo dari sheet 'Members')
-  const normalizedMembers = useMemo(() => {
+  const normalizedMembers = useMemo<NormalizedMember[]>(() => {
     if (!members || members.length === 0) return [];
     
     return members.map(m => {
@@ -61,7 +68,7 @@ const MemberPoints: React.FC<Props> = ({ members, rawLogs, onRefresh }) => {
         isAffiliate: String(getValue(m, ['isaffiliate'], 'd')).toLowerCase() === 'true' || 
                      String(getValue(m, ['isaffiliate'], 'd')).toLowerCase() === 'yes'
       };
-    }).filter(m => m !== null && m.code !== '');
+    }).filter((m): m is NormalizedMember => m !== null && m.code !== '');
   }, [members]);
 
   // 2. Memproses Riwayat (Log dari sheet 'MemberLog')
@@ -84,7 +91,7 @@ const MemberPoints: React.FC<Props> = ({ members, rawLogs, onRefresh }) => {
         <div>
           <h2 className="text-4xl font-black text-slate-800 tracking-tighter uppercase leading-none">Database <span className="text-blue-600">Member</span></h2>
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-2 flex items-center gap-2">
-            <span className="w-8 h-[1px] bg-slate-200"></span>
+            <span className="w-8 h-px bg-slate-200"></span>
             Poin & Loyalitas Terminal
           </p>
         </div>

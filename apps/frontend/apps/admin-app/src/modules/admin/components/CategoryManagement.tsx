@@ -88,7 +88,7 @@ const CategoryManagement: React.FC<CategoryManagementProps> = ({ initialCategori
         <div>
           <h2 className="text-4xl font-black text-slate-800 tracking-tighter uppercase leading-none">Category <span className="text-blue-600">Hub</span></h2>
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-2 flex items-center gap-2">
-            <span className="w-8 h-[1px] bg-slate-200"></span>
+            <span className="w-8 h-px bg-slate-200"></span>
             Struktur Menu Terminal
           </p>
         </div>
@@ -126,10 +126,10 @@ const CategoryManagement: React.FC<CategoryManagementProps> = ({ initialCategori
           filteredCategories.map((cat) => (
             <div key={cat.id} className="group bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-blue-600/5 transition-all duration-500 relative overflow-hidden">
               {/* Background Decor */}
-              <div className={`absolute -top-12 -right-12 w-32 h-32 bg-gradient-to-br ${getGradient(cat.name)} opacity-[0.03] rounded-full group-hover:scale-150 transition-transform duration-700`}></div>
+              <div className={`absolute -top-12 -right-12 w-32 h-32 bg-linear-to-br ${getGradient(cat.name)} opacity-[0.03] rounded-full group-hover:scale-150 transition-transform duration-700`}></div>
               
               <div className="flex items-start justify-between relative z-10">
-                <div className={`w-14 h-14 bg-gradient-to-br ${getGradient(cat.name)} rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-600/10`}>
+                <div className={`w-14 h-14 bg-linear-to-br ${getGradient(cat.name)} rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-600/10`}>
                   {cat.name.charAt(0)}
                 </div>
                 
@@ -198,7 +198,7 @@ const CategoryManagement: React.FC<CategoryManagementProps> = ({ initialCategori
                   required 
                   autoFocus
                   defaultValue={editingCategory?.name} 
-                  className="w-full px-8 py-5 bg-slate-50 border-none rounded-[1.5rem] focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-black text-slate-800 text-base uppercase tracking-widest placeholder:text-slate-200" 
+                  className="w-full px-8 py-5 bg-slate-50 border-none rounded-3xl focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-black text-slate-800 text-base uppercase tracking-widest placeholder:text-slate-200" 
                   placeholder="MISALNYA: MINUMAN"
                 />
               </div>
@@ -207,14 +207,14 @@ const CategoryManagement: React.FC<CategoryManagementProps> = ({ initialCategori
                 <button 
                   type="button" 
                   onClick={() => setIsModalOpen(false)} 
-                  className="flex-1 py-5 bg-slate-100 rounded-[1.5rem] font-black text-slate-400 hover:bg-slate-200 transition-all uppercase tracking-widest text-[11px]"
+                  className="flex-1 py-5 bg-slate-100 rounded-3xl font-black text-slate-400 hover:bg-slate-200 transition-all uppercase tracking-widest text-[11px]"
                 >
                   Batal
                 </button>
                 <button 
                   type="submit" 
                   disabled={isSaving} 
-                  className="flex-2 py-5 bg-blue-600 text-white rounded-[1.5rem] font-black shadow-2xl shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-[0.98] disabled:opacity-70 uppercase tracking-widest text-[11px] px-10"
+                  className="flex-2 py-5 bg-blue-600 text-white rounded-3xl font-black shadow-2xl shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-[0.98] disabled:opacity-70 uppercase tracking-widest text-[11px] px-10"
                 >
                   {isSaving ? 'Tunggu...' : 'Simpan Kategori'}
                 </button>

@@ -27,17 +27,17 @@ const WelcomeScreen: React.FC<Props> = ({ onStart = () => {} }) => {
             className="w-full h-full object-cover animate-ken-burns scale-110"
             alt="Premium Bakso Express Poster"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-slate-950/90" />
+          <div className="absolute inset-0 bg-linear-to-t from-slate-950 via-slate-950/50 to-slate-950/90" />
         </div>
       </div>
 
       <div className="relative z-20 w-full pt-10 flex flex-col items-center shrink-0">
         <div className="flex items-center gap-3 mb-2">
-          <div className="h-[1px] w-6 bg-orange-500" />
+          <div className="h-px w-6 bg-orange-500" />
           <span className="text-orange-500 font-black text-[10px] tracking-[0.6em] uppercase">
             NGOLAB EXPRESS
           </span>
-          <div className="h-[1px] w-6 bg-orange-500" />
+          <div className="h-px w-6 bg-orange-500" />
         </div>
         <p className="text-white/40 text-[9px] font-bold uppercase tracking-[0.3em]">Autentik Malang • Mie Yamin Spesial</p>
       </div>
@@ -64,7 +64,7 @@ const WelcomeScreen: React.FC<Props> = ({ onStart = () => {} }) => {
       </div>
 
       <div className="relative z-30 w-full max-w-4xl pb-10 px-8 flex flex-col items-center shrink-0">
-        <div className="w-full bg-white rounded-[2rem] p-2.5 flex items-center justify-between shadow-2xl border border-white/10 group active:scale-[0.99] transition-all duration-300">
+        <div className="w-full bg-white rounded-4xl p-2.5 flex items-center justify-between shadow-2xl border border-white/10 group active:scale-[0.99] transition-all duration-300">
           <div className="flex items-center gap-5 pl-5">
             <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transition-transform group-hover:scale-105 shrink-0">
                <img
@@ -75,7 +75,7 @@ const WelcomeScreen: React.FC<Props> = ({ onStart = () => {} }) => {
             </div>
             <div className="flex flex-col">
               <h2 className="text-xl md:text-2xl font-black text-slate-950 tracking-tight uppercase leading-none">SENTUH UNTUK MEMESAN</h2>
-              <p className="text-slate-400 text-[9px] font-bold tracking-[0.1em] uppercase mt-1.5">Dapatkan Poin & Cashback Di Setiap Pesanan</p>
+              <p className="text-slate-400 text-[9px] font-bold tracking-widest uppercase mt-1.5">Dapatkan Poin & Cashback Di Setiap Pesanan</p>
             </div>
           </div>
 

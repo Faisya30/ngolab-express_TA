@@ -124,7 +124,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout }) => 
               <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
               <div className="absolute inset-0 bg-emerald-500 rounded-full animate-ping opacity-25" />
             </div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">System Active</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">System Active</p>
           </div>
           <button
             onClick={onLogout}

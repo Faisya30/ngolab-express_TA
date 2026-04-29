@@ -217,7 +217,7 @@ export default function App() {
             <span className="text-xl font-bold text-white tracking-tight text-nowrap">Ngolab Express</span>
           </div>
           
-          <div className="h-6 w-[1px] bg-slate-700 hidden sm:block" />
+          <div className="h-6 w-px bg-slate-700 hidden sm:block" />
           
           <h1 className="text-sm font-medium text-slate-400 hidden lg:block">
             Super Admin Dashboard
@@ -240,7 +240,7 @@ export default function App() {
               <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-slate-900" />
             </button>
             <div className="flex items-center gap-3 pl-3 border-l border-slate-800">
-              <div className="flex flex-col items-end hidden sm:flex">
+              <div className="flex flex-col items-end">
                 <span className="text-xs font-bold text-white uppercase">{username}</span>
                 <span className="text-[10px] text-slate-500">Super Admin</span>
               </div>
@@ -297,7 +297,7 @@ export default function App() {
                         onClick={(e) => e.stopPropagation()}
                         className="ml-2 p-1 bg-emerald-500 hover:bg-emerald-400 text-white rounded-md transition-colors flex items-center gap-1 text-[10px] animate-in fade-in slide-in-from-left-1"
                       >
-                        <ChevronRight size={10} className="stroke-[3]" />
+                        <ChevronRight size={10} className="stroke-3" />
                         <span className="font-bold uppercase tracking-tighter">Admin</span>
                       </a>
                     )}

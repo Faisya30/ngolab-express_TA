@@ -73,7 +73,7 @@ const MemberBenefitsScreen: React.FC<Props> = ({ member, cart, vouchers, onSelec
                   <div 
                     key={v.id} 
                     onClick={() => onSelectVoucher(v)}
-                    className="bg-white rounded-[1.5rem] border-2 border-slate-100 shadow-sm relative overflow-visible group cursor-pointer hover:border-orange-500 hover:shadow-lg transition-all active:scale-[0.99]"
+                    className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm relative overflow-visible group cursor-pointer hover:border-orange-500 hover:shadow-lg transition-all active:scale-[0.99]"
                   >
                     {/* Efek Gerigi Khas Voucher */}
                     <div className="absolute left-0 top-[68%] -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-[#F8FAFC] rounded-full border-2 border-slate-100 z-10" />
@@ -124,7 +124,7 @@ const MemberBenefitsScreen: React.FC<Props> = ({ member, cart, vouchers, onSelec
 
       <footer className="p-10 bg-white border-t border-slate-100 sticky bottom-0 z-40">
          <div className="max-w-4xl mx-auto">
-            <button onClick={onContinue} className="w-full bg-slate-900 text-white py-8 rounded-[2rem] text-xl font-black shadow-xl transition active:scale-95 uppercase tracking-widest hover:bg-black">
+            <button onClick={onContinue} className="w-full bg-slate-900 text-white py-8 rounded-4xl text-xl font-black shadow-xl transition active:scale-95 uppercase tracking-widest hover:bg-black">
                 Lanjut Tanpa Voucher
             </button>
          </div>

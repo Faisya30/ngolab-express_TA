@@ -291,7 +291,7 @@ const HandTracking = ({ onLandmarks }) => {
   }, [onLandmarks]);
 
   return (
-    <div className="fixed top-4 left-4 z-[10000] w-[300px] rounded-2xl border border-white/20 bg-slate-900/85 backdrop-blur-md p-3 shadow-2xl">
+    <div className="fixed top-4 left-4 z-10000 w-[300px] rounded-2xl border border-white/20 bg-slate-900/85 backdrop-blur-md p-3 shadow-2xl">
       <div className="mb-2 flex items-center justify-between">
         <p className="text-[10px] uppercase tracking-wider text-white/80">Hand Tracking</p>
         <span className="text-[9px] text-emerald-300">{status}</span>

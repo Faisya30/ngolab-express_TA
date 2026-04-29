@@ -35,7 +35,7 @@ const CashScreen: React.FC<Props> = ({ onComplete, onBack }) => {
 
         <button 
           onClick={onComplete}
-          className="w-full bg-slate-800 dark:bg-amber-400 text-white dark:text-black py-4 md:py-5 rounded-[2rem] text-lg md:text-xl font-black shadow-xl transition active:scale-95 uppercase tracking-widest"
+          className="w-full bg-slate-800 dark:bg-amber-400 text-white dark:text-black py-4 md:py-5 rounded-4xl text-lg md:text-xl font-black shadow-xl transition active:scale-95 uppercase tracking-widest"
         >
           Konfirmasi & Cetak Struk
         </button>

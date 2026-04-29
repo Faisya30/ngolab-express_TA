@@ -48,7 +48,7 @@ const VoucherManagement: React.FC<Props> = ({ initialVouchers, onUpdate }) => {
         </div>
         <button 
           onClick={() => { setEditingVoucher(null); setIsModalOpen(true); }} 
-          className="px-8 py-4 bg-blue-600 text-white rounded-[1.5rem] font-black shadow-2xl shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 text-xs uppercase tracking-widest flex items-center gap-3"
+          className="px-8 py-4 bg-blue-600 text-white rounded-3xl font-black shadow-2xl shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 text-xs uppercase tracking-widest flex items-center gap-3"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
           Create New Voucher

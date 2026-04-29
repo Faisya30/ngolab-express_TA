@@ -44,7 +44,7 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack }) => {
     <div className="w-full h-full bg-black flex flex-col items-center justify-center relative overflow-hidden">
       {/* Background Decor */}
       <div className="absolute inset-0 z-0">
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-orange-600/10 via-transparent to-transparent" />
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-orange-600/10 via-transparent to-transparent" />
       </div>
 
       <button 
@@ -75,7 +75,7 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack }) => {
 
           {/* Scanner Overlay UI */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-64 h-64 border-2 border-orange-500/30 rounded-[2rem] relative">
+            <div className="w-64 h-64 border-2 border-orange-500/30 rounded-4xl relative">
               <div className="absolute -top-1 -left-1 w-12 h-12 border-t-8 border-l-8 border-orange-500 rounded-tl-2xl" />
               <div className="absolute -top-1 -right-1 w-12 h-12 border-t-8 border-r-8 border-orange-500 rounded-tr-2xl" />
               <div className="absolute -bottom-1 -left-1 w-12 h-12 border-b-8 border-l-8 border-orange-500 rounded-bl-2xl" />
