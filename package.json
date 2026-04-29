@@ -3,21 +3,21 @@
   "private": true,
   "version": "1.0.0",
   "workspaces": [
-    "apps/admin-app",
-    "apps/user-app",
+    "apps/frontend/apps/admin-app",
+    "apps/frontend/apps/user-app",
     "apps/shared-lib",
     "apps/backend"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --prefix apps/backend\" \"npm run dev --prefix apps/admin-app\" \"npm run dev --prefix apps/user-app\"",
-    "dev:admin": "npm run dev --prefix apps/admin-app",
-    "dev:user": "npm run dev --prefix apps/user-app",
+    "dev": "concurrently \"npm run dev --prefix apps/backend\" \"npm run dev --prefix apps/frontend/apps/admin-app\" \"npm run dev --prefix apps/frontend/apps/user-app\"",
+    "dev:admin": "npm run dev --prefix apps/frontend/apps/admin-app",
+    "dev:user": "npm run dev --prefix apps/frontend/apps/user-app",
     "dev:backend": "npm run dev --prefix apps/backend",
-    "build": "npm run build --prefix apps/admin-app && npm run build --prefix apps/user-app",
-    "preview:admin": "npm run preview --prefix apps/admin-app",
-    "preview:user": "npm run preview --prefix apps/user-app",
-    "lint": "npm run lint --prefix apps/admin-app && npm run lint --prefix apps/user-app"
-  },
+    "build": "npm run build --prefix apps/frontend/apps/admin-app && npm run build --prefix apps/frontend/apps/user-app",
+    "preview:admin": "npm run preview --prefix apps/frontend/apps/admin-app",
+    "preview:user": "npm run preview --prefix apps/frontend/apps/user-app",
+    "lint": "npm run lint --prefix apps/frontend/apps/admin-app && npm run lint --prefix apps/frontend/apps/user-app"
+  }, 
   "devDependencies": {
     "concurrently": "^9.1.2"
   }

@@ -2,8 +2,8 @@
 
 Struktur project sekarang dipisah menjadi beberapa aplikasi yang saling terhubung:
 
-- `apps/admin-app` untuk Vite + React (Super Admin Dashboard)
-- `apps/user-app` untuk Vite + React (User Kiosk)
+- `apps/frontend/apps/admin-app` untuk Vite + React (Super Admin Dashboard)
+- `apps/frontend/apps/user-app` untuk Vite + React (User Kiosk)
 - `apps/shared-lib` untuk service dan konstanta yang dipakai bersama
 - `apps/backend` untuk Node.js + Express API
 
@@ -12,8 +12,10 @@ Struktur project sekarang dipisah menjadi beberapa aplikasi yang saling terhubun
 ```txt
 ngolab-express/
 ├─ apps/
-│  ├─ admin-app/
-│  ├─ user-app/
+│  ├─ frontend/
+│  │  └─ apps/
+│  │     ├─ admin-app/
+│  │     └─ user-app/
 │  ├─ shared-lib/
 │  └─ backend/
 ├─ package.json
@@ -29,11 +31,11 @@ ngolab-express/
 ## Setup
 
 1. Install dependency frontend:
-   - `npm install --prefix apps/admin-app`
-   - `npm install --prefix apps/user-app`
+  - `npm install --prefix apps/frontend/apps/admin-app`
+  - `npm install --prefix apps/frontend/apps/user-app`
 2. Install dependency backend:
    - `npm install --prefix apps/backend`
-3. Buat atau cek env frontend di `apps/admin-app/.env` dan `apps/user-app/.env`:
+3. Buat atau cek env frontend di `apps/frontend/apps/admin-app/.env` dan `apps/frontend/apps/user-app/.env`:
    - `VITE_BACKEND_URL=http://localhost:4000`
 4. Buat atau cek env backend di `apps/backend/.env`:
    - `PORT=4000`

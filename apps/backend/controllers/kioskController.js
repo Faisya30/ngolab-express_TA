@@ -73,9 +73,11 @@ function buildOrderCode(rawOrderId) {
 export async function init(req, res) {
 	try {
 		const usesCategoryCode = await hasColumn('products', 'category_code');
-		const products = usesCategoryCode
-			? await query(
-					`SELECT
+		const hasProductType = await hasColumn('products', 'product_type');
+
+		let productsQuery;
+		if (usesCategoryCode) {
+			productsQuery = `SELECT
 						p.code AS id,
 						p.code,
 						p.name,
@@ -87,11 +89,10 @@ export async function init(req, res) {
 						p.cashback_reward AS cashbackReward,
 						p.is_active AS isActive
 					FROM products p
-					WHERE p.is_active = 1
-					ORDER BY p.created_at DESC`
-				)
-			: await query(
-					`SELECT
+					WHERE p.is_active = 1 ${hasProductType ? "AND (p.product_type = 'kiosk' OR p.product_type IS NULL)" : ''}
+					ORDER BY p.created_at DESC`;
+		} else {
+			productsQuery = `SELECT
 						p.code AS id,
 						p.code,
 						p.name,
@@ -104,19 +105,26 @@ export async function init(req, res) {
 						p.is_active AS isActive
 					FROM products p
 					LEFT JOIN categories c ON p.category_id = c.id
-					WHERE p.is_active = 1
-					ORDER BY p.created_at DESC`
-				);
+					WHERE p.is_active = 1 ${hasProductType ? "AND (p.product_type = 'kiosk' OR p.product_type IS NULL)" : ''}
+					ORDER BY p.created_at DESC`;
+		}
 
-		const categories = await query(
-			`SELECT
+		const products = await query(productsQuery);
+
+		let categoriesQuery = `SELECT
 				code AS id,
 				name,
 				is_active AS isActive
 			FROM categories
-			WHERE is_active = 1
-			ORDER BY created_at ASC`
-		);
+			WHERE is_active = 1`;
+		
+		if (hasProductType) {
+			categoriesQuery += ` AND (product_type = 'kiosk' OR product_type = 'all')`;
+		}
+		
+		categoriesQuery += ` ORDER BY created_at ASC`;
+		
+		const categories = await query(categoriesQuery);
 
 		const hasVoucherActiveWindow = await hasColumn('vouchers', 'start_at');
 		const vouchers = hasVoucherActiveWindow

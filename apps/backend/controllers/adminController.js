@@ -45,37 +45,106 @@ function resolveRequestProductType(req) {
   return mapRoleToProductType(req.headers['x-admin-role']);
 }
 
-export async function getOrders(_req, res) {
+function resolveCategoryProductType(requestProductType, categoryValue) {
+  const raw = String(categoryValue || '').trim().toLowerCase();
+
+  if (raw === 'cv' || raw === 'kiosk' || raw === 'all') {
+    return raw;
+  }
+
+  if (requestProductType === 'cv' || requestProductType === 'kiosk') {
+    return requestProductType;
+  }
+
+  return 'all';
+}
+
+export async function getOrders(req, res) {
   try {
+    // Validasi role admin dan dapatkan product_type-nya
+    const requestProductType = resolveRequestProductType(req);
+    if (!requestProductType) {
+      return res.status(403).json({ success: false, error: 'Role admin tidak diizinkan mengakses orders.' });
+    }
+
     const usesMemberCode = await hasColumn('orders', 'member_code');
-    const rows = usesMemberCode
-      ? await query(
-          `SELECT
-            order_code AS orderId,
-            created_at AS timestamp,
-            service_type AS service,
-            subtotal,
-            discount,
-            total,
-            payment_method AS payment,
-            COALESCE(member_code, 'Guest') AS member
-          FROM orders
-          ORDER BY created_at DESC`
-        )
-      : await query(
-          `SELECT
-            o.order_code AS orderId,
-            o.created_at AS timestamp,
-            o.service_type AS service,
-            o.subtotal,
-            o.discount,
-            o.total,
-            o.payment_method AS payment,
-            COALESCE(m.code, 'Guest') AS member
-          FROM orders o
-          LEFT JOIN members m ON o.member_id = m.id
-          ORDER BY o.created_at DESC`
-        );
+    const hasProductType = await hasColumn('products', 'product_type');
+    
+    // Jika product_type belum ada di products, assume semua orders adalah kiosk (legacy mode)
+    if (!hasProductType) {
+      const rows = usesMemberCode
+        ? await query(
+            `SELECT
+              order_code AS orderId,
+              created_at AS timestamp,
+              service_type AS service,
+              subtotal,
+              discount,
+              total,
+              payment_method AS payment,
+              COALESCE(member_code, 'Guest') AS member
+            FROM orders
+            ORDER BY created_at DESC`
+          )
+        : await query(
+            `SELECT
+              o.order_code AS orderId,
+              o.created_at AS timestamp,
+              o.service_type AS service,
+              o.subtotal,
+              o.discount,
+              o.total,
+              o.payment_method AS payment,
+              COALESCE(m.code, 'Guest') AS member
+            FROM orders o
+            LEFT JOIN members m ON o.member_id = m.id
+            ORDER BY o.created_at DESC`
+          );
+      return res.json(rows);
+    }
+
+    // Filter orders berdasarkan product_type dari order items
+    // Super admin (requestProductType='all') melihat semua orders
+    const filterClause = requestProductType === 'all' 
+      ? '' 
+      : `WHERE p.product_type = '${requestProductType}'`;
+
+    // Cek struktur order_items - bisa punya order_code atau order_id, product_code atau product_id
+    const hasOrderItemsOrderCode = await hasColumn('order_items', 'order_code');
+    const hasOrderItemsProductCode = await hasColumn('order_items', 'product_code');
+    
+    let joinClause1, joinClause2, selectProductJoin;
+    
+    if (hasOrderItemsOrderCode) {
+      joinClause1 = 'o.order_code = oi.order_code';
+    } else {
+      joinClause1 = 'o.id = oi.order_id';
+    }
+    
+    if (hasOrderItemsProductCode) {
+      joinClause2 = 'oi.product_code = p.code';
+    } else {
+      joinClause2 = 'oi.product_id = p.id';
+    }
+
+    const rows = await query(
+      `SELECT DISTINCT
+        o.order_code AS orderId,
+        o.created_at AS timestamp,
+        o.service_type AS service,
+        o.subtotal,
+        o.discount,
+        o.total,
+        o.payment_method AS payment,
+        COALESCE(${usesMemberCode ? 'o.member_code' : 'm.code'}, 'Guest') AS member
+      FROM orders o
+      LEFT JOIN order_items oi ON ${joinClause1}
+      LEFT JOIN products p ON ${joinClause2}
+      ${usesMemberCode ? '' : 'LEFT JOIN members m ON o.member_id = m.id'}
+      ${filterClause}
+      ORDER BY o.created_at DESC`
+    );
+
     res.json(rows);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -197,16 +266,39 @@ export async function getProducts(req, res) {
   }
 }
 
-export async function getCategories(_req, res) {
+export async function getCategories(req, res) {
   try {
-    const rows = await query(
-      `SELECT
-        code AS id,
-        name,
-        is_active AS isActive
-      FROM categories
-      ORDER BY created_at ASC`
-    );
+    const hasCategoryType = await hasColumn('categories', 'product_type');
+    const requestProductType = resolveRequestProductType(req);
+
+    const rows = hasCategoryType
+      ? await query(
+          requestProductType === 'all'
+            ? `SELECT
+                code AS id,
+                name,
+                COALESCE(product_type, 'all') AS productType,
+                is_active AS isActive
+              FROM categories
+              ORDER BY created_at ASC`
+            : `SELECT
+                code AS id,
+                name,
+                COALESCE(product_type, 'all') AS productType,
+                is_active AS isActive
+              FROM categories
+              WHERE product_type IN (?, 'all')
+              ORDER BY created_at ASC`,
+          requestProductType === 'all' ? [] : [requestProductType]
+        )
+      : await query(
+          `SELECT
+            code AS id,
+            name,
+            is_active AS isActive
+          FROM categories
+          ORDER BY created_at ASC`
+        );
     res.json(rows);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -313,6 +405,25 @@ export async function saveProduct(req, res) {
       ? String(product.product_type || product.productType || 'kiosk').toLowerCase()
       : requestProductType;
 
+    const hasCategoryType = await hasColumn('categories', 'product_type');
+    if (hasCategoryType) {
+      const categoryTypeRows = await query(
+        `SELECT COALESCE(product_type, 'all') AS productType
+        FROM categories
+        WHERE code = ?
+        LIMIT 1`,
+        [String(product.category || 'recommended')]
+      );
+      const categoryProductType = String(categoryTypeRows[0]?.productType || 'all').toLowerCase();
+
+      if (categoryProductType !== 'all' && categoryProductType !== targetProductType) {
+        return res.status(400).json({
+          success: false,
+          error: 'Kategori tidak bisa dipakai untuk scope produk ini.',
+        });
+      }
+    }
+
     const usesCategoryCode = await hasColumn('products', 'category_code');
 
     if (usesCategoryCode) {
@@ -409,15 +520,41 @@ export async function saveCategory(req, res) {
   try {
     const category = req.body?.category || req.body || {};
     const code = String(category.id || `CAT-${Date.now()}`);
+    const requestProductType = resolveRequestProductType(req);
+    const hasCategoryType = await hasColumn('categories', 'product_type');
+    const targetCategoryType = resolveCategoryProductType(requestProductType, category.product_type || category.productType);
 
-    await query(
-      `INSERT INTO categories (code, name, is_active)
-      VALUES (?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        name = VALUES(name),
-        is_active = VALUES(is_active)`,
-      [code, String(category.name || '').toUpperCase(), category.isActive === false ? 0 : 1]
-    );
+    if (!requestProductType) {
+      return res.status(403).json({ success: false, error: 'Role admin tidak diizinkan menyimpan kategori.' });
+    }
+
+    if (hasCategoryType && requestProductType !== 'all' && targetCategoryType !== requestProductType) {
+      return res.status(403).json({
+        success: false,
+        error: 'Role admin hanya boleh menyimpan kategori sesuai scope produknya.',
+      });
+    }
+
+    if (hasCategoryType) {
+      await query(
+        `INSERT INTO categories (code, name, product_type, is_active)
+        VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          name = VALUES(name),
+          product_type = VALUES(product_type),
+          is_active = VALUES(is_active)`,
+        [code, String(category.name || '').toUpperCase(), targetCategoryType, category.isActive === false ? 0 : 1]
+      );
+    } else {
+      await query(
+        `INSERT INTO categories (code, name, is_active)
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          name = VALUES(name),
+          is_active = VALUES(is_active)`,
+        [code, String(category.name || '').toUpperCase(), category.isActive === false ? 0 : 1]
+      );
+    }
 
     res.json({ success: true, id: code });
   } catch (error) {

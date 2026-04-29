@@ -77,6 +77,44 @@ async function resolveVoucherCode(connection, rawVoucherCode, rawVoucherId) {
   return rows[0]?.code || null;
 }
 
+async function resolveCvCategoryCode(rawCategory) {
+  const categoryValue = String(rawCategory || '').trim();
+  if (!categoryValue) return null;
+
+  const hasCategoryType = await hasColumn('categories', 'product_type');
+  if (hasCategoryType) {
+    const rows = await query(
+      `SELECT
+        code,
+        COALESCE(product_type, 'all') AS productType
+      FROM categories
+      WHERE code = ? OR LOWER(name) = LOWER(?)
+      LIMIT 1`,
+      [categoryValue, categoryValue]
+    );
+
+    const category = rows[0];
+    if (!category) return null;
+
+    const categoryType = String(category.productType || 'all').toLowerCase();
+    if (categoryType !== 'cv' && categoryType !== 'all') {
+      return null;
+    }
+
+    return String(category.code || '').trim() || null;
+  }
+
+  const rows = await query(
+    `SELECT code
+    FROM categories
+    WHERE code = ? OR LOWER(name) = LOWER(?)
+    LIMIT 1`,
+    [categoryValue, categoryValue]
+  );
+
+  return rows[0]?.code ?? null;
+}
+
 export async function getCvProducts(req, res) {
   try {
     const hasProductType = await hasColumn('products', 'product_type');
@@ -137,6 +175,156 @@ export async function getCvProducts(req, res) {
     );
 
     return res.json({ success: true, products: rows });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+export async function getCvCategories(_req, res) {
+  try {
+    const hasCategoryType = await hasColumn('categories', 'product_type');
+
+    const rows = hasCategoryType
+      ? await query(
+          `SELECT
+            code AS id,
+            name,
+            COALESCE(product_type, 'all') AS productType,
+            is_active AS isActive
+          FROM categories
+          WHERE is_active = 1
+            AND product_type IN ('cv', 'all')
+          ORDER BY created_at ASC`
+        )
+      : await query(
+          `SELECT
+            code AS id,
+            name,
+            is_active AS isActive
+          FROM categories
+          WHERE is_active = 1
+          ORDER BY created_at ASC`
+        );
+
+    return res.json({ success: true, categories: rows });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+export async function saveCvProduct(req, res) {
+  try {
+    const hasProductType = await hasColumn('products', 'product_type');
+    if (!hasProductType) {
+      return res.status(500).json({ success: false, error: 'Kolom product_type belum tersedia. Jalankan migrasi database.' });
+    }
+
+    const product = req.body?.product || req.body || {};
+    const code = String(req.params.id || product.id || product.code || `PROD-${Date.now()}`).trim();
+    if (!code) {
+      return res.status(400).json({ success: false, error: 'Kode produk wajib diisi.' });
+    }
+
+    const name = String(product.name || '').trim();
+    if (!name) {
+      return res.status(400).json({ success: false, error: 'Nama produk tidak boleh kosong.' });
+    }
+
+    const categoryInput = product.category_code || product.category || 'retail';
+    const categoryCode = await resolveCvCategoryCode(categoryInput);
+    if (!categoryCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'Kategori tidak valid atau bukan scope CV. Gunakan kategori Retail atau kategori CV lain yang diizinkan.',
+      });
+    }
+
+    const usesCategoryCode = await hasColumn('products', 'category_code');
+    const hasBarcode = await hasColumn('products', 'barcode');
+    const isActiveValue = product.isActive === false || product.is_active === false ? 0 : 1;
+    const barcodeValue = String(product.barcode || '').trim();
+
+    const columns = ['code', 'name'];
+    const values = [code, name];
+    const updates = ['name = VALUES(name)'];
+
+    if (usesCategoryCode) {
+      columns.push('category_code');
+      values.push(categoryCode);
+      updates.push('category_code = VALUES(category_code)');
+    } else {
+      const categoryIdRows = await query(
+        `SELECT id FROM categories WHERE code = ? LIMIT 1`,
+        [categoryCode]
+      );
+      const categoryId = categoryIdRows[0]?.id ?? null;
+      if (!categoryId) {
+        return res.status(400).json({ success: false, error: 'Kategori CV tidak ditemukan di database.' });
+      }
+
+      columns.push('category_id');
+      values.push(Number(categoryId));
+      updates.push('category_id = VALUES(category_id)');
+    }
+
+    columns.push('price', 'image_url', 'description', 'product_type', 'is_recommended', 'cashback_reward', 'is_active');
+    values.push(
+      Number(product.price || 0),
+      String(product.image || product.image_url || ''),
+      String(product.description || ''),
+      'cv',
+      product.isRecommended ? 1 : 0,
+      Number(product.cashbackReward || 0),
+      isActiveValue
+    );
+    updates.push(
+      'price = VALUES(price)',
+      'image_url = VALUES(image_url)',
+      'description = VALUES(description)',
+      'product_type = VALUES(product_type)',
+      'is_recommended = VALUES(is_recommended)',
+      'cashback_reward = VALUES(cashback_reward)',
+      'is_active = VALUES(is_active)'
+    );
+
+    if (hasBarcode) {
+      columns.splice(4, 0, 'barcode');
+      values.splice(4, 0, barcodeValue || null);
+      updates.push('barcode = VALUES(barcode)');
+    }
+
+    const placeholders = columns.map(() => '?').join(', ');
+    const result = await query(
+      `INSERT INTO products (${columns.join(', ')})
+      VALUES (${placeholders})
+      ON DUPLICATE KEY UPDATE ${updates.join(', ')}`,
+      values
+    );
+
+    return res.json({ success: true, id: code, affectedRows: result.affectedRows ?? 1 });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+export async function deleteCvProduct(req, res) {
+  try {
+    const hasProductType = await hasColumn('products', 'product_type');
+    if (!hasProductType) {
+      return res.status(500).json({ success: false, error: 'Kolom product_type belum tersedia. Jalankan migrasi database.' });
+    }
+
+    const code = String(req.params.id || '').trim();
+    if (!code) {
+      return res.status(400).json({ success: false, error: 'Kode produk wajib diisi.' });
+    }
+
+    const result = await query('DELETE FROM products WHERE code = ? AND product_type = ?', [code, 'cv']);
+    if (!result.affectedRows) {
+      return res.status(404).json({ success: false, error: 'Produk CV tidak ditemukan.' });
+    }
+
+    return res.json({ success: true });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
