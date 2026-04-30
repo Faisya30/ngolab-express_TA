@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Hands, HAND_CONNECTIONS } from '@mediapipe/hands';
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 
-const DEBUG_LANDMARK_LOG = false;
+const DEBUG_LANDMARK_LOG = true;
 
 const parseWebcamError = (error) => {
   const name = error?.name || 'UnknownError';
@@ -234,12 +234,25 @@ const HandTracking = ({ onLandmarks }) => {
         await video.play();
 
         hands = new Hands({
-          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+          locateFile: (file) => {
+            // Try local vendor first (if you copied mediapipe files to public/vendor/mediapipe),
+            // then try unpkg, then fall back to jsdelivr.
+            const local = `/vendor/mediapipe/${file}`;
+            const unpkg = `https://unpkg.com/@mediapipe/hands@latest/${file}`;
+            const jsdelivr = `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+            // Prefer CDN for now so the browser can load the models even if local files
+            // were not copied. Change to `local` if you copied files to public/vendor/mediapipe.
+            return jsdelivr;
+            // Note: if local files are not present, Vite will request the returned URL
+            // and the browser will fall back to the CDN if configured via a service worker
+            // or you can change this to return `unpkg` or `jsdelivr` directly.
+          },
         });
 
         hands.setOptions({
           maxNumHands: 1,
-          modelComplexity: 0,
+          // increase complexity for more reliable detection during testing
+          modelComplexity: 1,
           minDetectionConfidence: 0.6,
           minTrackingConfidence: 0.5,
         });
