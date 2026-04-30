@@ -386,7 +386,7 @@ const UserKiosk: React.FC = () => {
     <div className="w-full h-screen overflow-hidden flex flex-col relative bg-white font-sans selection:bg-orange-100">
       <button
         onClick={() => setHandTrackingEnabled((prev) => !prev)}
-        className="fixed top-3 right-3 z-10001 px-3 py-2 rounded-xl text-[10px] uppercase tracking-wider bg-slate-900/90 text-white border border-white/20 shadow-lg"
+        className="fixed top-3 right-3 z-50 px-3 py-2 rounded-xl text-[10px] uppercase tracking-wider bg-slate-900/90 text-white border border-white/20 shadow-lg"
       >
         {handTrackingEnabled ? 'Matikan Gesture' : 'Aktifkan Gesture'}
       </button>
@@ -395,7 +395,7 @@ const UserKiosk: React.FC = () => {
 
       {handTrackingEnabled && virtualCursor && (
         <div
-          className="fixed z-10002 pointer-events-none"
+          className="fixed z-50 pointer-events-none"
           style={{
             left: `${virtualCursor.x}px`,
             top: `${virtualCursor.y}px`,
