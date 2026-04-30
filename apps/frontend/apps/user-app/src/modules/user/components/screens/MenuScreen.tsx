@@ -220,7 +220,7 @@ const MenuScreen: React.FC<Props> = ({ cart, member, potentialPoints, products, 
       </div>
 
       {/* SUMMARY SIDEBAR - Ramping */}
-      <div className="w-[280px] md:w-[320px] bg-white border-l border-slate-100 flex flex-col shrink-0 z-30 shadow-xl">
+      <div className="w-70 md:w-[320px] bg-white border-l border-slate-100 flex flex-col shrink-0 z-30 shadow-xl">
         <header className="p-6 md:p-8 border-b border-slate-50">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-black text-slate-950 uppercase tracking-tighter">Pesanan</h3>
