@@ -489,6 +489,12 @@ export async function saveProduct(req, res) {
 
     res.json({ success: true, id: code });
   } catch (error) {
+    if (error?.code === 'ER_DATA_TOO_LONG') {
+      return res.status(413).json({
+        success: false,
+        error: 'Data gambar terlalu besar untuk kolom database (image_url). Perbesar tipe kolom atau kompres gambar.',
+      });
+    }
     res.status(500).json({ success: false, error: error.message });
   }
 }

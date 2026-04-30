@@ -17,7 +17,7 @@ export function createApp({ frontendOrigins }) {
     })
   );
 
-  app.use(express.json({ limit: '2mb' }));
+  app.use(express.json({ limit: '25mb' }));
 
   app.get('/health', async (_req, res) => {
     try {

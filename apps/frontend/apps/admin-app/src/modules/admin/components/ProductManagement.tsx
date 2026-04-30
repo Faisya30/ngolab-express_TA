@@ -124,13 +124,6 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
 
     console.log(`[💾 SAVING PRODUCT] ID: ${productId} | Payload Size: ${JSON.stringify(productData).length} chars`);
 
-    // Validasi ukuran gambar agar request tetap stabil saat upload via backend.
-    if (productData.image && productData.image.startsWith('data:image') && productData.image.length > 500000) {
-      setSaveError('Ukuran gambar terlalu besar (Max 500KB). Silakan gunakan foto yang lebih kecil atau hapus foto terlebih dahulu untuk tes update.');
-      setIsSaving(false);
-      return;
-    }
-
     try {
       const result = await fetchFromSheet('saveProduct', { product: productData });
       console.log('[✅ SAVE RESULT]', result);
@@ -347,7 +340,7 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
                           <div className="w-16 h-16 rounded-3xl bg-white border border-slate-100 flex items-center justify-center text-slate-300 group-hover:text-blue-600 group-hover:scale-110 transition-all shadow-sm">
                             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                           </div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">Ketuk untuk unggah<br/>foto produk (Max 2MB)</p>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">Ketuk untuk unggah<br/>foto produk (tanpa batas di form)</p>
                         </div>
                       )}
                     </div>

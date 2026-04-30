@@ -54,6 +54,23 @@ async function runMigrations() {
         }
       }
     }
+
+    // Run migration_expand_image_storage.sql
+    const migrationPath3 = path.join(process.cwd(), 'sql', 'migration_expand_image_storage.sql');
+    const migrationSQL3 = fs.readFileSync(migrationPath3, 'utf8');
+
+    console.log('\n> Running migration_expand_image_storage.sql');
+    const statements3 = migrationSQL3.split(';').filter(s => s.trim());
+    for (const statement of statements3) {
+      if (statement.trim()) {
+        try {
+          await conn.query(statement);
+          console.log('  ✓ Executed');
+        } catch (err) {
+          console.log('  ✗ Error:', err.message);
+        }
+      }
+    }
     
     console.log('\n✓ Migrations completed!');
     

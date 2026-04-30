@@ -27,7 +27,8 @@ const WelcomeScreen: React.FC<Props> = ({ onStart = () => {} }) => {
             className="w-full h-full object-cover animate-ken-burns scale-110"
             alt="Premium Bakso Express Poster"
           />
-          <div className="absolute inset-0 bg-linear-to-t from-slate-950 via-slate-950/50 to-slate-950/90" />
+          <div className="absolute inset-0 bg-black/45" />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/45 to-slate-950/75" />
         </div>
       </div>
 
@@ -63,25 +64,25 @@ const WelcomeScreen: React.FC<Props> = ({ onStart = () => {} }) => {
         </div>
       </div>
 
-      <div className="relative z-30 w-full max-w-4xl pb-10 px-8 flex flex-col items-center shrink-0">
-        <div className="w-full bg-white rounded-4xl p-2.5 flex items-center justify-between shadow-2xl border border-white/10 group active:scale-[0.99] transition-all duration-300">
-          <div className="flex items-center gap-5 pl-5">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transition-transform group-hover:scale-105 shrink-0">
-               <img
-                 src={logoNgolab}
-                 alt="Logo Ngolab"
-                 className="w-7 h-7 object-contain"
-               />
+      <div className="relative z-30 w-full max-w-5xl pb-10 px-8 flex flex-col items-center shrink-0">
+        <div className="w-full bg-zinc-100 rounded-[2.2rem] p-3 md:p-4 flex items-center justify-between shadow-[0_14px_40px_rgba(2,6,23,0.26)] border border-white/30 group active:scale-[0.99] transition-all duration-300">
+          <div className="flex items-center gap-4 md:gap-5 pl-1 md:pl-2 min-w-0">
+            <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-white flex items-center justify-center shrink-0 border border-slate-200">
+              <img
+                src={logoNgolab}
+                alt="Logo Ngolab"
+                className="w-7 h-7 md:w-8 md:h-8 object-contain"
+              />
             </div>
-            <div className="flex flex-col">
-              <h2 className="text-xl md:text-2xl font-black text-slate-950 tracking-tight uppercase leading-none">SENTUH UNTUK MEMESAN</h2>
-              <p className="text-slate-400 text-[9px] font-bold tracking-widest uppercase mt-1.5">Dapatkan Poin & Cashback Di Setiap Pesanan</p>
+            <div className="flex flex-col min-w-0">
+              <h2 className="text-[clamp(1.1rem,2vw,2.5rem)] font-black text-[#060e2a] tracking-tight uppercase leading-none truncate">SENTUH UNTUK MEMESAN</h2>
+              <p className="text-slate-500 text-[10px] md:text-sm font-bold tracking-[0.16em] uppercase mt-1 truncate">Dapatkan Poin & Cashback Di Setiap Pesanan</p>
             </div>
           </div>
 
-          <div className="bg-orange-500 px-10 py-5 rounded-xl flex items-center gap-4 group-hover:bg-slate-900 transition-all duration-500 shrink-0 mr-1">
-            <span className="text-sm md:text-base font-black text-white uppercase tracking-widest">MULAI</span>
-            <div className="w-6 h-6 bg-white/20 rounded-lg flex items-center justify-center group-hover:translate-x-1 transition-transform">
+          <div className="bg-orange-500 min-w-[170px] md:min-w-[230px] px-7 md:px-10 py-4 md:py-5 rounded-2xl flex items-center justify-center gap-4 group-hover:bg-slate-900 transition-all duration-500 shrink-0 mr-0.5">
+            <span className="text-lg md:text-[2rem] font-black text-white uppercase tracking-[0.08em] leading-none">MULAI</span>
+            <div className="w-7 h-7 md:w-8 md:h-8 bg-white/20 rounded-xl flex items-center justify-center group-hover:translate-x-1 transition-transform">
                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </div>
           </div>

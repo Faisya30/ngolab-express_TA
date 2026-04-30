@@ -98,11 +98,21 @@ export async function fetchFromSheet(action: string, data?: any, retryCount = 0)
     const response = await fetch(url, options);
     clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
     const responseText = await response.text();
+
+    if (!response.ok) {
+      let serverMessage = '';
+      try {
+        const parsed = JSON.parse(responseText);
+        serverMessage = String(parsed?.error || parsed?.message || '');
+      } catch (_parseErr) {
+        serverMessage = String(responseText || '');
+      }
+
+      const error: any = new Error(serverMessage || `HTTP error! status: ${response.status}`);
+      error.status = response.status;
+      throw error;
+    }
 
     try {
       const result = JSON.parse(responseText);
@@ -127,7 +137,16 @@ export async function fetchFromSheet(action: string, data?: any, retryCount = 0)
       return { success: false, error: 'Koneksi lambat (Timeout). Silakan coba lagi.' };
     }
 
-    let errorMessage = 'Gagal terhubung ke server. Pastikan internet stabil.';
+    let errorMessage = 'Gagal terhubung ke server. Pastikan backend berjalan.';
+
+    const status = Number(error?.status || 0);
+    if (status === 413) {
+      errorMessage = 'Ukuran data terlalu besar untuk server. Perkecil gambar atau naikkan limit backend/database.';
+    } else if (status >= 400 && status < 500 && error?.message) {
+      errorMessage = String(error.message);
+    } else if (status >= 500 && error?.message) {
+      errorMessage = String(error.message);
+    }
 
     if (!window.navigator.onLine) {
       errorMessage = 'Koneksi internet terputus. Periksa wifi atau paket data Anda.';
