@@ -8,6 +8,7 @@ import {
   getCvProducts,
   saveCvProduct,
   saveCvOrder,
+  getCvOrders,
 } from '../controllers/cvController.js';
 
 const router = Router();
@@ -20,6 +21,7 @@ router.delete('/products/:id', deleteCvProduct);
 router.get('/products/by-barcode/:barcode', getCvProductByBarcode);
 router.get('/members/:code', getCvMemberByCode);
 router.get('/vouchers/active', getActiveVouchers);
+router.get('/orders', getCvOrders);
 router.post('/orders', saveCvOrder);
 
 export default router;

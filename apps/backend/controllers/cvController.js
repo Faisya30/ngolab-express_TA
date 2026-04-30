@@ -421,6 +421,110 @@ export async function getActiveVouchers(_req, res) {
   }
 }
 
+export async function getCvOrders(req, res) {
+  try {
+    const requestedType = normalizeProductType(req.query.order_type);
+    const usesMemberCode = await hasColumn('orders', 'member_code');
+    const hasProductType = await hasColumn('products', 'product_type');
+
+    // Fetch orders (always return consistent fields: id, order_code, created_at, subtotal, discount, total, payment, member)
+    let orders = [];
+
+    if (!hasProductType) {
+      orders = usesMemberCode
+        ? await query(
+            `SELECT
+              id,
+              order_code,
+              created_at,
+              service_type AS service,
+              subtotal,
+              discount,
+              total,
+              payment_method AS payment,
+              COALESCE(member_code, 'Guest') AS member
+            FROM orders
+            ORDER BY created_at DESC`
+          )
+        : await query(
+            `SELECT
+              o.id,
+              o.order_code,
+              o.created_at,
+              o.service_type AS service,
+              o.subtotal,
+              o.discount,
+              o.total,
+              o.payment_method AS payment,
+              COALESCE(m.code, 'Guest') AS member
+            FROM orders o
+            LEFT JOIN members m ON o.member_id = m.id
+            ORDER BY o.created_at DESC`
+          );
+
+      orders = orders[0] || orders; // normalize mysql2 result shape
+    } else {
+      const hasOrderItemsOrderCode = await hasColumn('order_items', 'order_code');
+      const hasOrderItemsProductCode = await hasColumn('order_items', 'product_code');
+
+      const joinClause1 = hasOrderItemsOrderCode ? 'o.order_code = oi.order_code' : 'o.id = oi.order_id';
+      const joinClause2 = hasOrderItemsProductCode ? 'oi.product_code = p.code' : 'oi.product_id = p.id';
+
+      const [rows] = await query(
+        `SELECT DISTINCT
+          o.id,
+          o.order_code,
+          o.created_at,
+          o.service_type AS service,
+          o.subtotal,
+          o.discount,
+          o.total,
+          o.payment_method AS payment,
+          COALESCE(${usesMemberCode ? 'o.member_code' : 'm.code'}, 'Guest') AS member
+        FROM orders o
+        LEFT JOIN order_items oi ON ${joinClause1}
+        LEFT JOIN products p ON ${joinClause2}
+        ${usesMemberCode ? '' : 'LEFT JOIN members m ON o.member_id = m.id'}
+        WHERE p.product_type = ?
+        ORDER BY o.created_at DESC`,
+        [requestedType]
+      );
+
+      orders = rows || [];
+    }
+
+    // Ensure we have array shape (in case mysql2 returned [rows, fields])
+    if (!Array.isArray(orders)) orders = orders || [];
+
+    // Attach items[] for each order
+    const orderItemsUsesOrderCode = await hasColumn('order_items', 'order_code');
+    for (const o of orders) {
+      const orderKey = orderItemsUsesOrderCode ? o.order_code : o.id;
+      const itemsQuery = orderItemsUsesOrderCode
+        ? `SELECT id, order_code, product_code, COALESCE(product_name_snapshot, product_name, '') AS product_name_snapshot, price_snapshot AS price, qty, subtotal FROM order_items WHERE order_code = ? ORDER BY id ASC`
+        : `SELECT id, order_id, product_id, COALESCE(product_name_snapshot, product_name, '') AS product_name_snapshot, price_snapshot AS price, qty, subtotal FROM order_items WHERE order_id = ? ORDER BY id ASC`;
+
+      const [itemsRows] = await query(itemsQuery, [orderKey]);
+      const items = itemsRows || [];
+
+      // Normalize item fields for frontend: include product_name_snapshot and productName
+      o.items = items.map((it) => ({
+        id: it.id,
+        product_code: it.product_code ?? it.product_id ?? null,
+        product_name_snapshot: it.product_name_snapshot ?? '',
+        productName: it.product_name_snapshot ?? '',
+        price: it.price ?? 0,
+        qty: it.qty ?? 0,
+        subtotal: it.subtotal ?? 0,
+      }));
+    }
+
+    return res.json({ success: true, orders });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
 export async function saveCvOrder(req, res) {
   try {
     const payload = req.body || {};
