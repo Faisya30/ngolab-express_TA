@@ -49,10 +49,10 @@ function cn(...inputs: ClassValue[]) {
 // --- Mock Data ---
 
 const APP_TYPES = [
-  { id: 'kiosk', label: 'Kiosk', icon: ShoppingBag, color: 'text-emerald-600', bg: 'bg-emerald-100', adminUrl: '/admin/kiosk' },
-  { id: 'cv', label: 'Computer Vision', icon: Scan, color: 'text-blue-600', bg: 'bg-blue-100', adminUrl: '/admin/cv' },
-  { id: 'affiliate', label: 'Member & Afiliasi', icon: Users, color: 'text-purple-600', bg: 'bg-purple-100', adminUrl: '/admin/affiliate' },
-  { id: 'game', label: 'Gamefication', icon: Gamepad2, color: 'text-orange-600', bg: 'bg-orange-100', adminUrl: '/admin/game' },
+  { id: 'kiosk', label: 'Kiosk', icon: ShoppingBag, color: 'text-emerald-600', bg: 'bg-emerald-100', adminUrl: 'http://localhost:3003' },
+  { id: 'cv', label: 'Computer Vision', icon: Scan, color: 'text-blue-600', bg: 'bg-blue-100', adminUrl: 'http://localhost:3003/cv' },
+  { id: 'affiliate', label: 'Member & Afiliasi', icon: Users, color: 'text-purple-600', bg: 'bg-purple-100', adminUrl: 'http://localhost:3003/affiliate' },
+  { id: 'game', label: 'Gamefication', icon: Gamepad2, color: 'text-orange-600', bg: 'bg-orange-100', adminUrl: 'http://localhost:3003/game' },
 ];
 
 const ANALYTICS_DATA = [
@@ -113,14 +113,25 @@ export default function App() {
     return INVENTORY.filter(item => activeApp === 'all' || item.tag === activeApp || (activeApp !== 'kiosk' && activeApp !== 'cv'));
   }, [activeApp]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Specific credentials for the user
-    if (username === 'admin' && password === 'admin123') {
-      setIsLoggedIn(true);
-      setError('');
-    } else {
-      setError('Username atau Password salah. Gunakan admin / admin123');
+    try {
+      const response = await fetch('http://localhost:4000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await response.json();
+      
+      // Cek apakah login berhasil DAN role super_admin
+      if (data.success && data.user && data.user.role === 'super_admin') {
+        setIsLoggedIn(true);
+        setError('');
+      } else {
+        setError('Username/Password salah atau bukan super admin');
+      }
+    } catch (err) {
+      setError('Gagal koneksi ke server. Pastikan backend jalan di http://localhost:4000');
     }
   };
 

@@ -6,12 +6,14 @@
     "apps/frontend/apps/admin-app",
     "apps/frontend/apps/user-app",
     "apps/shared-lib",
-    "apps/backend"
+    "apps/backend",
+    "ngolab-express-super-admin"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix apps/backend\" \"npm run dev --prefix apps/frontend/apps/admin-app\" \"npm run dev --prefix apps/frontend/apps/user-app\"",
     "dev:admin": "npm run dev --prefix apps/frontend/apps/admin-app",
     "dev:user": "npm run dev --prefix apps/frontend/apps/user-app",
+    "dev:super-admin": "npm run dev --prefix ngolab-express-super-admin",
     "dev:backend": "npm run dev --prefix apps/backend",
     "build": "npm run build --prefix apps/frontend/apps/admin-app && npm run build --prefix apps/frontend/apps/user-app",
     "preview:admin": "npm run preview --prefix apps/frontend/apps/admin-app",
