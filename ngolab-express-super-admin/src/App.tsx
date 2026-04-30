@@ -104,6 +104,7 @@ const Badge = ({ label, variant }: { label: string, variant: 'kiosk' | 'cv' | 'm
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [hasEnteredDashboard, setHasEnteredDashboard] = useState(false);
   const [activeApp, setActiveApp] = useState('kiosk');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -126,6 +127,7 @@ export default function App() {
       // Cek apakah login berhasil DAN role super_admin
       if (data.success && data.user && data.user.role === 'super_admin') {
         setIsLoggedIn(true);
+        setHasEnteredDashboard(false);
         setError('');
       } else {
         setError('Username/Password salah atau bukan super admin');
@@ -216,6 +218,61 @@ export default function App() {
     );
   }
 
+  if (!hasEnteredDashboard) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6">
+        <div className="w-full max-w-3xl">
+          <Card className="p-8 md:p-10 bg-slate-900/85 border-white/10 backdrop-blur-xl">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 flex items-center justify-center">
+                <TrendingUp size={20} />
+              </div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-300">Super Admin Welcome</p>
+            </div>
+
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
+              Selamat datang, <span className="text-emerald-400 uppercase">{username}</span>
+            </h1>
+            <p className="mt-3 text-slate-300 text-sm md:text-base">
+              Ini halaman pembuka Super Admin. Lanjutkan ke dashboard untuk mengakses card aplikasi dan kontrol lintas ekosistem.
+            </p>
+
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-3">
+              {APP_TYPES.map((app) => (
+                <div key={app.id} className="rounded-xl border border-white/10 bg-slate-800/60 p-4">
+                  <div className="flex items-center gap-2">
+                    <app.icon size={16} className="text-slate-200" />
+                    <p className="text-sm font-semibold text-slate-100">{app.label}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => setHasEnteredDashboard(true)}
+                className="px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black transition-colors"
+              >
+                Masuk Ke Dashboard
+              </button>
+              <button
+                onClick={() => {
+                  setIsLoggedIn(false);
+                  setHasEnteredDashboard(false);
+                  setUsername('');
+                  setPassword('');
+                }}
+                className="px-6 py-3 rounded-xl border border-white/20 text-slate-200 hover:bg-white/10 font-semibold transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-zinc-50 font-sans">
       {/* Header */}
@@ -258,6 +315,7 @@ export default function App() {
               <button 
                 onClick={() => {
                   setIsLoggedIn(false);
+                  setHasEnteredDashboard(false);
                   setUsername('');
                   setPassword('');
                 }}
@@ -318,120 +376,156 @@ export default function App() {
             </div>
           </section>
 
-          {/* Centralized Analytics Cards */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card className="p-6 relative group overflow-hidden">
-              <div className="absolute top-0 right-0 p-8 opacity-5 -mr-4 -mt-4 transform rotate-12 group-hover:rotate-0 transition-transform">
-                <TrendingUp size={80} />
-              </div>
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
-                  <CreditCard size={24} />
+          {activeApp === 'kiosk' ? (
+            <section className="space-y-6">
+              <Card className="p-6 md:p-8">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-zinc-900">Kiosk Live Panel</h3>
+                    <p className="text-sm text-zinc-500">Mode Kiosk menggunakan tampilan operasional asli (bukan data demo).</p>
+                  </div>
+                  <a
+                    href="http://localhost:3003"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors"
+                  >
+                    Buka Kiosk Admin
+                    <ChevronRight size={16} />
+                  </a>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-zinc-500">Total Sales (IDR)</p>
-                  <h3 className="text-2xl font-bold">Rp 154.200.000</h3>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-600">
-                <TrendingUp size={14} />
-                <span>+12.5% from last month</span>
-              </div>
-            </Card>
 
-            <Card className="p-6 relative group overflow-hidden">
-              <div className="absolute top-0 right-0 p-8 opacity-5 -mr-4 -mt-4 transform rotate-12 group-hover:rotate-0 transition-transform">
-                <Users2 size={80} />
-              </div>
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
-                  <Users2 size={24} />
+                <div className="rounded-xl border border-zinc-200 overflow-hidden bg-white">
+                  <iframe
+                    src="http://localhost:3003"
+                    title="Kiosk Admin Live"
+                    className="w-full h-[70vh]"
+                  />
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-zinc-500">Total Members</p>
-                  <h3 className="text-2xl font-bold">8,432</h3>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-xs font-semibold text-blue-600">
-                <TrendingUp size={14} />
-                <span>+4.2% since yesterday</span>
-              </div>
-            </Card>
+              </Card>
 
-            <Card className="p-6 relative group overflow-hidden">
-              <div className="absolute top-0 right-0 p-8 opacity-5 -mr-4 -mt-4 transform rotate-12 group-hover:rotate-0 transition-transform">
-                <ShoppingBag size={80} />
-              </div>
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600">
-                  <ShoppingBag size={24} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-zinc-500">Total Orders</p>
-                  <h3 className="text-2xl font-bold">12,105</h3>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-xs font-semibold text-purple-600">
-                <TrendingUp size={14} />
-                <span>+8.9% this week</span>
-              </div>
-            </Card>
-          </section>
+              <Card className="p-4 bg-amber-50 border-amber-200">
+                <p className="text-xs text-amber-700 font-medium">
+                  Jika iframe tidak tampil karena kebijakan browser, gunakan tombol <span className="font-bold">Buka Kiosk Admin</span> di atas.
+                </p>
+              </Card>
+            </section>
+          ) : (
+            <>
+              {/* Centralized Analytics Cards */}
+              <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card className="p-6 relative group overflow-hidden">
+                  <div className="absolute top-0 right-0 p-8 opacity-5 -mr-4 -mt-4 transform rotate-12 group-hover:rotate-0 transition-transform">
+                    <TrendingUp size={80} />
+                  </div>
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                      <CreditCard size={24} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-zinc-500">Total Sales (IDR)</p>
+                      <h3 className="text-2xl font-bold">Rp 154.200.000</h3>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-semibold text-emerald-600">
+                    <TrendingUp size={14} />
+                    <span>+12.5% from last month</span>
+                  </div>
+                </Card>
 
-          {/* Revenue Chart */}
-          <section>
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h3 className="text-lg font-bold">Pendapatan Terpusat</h3>
-                  <p className="text-sm text-zinc-500">Data gabungan dari Kiosk, CV, dan Afiliasi</p>
-                </div>
-                <select className="bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500">
-                  <option>Last 7 Days</option>
-                  <option>Last 30 Days</option>
-                </select>
-              </div>
-              
-              <div className="h-75 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={ANALYTICS_DATA}>
-                    <defs>
-                      <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                    <XAxis 
-                      dataKey="name" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{fill: '#71717a', fontSize: 12}} 
-                    />
-                    <YAxis 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{fill: '#71717a', fontSize: 12}}
-                    />
-                    <RechartsTooltip 
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="sales" 
-                      stroke="#10b981" 
-                      strokeWidth={3} 
-                      fillOpacity={1} 
-                      fill="url(#colorSales)" 
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          </section>
+                <Card className="p-6 relative group overflow-hidden">
+                  <div className="absolute top-0 right-0 p-8 opacity-5 -mr-4 -mt-4 transform rotate-12 group-hover:rotate-0 transition-transform">
+                    <Users2 size={80} />
+                  </div>
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
+                      <Users2 size={24} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-zinc-500">Total Members</p>
+                      <h3 className="text-2xl font-bold">8,432</h3>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-semibold text-blue-600">
+                    <TrendingUp size={14} />
+                    <span>+4.2% since yesterday</span>
+                  </div>
+                </Card>
 
-          {/* Data Tables Grid */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                <Card className="p-6 relative group overflow-hidden">
+                  <div className="absolute top-0 right-0 p-8 opacity-5 -mr-4 -mt-4 transform rotate-12 group-hover:rotate-0 transition-transform">
+                    <ShoppingBag size={80} />
+                  </div>
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600">
+                      <ShoppingBag size={24} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-zinc-500">Total Orders</p>
+                      <h3 className="text-2xl font-bold">12,105</h3>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-semibold text-purple-600">
+                    <TrendingUp size={14} />
+                    <span>+8.9% this week</span>
+                  </div>
+                </Card>
+              </section>
+
+              {/* Revenue Chart */}
+              <section>
+                <Card className="p-6">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h3 className="text-lg font-bold">Pendapatan Terpusat</h3>
+                      <p className="text-sm text-zinc-500">Data gabungan dari Kiosk, CV, dan Afiliasi</p>
+                    </div>
+                    <select className="bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+                      <option>Last 7 Days</option>
+                      <option>Last 30 Days</option>
+                    </select>
+                  </div>
+                  
+                  <div className="h-75 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={ANALYTICS_DATA}>
+                        <defs>
+                          <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                        <XAxis 
+                          dataKey="name" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{fill: '#71717a', fontSize: 12}} 
+                        />
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{fill: '#71717a', fontSize: 12}}
+                        />
+                        <RechartsTooltip 
+                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="sales" 
+                          stroke="#10b981" 
+                          strokeWidth={3} 
+                          fillOpacity={1} 
+                          fill="url(#colorSales)" 
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Card>
+              </section>
+
+              {/* Data Tables Grid */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             
             {/* Global Inventory Table */}
             <Card className="flex flex-col">
@@ -536,7 +630,9 @@ export default function App() {
               </div>
             </Card>
 
-          </div>
+              </div>
+            </>
+          )}
         </div>
       </main>
     </div>
