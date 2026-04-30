@@ -461,8 +461,6 @@ export async function getCvOrders(req, res) {
             LEFT JOIN members m ON o.member_id = m.id
             ORDER BY o.created_at DESC`
           );
-
-      orders = orders[0] || orders; // normalize mysql2 result shape
     } else {
       const hasOrderItemsOrderCode = await hasColumn('order_items', 'order_code');
       const hasOrderItemsProductCode = await hasColumn('order_items', 'product_code');
@@ -470,7 +468,7 @@ export async function getCvOrders(req, res) {
       const joinClause1 = hasOrderItemsOrderCode ? 'o.order_code = oi.order_code' : 'o.id = oi.order_id';
       const joinClause2 = hasOrderItemsProductCode ? 'oi.product_code = p.code' : 'oi.product_id = p.id';
 
-      const [rows] = await query(
+      orders = await query(
         `SELECT DISTINCT
           o.id,
           o.order_code,
@@ -489,22 +487,30 @@ export async function getCvOrders(req, res) {
         ORDER BY o.created_at DESC`,
         [requestedType]
       );
-
-      orders = rows || [];
     }
 
-    // Ensure we have array shape (in case mysql2 returned [rows, fields])
-    if (!Array.isArray(orders)) orders = orders || [];
+    // Ensure we have array shape
+    if (!Array.isArray(orders)) orders = [];
 
     // Attach items[] for each order
     const orderItemsUsesOrderCode = await hasColumn('order_items', 'order_code');
+    const orderItemsHasProductNameSnapshot = await hasColumn('order_items', 'product_name_snapshot');
+    const orderItemsHasProductName = await hasColumn('order_items', 'product_name');
+    const orderItemsHasPriceSnapshot = await hasColumn('order_items', 'price_snapshot');
+    const orderItemsHasPrice = await hasColumn('order_items', 'price');
+
     for (const o of orders) {
       const orderKey = orderItemsUsesOrderCode ? o.order_code : o.id;
+      
+      // Build dynamic SELECT based on available columns
+      const productNameCol = orderItemsHasProductNameSnapshot ? 'product_name_snapshot' : (orderItemsHasProductName ? 'product_name' : "''");
+      const priceCol = orderItemsHasPriceSnapshot ? 'price_snapshot' : (orderItemsHasPrice ? 'price' : '0');
+      
       const itemsQuery = orderItemsUsesOrderCode
-        ? `SELECT id, order_code, product_code, COALESCE(product_name_snapshot, product_name, '') AS product_name_snapshot, price_snapshot AS price, qty, subtotal FROM order_items WHERE order_code = ? ORDER BY id ASC`
-        : `SELECT id, order_id, product_id, COALESCE(product_name_snapshot, product_name, '') AS product_name_snapshot, price_snapshot AS price, qty, subtotal FROM order_items WHERE order_id = ? ORDER BY id ASC`;
+        ? `SELECT id, order_code, product_code, ${productNameCol} AS product_name_snapshot, ${priceCol} AS price, qty, subtotal FROM order_items WHERE order_code = ? ORDER BY id ASC`
+        : `SELECT id, order_id, product_id, ${productNameCol} AS product_name_snapshot, ${priceCol} AS price, qty, subtotal FROM order_items WHERE order_id = ? ORDER BY id ASC`;
 
-      const [itemsRows] = await query(itemsQuery, [orderKey]);
+      const itemsRows = await query(itemsQuery, [orderKey]);
       const items = itemsRows || [];
 
       // Normalize item fields for frontend: include product_name_snapshot and productName
