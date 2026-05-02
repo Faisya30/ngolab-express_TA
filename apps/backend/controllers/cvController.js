@@ -51,32 +51,6 @@ function buildOrderCode(rawOrderCode) {
   return input.startsWith('ORD-') ? input : `ORD-${input}`;
 }
 
-async function resolveMemberCode(connection, rawMemberCode, rawMemberId) {
-  const memberCode = String(rawMemberCode || '').trim();
-  if (memberCode) {
-    const [rows] = await connection.query('SELECT code FROM members WHERE code = ? LIMIT 1', [memberCode]);
-    return rows[0]?.code || null;
-  }
-
-  const memberId = Number(rawMemberId || 0);
-  if (!memberId) return null;
-  const [rows] = await connection.query('SELECT code FROM members WHERE id = ? LIMIT 1', [memberId]);
-  return rows[0]?.code || null;
-}
-
-async function resolveVoucherCode(connection, rawVoucherCode, rawVoucherId) {
-  const voucherCode = String(rawVoucherCode || '').trim();
-  if (voucherCode) {
-    const [rows] = await connection.query('SELECT code FROM vouchers WHERE code = ? LIMIT 1', [voucherCode]);
-    return rows[0]?.code || null;
-  }
-
-  const voucherId = Number(rawVoucherId || 0);
-  if (!voucherId) return null;
-  const [rows] = await connection.query('SELECT code FROM vouchers WHERE id = ? LIMIT 1', [voucherId]);
-  return rows[0]?.code || null;
-}
-
 async function resolveCvCategoryCode(rawCategory) {
   const categoryValue = String(rawCategory || '').trim();
   if (!categoryValue) return null;
@@ -368,54 +342,6 @@ export async function getCvProductByBarcode(req, res) {
     }
 
     return res.json({ success: true, product: rows[0] });
-  } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
-  }
-}
-
-export async function getCvMemberByCode(req, res) {
-  try {
-    const code = String(req.params.code || '').trim();
-    const rows = await query(
-      `SELECT
-        code,
-        name,
-        cashback_points AS cashbackPoints,
-        cashback_points AS points,
-        is_affiliate AS isAffiliate
-      FROM members
-      WHERE code = ?
-      LIMIT 1`,
-      [code]
-    );
-
-    if (!rows.length) {
-      return res.status(404).json({ success: false, error: 'Member tidak ditemukan.' });
-    }
-
-    return res.json({ success: true, member: rows[0] });
-  } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
-  }
-}
-
-export async function getActiveVouchers(_req, res) {
-  try {
-    const rows = await query(
-      `SELECT
-        code AS id,
-        code,
-        title,
-        COALESCE(description, '') AS description,
-        discount,
-        type,
-        is_active AS isActive
-      FROM vouchers
-      WHERE is_active = 1
-      ORDER BY created_at DESC`
-    );
-
-    return res.json({ success: true, vouchers: rows });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

@@ -5,9 +5,7 @@ import Sidebar from './components/Sidebar';
 import Auth from './components/Auth';
 import ProductManagement from './components/ProductManagement';
 import CategoryManagement from './components/CategoryManagement';
-import VoucherManagement from './components/VoucherManagement';
 import TransactionList from './components/TransactionList';
-import MemberPoints from './components/MemberPoints';
 import Reports from './components/Reports';
 import { ViewType } from '../../types';
 import { fetchFromSheet, API_ACTIONS } from '@ngolab/shared-lib';
@@ -23,9 +21,6 @@ const AdminDashboard: React.FC = () => {
   const [orderDetails, setOrderDetails] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
-  const [vouchers, setVouchers] = useState<any[]>([]);
-  const [members, setMembers] = useState<any[]>([]);
-  const [memberLogs, setMemberLogs] = useState<any[]>([]);
   const adminProductType = getProductTypeFromRole(user?.role);
 
   useEffect(() => {
@@ -56,23 +51,17 @@ const AdminDashboard: React.FC = () => {
 
   const loadDashboardData = useCallback(async () => {
     try {
-      const [ordersRes, orderDetailsRes, productsRes, categoriesRes, vouchersRes, membersRes, memberLogsRes] = await Promise.all([
+      const [ordersRes, orderDetailsRes, productsRes, categoriesRes] = await Promise.all([
         fetchFromSheet(API_ACTIONS.GET_ORDERS),
         fetchFromSheet(API_ACTIONS.GET_ORDER_DETAILS),
         fetchFromSheet(API_ACTIONS.GET_PRODUCTS),
         fetchFromSheet(API_ACTIONS.GET_CATEGORIES),
-        fetchFromSheet(API_ACTIONS.GET_VOUCHERS),
-        fetchFromSheet(API_ACTIONS.GET_MEMBERS),
-        fetchFromSheet(API_ACTIONS.GET_MEMBER_LOGS),
       ]);
 
       setOrders(normalizeRows(ordersRes));
       setOrderDetails(normalizeRows(orderDetailsRes));
       setProducts(normalizeRows(productsRes));
       setCategories(normalizeRows(categoriesRes));
-      setVouchers(normalizeRows(vouchersRes));
-      setMembers(normalizeRows(membersRes));
-      setMemberLogs(normalizeRows(memberLogsRes));
     } catch (error) {
       console.error('Failed to load admin dashboard data:', error);
     }
@@ -166,20 +155,6 @@ const AdminDashboard: React.FC = () => {
             <Reports />
           )}
           
-          {currentView === 'VOUCHERS' && (
-            <VoucherManagement 
-              initialVouchers={vouchers}
-              onUpdate={handleRefresh}
-            />
-          )}
-          
-          {currentView === 'MEMBER_LOG' && (
-            <MemberPoints 
-              members={members}
-              rawLogs={memberLogs}
-              onRefresh={handleRefresh}
-            />
-          )}
         </div>
       </div>
     </div>

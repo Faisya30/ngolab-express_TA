@@ -61,88 +61,42 @@ function resolveCategoryProductType(requestProductType, categoryValue) {
 
 export async function getOrders(req, res) {
   try {
-    // Validasi role admin dan dapatkan product_type-nya
     const requestProductType = resolveRequestProductType(req);
     if (!requestProductType) {
       return res.status(403).json({ success: false, error: 'Role admin tidak diizinkan mengakses orders.' });
     }
 
-    const usesMemberCode = await hasColumn('orders', 'member_code');
-    const hasProductType = await hasColumn('products', 'product_type');
-    
-    // Jika product_type belum ada di products, assume semua orders adalah kiosk (legacy mode)
-    if (!hasProductType) {
-      const rows = usesMemberCode
-        ? await query(
-            `SELECT
-              order_code AS orderId,
-              created_at AS timestamp,
-              service_type AS service,
-              subtotal,
-              discount,
-              total,
-              payment_method AS payment,
-              COALESCE(member_code, 'Guest') AS member
-            FROM orders
-            ORDER BY created_at DESC`
-          )
-        : await query(
-            `SELECT
-              o.order_code AS orderId,
-              o.created_at AS timestamp,
-              o.service_type AS service,
-              o.subtotal,
-              o.discount,
-              o.total,
-              o.payment_method AS payment,
-              COALESCE(m.code, 'Guest') AS member
-            FROM orders o
-            LEFT JOIN members m ON o.member_id = m.id
-            ORDER BY o.created_at DESC`
-          );
-      return res.json(rows);
-    }
-
-    // Filter orders berdasarkan product_type dari order items
-    // Super admin (requestProductType='all') melihat semua orders
-    const filterClause = requestProductType === 'all' 
-      ? '' 
-      : `WHERE p.product_type = '${requestProductType}'`;
-
-    // Cek struktur order_items - bisa punya order_code atau order_id, product_code atau product_id
-    const hasOrderItemsOrderCode = await hasColumn('order_items', 'order_code');
-    const hasOrderItemsProductCode = await hasColumn('order_items', 'product_code');
-    
-    let joinClause1, joinClause2, selectProductJoin;
-    
-    if (hasOrderItemsOrderCode) {
-      joinClause1 = 'o.order_code = oi.order_code';
-    } else {
-      joinClause1 = 'o.id = oi.order_id';
-    }
-    
-    if (hasOrderItemsProductCode) {
-      joinClause2 = 'oi.product_code = p.code';
-    } else {
-      joinClause2 = 'oi.product_id = p.id';
+    const hasOrderType = await hasColumn('orders', 'order_type');
+    if (!hasOrderType) {
+      return res.status(500).json({ success: false, error: 'Kolom order_type belum tersedia. Jalankan migrasi database terlebih dahulu.' });
     }
 
     const rows = await query(
-      `SELECT DISTINCT
-        o.order_code AS orderId,
-        o.created_at AS timestamp,
-        o.service_type AS service,
-        o.subtotal,
-        o.discount,
-        o.total,
-        o.payment_method AS payment,
-        COALESCE(${usesMemberCode ? 'o.member_code' : 'm.code'}, 'Guest') AS member
-      FROM orders o
-      LEFT JOIN order_items oi ON ${joinClause1}
-      LEFT JOIN products p ON ${joinClause2}
-      ${usesMemberCode ? '' : 'LEFT JOIN members m ON o.member_id = m.id'}
-      ${filterClause}
-      ORDER BY o.created_at DESC`
+      requestProductType === 'all'
+        ? `SELECT
+            order_code AS orderId,
+            created_at AS timestamp,
+            service_type AS service,
+            subtotal,
+            discount,
+            total,
+            payment_method AS payment,
+            COALESCE(order_type, 'kiosk') AS orderType
+          FROM orders
+          ORDER BY created_at DESC`
+        : `SELECT
+            order_code AS orderId,
+            created_at AS timestamp,
+            service_type AS service,
+            subtotal,
+            discount,
+            total,
+            payment_method AS payment,
+            COALESCE(order_type, 'kiosk') AS orderType
+          FROM orders
+          WHERE order_type = ?
+          ORDER BY created_at DESC`,
+      requestProductType === 'all' ? [] : [requestProductType]
     );
 
     res.json(rows);
@@ -299,88 +253,6 @@ export async function getCategories(req, res) {
           FROM categories
           ORDER BY created_at ASC`
         );
-    res.json(rows);
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-}
-
-export async function getVouchers(_req, res) {
-  try {
-    const rows = await query(
-      `SELECT
-        code AS id,
-        title,
-        COALESCE(description, '') AS description,
-        discount,
-        type,
-        is_active AS isActive
-      FROM vouchers
-      ORDER BY created_at DESC`
-    );
-    res.json(rows);
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-}
-
-export async function getMembers(_req, res) {
-  try {
-    const rows = await query(
-      `SELECT
-        code,
-        name,
-        cashback_points AS cashbackPoints,
-        is_affiliate AS isAffiliate
-      FROM members
-      ORDER BY created_at DESC`
-    );
-    res.json(rows);
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-}
-
-export async function getMemberLogs(_req, res) {
-  try {
-    const usesMemberCode = await hasColumn('member_logs', 'member_code');
-    const usesOrderCode = await hasColumn('member_logs', 'order_code');
-
-    const rows = usesMemberCode
-      ? await query(
-          `SELECT
-            created_at AS timestamp,
-            member_code AS memberCode,
-            COALESCE(m.name, '') AS memberName,
-            order_code AS orderId,
-            points_earned AS pointsEarned,
-            points_used AS pointsUsed,
-            note,
-            COALESCE(m.is_affiliate, 0) AS affiliate
-          FROM member_logs ml
-          LEFT JOIN members m ON ml.member_code = m.code
-          ORDER BY ml.created_at DESC`
-        )
-      : await query(
-          `SELECT
-            ml.created_at AS timestamp,
-            COALESCE(m.code, '') AS memberCode,
-            COALESCE(m.name, '') AS memberName,
-            COALESCE(o.order_code, '') AS orderId,
-            ml.points_earned AS pointsEarned,
-            ml.points_used AS pointsUsed,
-            ml.note,
-            COALESCE(m.is_affiliate, 0) AS affiliate
-          FROM member_logs ml
-          LEFT JOIN members m ON ml.member_id = m.id
-          LEFT JOIN orders o ON ml.order_id = o.id
-          ORDER BY ml.created_at DESC`
-        );
-
-    if (!usesOrderCode) {
-      return res.json(rows);
-    }
-
     res.json(rows);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -577,39 +449,4 @@ export async function deleteCategory(req, res) {
   }
 }
 
-export async function saveVoucher(req, res) {
-  try {
-    const voucher = req.body?.voucher || req.body || {};
-    const code = String(voucher.id || `VOU-${Date.now()}`);
 
-    await query(
-      `INSERT INTO vouchers (code, title, description, discount, type, is_active)
-      VALUES (?, ?, ?, ?, ?, 1)
-      ON DUPLICATE KEY UPDATE
-        title = VALUES(title),
-        description = VALUES(description),
-        discount = VALUES(discount),
-        type = VALUES(type)`,
-      [
-        code,
-        String(voucher.title || ''),
-        String(voucher.description || ''),
-        Number(voucher.discount || 0),
-        String(voucher.type || 'PERCENT').toUpperCase() === 'VALUE' ? 'VALUE' : 'PERCENT',
-      ]
-    );
-
-    res.json({ success: true, id: code });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-}
-
-export async function deleteVoucher(req, res) {
-  try {
-    await query('DELETE FROM vouchers WHERE code = ?', [req.params.id]);
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-}

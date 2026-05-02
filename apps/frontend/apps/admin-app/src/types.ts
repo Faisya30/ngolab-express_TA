@@ -1,5 +1,5 @@
 
-export type ViewType = 'DASHBOARD' | 'CATEGORIES' | 'PRODUCTS' | 'VOUCHERS' | 'MEMBERS' | 'TRANSACTIONS' | 'MEMBER_LOG' | 'REPORTS';
+export type ViewType = 'DASHBOARD' | 'CATEGORIES' | 'PRODUCTS' | 'TRANSACTIONS' | 'REPORTS';
 
 export interface Category {
   id: string;
@@ -17,31 +17,6 @@ export interface Product {
   isRecommended: boolean;
   cashbackReward: number;
   product_type?: 'kiosk' | 'cv';
-}
-
-export interface Voucher {
-  id: string;
-  title: string;
-  description: string;
-  discount: number;
-  type: 'PERCENT' | 'VALUE';
-}
-
-export interface Member {
-  code: string;
-  name: string;
-  cashbackPoints: number;
-  isAffiliate: boolean;
-}
-
-export interface MemberLogEntry {
-  timestamp: string;
-  memberCode: string;
-  memberName: string;
-  orderId: string;
-  pointsEarned: number;
-  pointsUsed: number;
-  affiliate: boolean;
 }
 
 export interface Order {

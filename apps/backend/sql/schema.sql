@@ -33,25 +33,7 @@ CREATE TABLE IF NOT EXISTS products (
     ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
-CREATE TABLE IF NOT EXISTS vouchers (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  code VARCHAR(50) NOT NULL UNIQUE,
-  title VARCHAR(150) NOT NULL,
-  description TEXT NULL,
-  type ENUM('PERCENT','VALUE') NOT NULL,
-  discount DECIMAL(12,2) NOT NULL DEFAULT 0,
-  is_active TINYINT(1) NOT NULL DEFAULT 1,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
 
-CREATE TABLE IF NOT EXISTS members (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  code VARCHAR(50) NOT NULL UNIQUE,
-  name VARCHAR(150) NOT NULL,
-  cashback_points INT NOT NULL DEFAULT 0,
-  is_affiliate TINYINT(1) NOT NULL DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
 
 CREATE TABLE IF NOT EXISTS orders (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -90,21 +72,7 @@ CREATE TABLE IF NOT EXISTS order_items (
     ON UPDATE CASCADE ON DELETE SET NULL
 );
 
-CREATE TABLE IF NOT EXISTS member_logs (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  member_code VARCHAR(50) NOT NULL,
-  order_code VARCHAR(50) NULL,
-  points_earned INT NOT NULL DEFAULT 0,
-  points_used INT NOT NULL DEFAULT 0,
-  note VARCHAR(255) NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_member_logs_member_code
-    FOREIGN KEY (member_code) REFERENCES members(code)
-    ON UPDATE CASCADE ON DELETE CASCADE,
-  CONSTRAINT fk_member_logs_order_code
-    FOREIGN KEY (order_code) REFERENCES orders(order_code)
-    ON UPDATE CASCADE ON DELETE SET NULL
-);
+
 
 INSERT IGNORE INTO categories (code, name, product_type, is_active) VALUES
 ('recommended', 'Andalan', 'all', 1),
@@ -113,6 +81,3 @@ INSERT IGNORE INTO categories (code, name, product_type, is_active) VALUES
 ('mie', 'Mie Yamin', 'kiosk', 1),
 ('drinks', 'Minuman', 'kiosk', 1),
 ('retail', 'Retail', 'cv', 1);
-
-INSERT IGNORE INTO members (code, name, cashback_points, is_affiliate) VALUES
-('MEM-001', 'Guest Member', 1500, 0);

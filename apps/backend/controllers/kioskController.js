@@ -22,34 +22,9 @@ function toNumber(value) {
 	return Number(cleaned) || 0;
 }
 
-async function resolveMemberByCodeOrName(connection, memberCode, memberName) {
-	const code = String(memberCode || '').trim();
-	const name = String(memberName || '').trim();
-	if (!code || code === '-') return null;
 
-	const [rows] = await connection.query(
-		`SELECT id, code, name, is_affiliate
-		FROM members
-		WHERE code = ? OR LOWER(name) = LOWER(?)
-		LIMIT 1`,
-		[code, name]
-	);
-	return rows[0] || null;
-}
 
-async function resolveVoucher(connection, voucherRaw) {
-	const value = String(voucherRaw || '').trim();
-	if (!value || value === '-') return null;
 
-	const [rows] = await connection.query(
-		`SELECT id, code, title
-		FROM vouchers
-		WHERE code = ? OR LOWER(title) = LOWER(?)
-		LIMIT 1`,
-		[value, value]
-	);
-	return rows[0] || null;
-}
 
 function parseCart(rawCartData) {
 	if (Array.isArray(rawCartData)) return rawCartData;
@@ -126,62 +101,7 @@ export async function init(req, res) {
 		
 		const categories = await query(categoriesQuery);
 
-		const hasVoucherActiveWindow = await hasColumn('vouchers', 'start_at');
-		const vouchers = hasVoucherActiveWindow
-			? await query(
-					`SELECT
-						code AS id,
-						title,
-						COALESCE(description, '') AS description,
-						discount,
-						type,
-						is_active AS isActive
-					FROM vouchers
-					WHERE is_active = 1
-						AND (start_at IS NULL OR start_at <= NOW())
-						AND (end_at IS NULL OR end_at >= NOW())
-					ORDER BY created_at DESC`
-				)
-			: await query(
-					`SELECT
-						code AS id,
-						title,
-						COALESCE(description, '') AS description,
-						discount,
-						type,
-						is_active AS isActive
-					FROM vouchers
-					WHERE is_active = 1
-					ORDER BY created_at DESC`
-				);
-
-		return res.json({ success: true, products, categories, vouchers });
-	} catch (error) {
-		return res.status(500).json({ success: false, error: error.message });
-	}
-}
-
-export async function getMemberByCode(req, res) {
-	try {
-		const code = String(req.params.code || '').trim();
-		const rows = await query(
-			`SELECT
-				code,
-				name,
-				cashback_points AS cashbackPoints,
-				cashback_points AS points,
-				is_affiliate AS isAffiliate
-			FROM members
-			WHERE code = ?
-			LIMIT 1`,
-			[code]
-		);
-
-		if (!rows.length) {
-			return res.status(404).json({ success: false, error: 'Member not found' });
-		}
-
-		return res.json(rows[0]);
+		return res.json({ success: true, products, categories, vouchers: [] });
 	} catch (error) {
 		return res.status(500).json({ success: false, error: error.message });
 	}
