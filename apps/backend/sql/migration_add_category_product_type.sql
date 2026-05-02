@@ -1,4 +1,4 @@
--- Migration: tambah scope product_type pada categories agar retail hanya tampil untuk CV.
+-- Migration: tambah scope product_type pada categories agar kategori hanya punya scope kiosk/cv.
 -- Aman dijalankan berulang (idempotent).
 
 SET @db_name := DATABASE();
@@ -14,7 +14,7 @@ SET @col_exists := (
 
 SET @sql_add_column := IF(
 	@col_exists = 0,
-	'ALTER TABLE categories ADD COLUMN product_type ENUM(''kiosk'',''cv'',''all'') NOT NULL DEFAULT ''all'' AFTER name',
+	'ALTER TABLE categories ADD COLUMN product_type ENUM(''kiosk'',''cv'') NOT NULL DEFAULT ''kiosk'' AFTER name',
 	'SELECT ''Column categories.product_type already exists'' AS info'
 );
 
@@ -25,15 +25,13 @@ DEALLOCATE PREPARE stmt_add_column;
 -- 2) Normalisasi data lama agar punya scope yang jelas.
 UPDATE categories
 SET product_type = CASE
-	WHEN code IN ('recommended', 'all') THEN 'all'
 	WHEN code = 'retail' THEN 'cv'
 	ELSE 'kiosk'
 END
-WHERE product_type IS NULL OR product_type = '' OR product_type NOT IN ('kiosk', 'cv', 'all');
+WHERE product_type IS NULL OR product_type = '' OR product_type NOT IN ('kiosk', 'cv');
 
 UPDATE categories
 SET product_type = CASE
-	WHEN code IN ('recommended', 'all') THEN 'all'
 	WHEN code = 'retail' THEN 'cv'
 	ELSE product_type
 END;

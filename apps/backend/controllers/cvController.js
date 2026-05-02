@@ -60,7 +60,7 @@ async function resolveCvCategoryCode(rawCategory) {
     const rows = await query(
       `SELECT
         code,
-        COALESCE(product_type, 'all') AS productType
+        COALESCE(product_type, 'cv') AS productType
       FROM categories
       WHERE code = ? OR LOWER(name) = LOWER(?)
       LIMIT 1`,
@@ -70,8 +70,8 @@ async function resolveCvCategoryCode(rawCategory) {
     const category = rows[0];
     if (!category) return null;
 
-    const categoryType = String(category.productType || 'all').toLowerCase();
-    if (categoryType !== 'cv' && categoryType !== 'all') {
+    const categoryType = String(category.productType || '').toLowerCase();
+    if (categoryType !== 'cv') {
       return null;
     }
 
@@ -163,11 +163,11 @@ export async function getCvCategories(_req, res) {
           `SELECT
             code AS id,
             name,
-            COALESCE(product_type, 'all') AS productType,
+            COALESCE(product_type, 'cv') AS productType,
             is_active AS isActive
           FROM categories
           WHERE is_active = 1
-            AND product_type IN ('cv', 'all')
+            AND product_type = 'cv'
           ORDER BY created_at ASC`
         )
       : await query(
@@ -320,11 +320,11 @@ export async function getCvProductByBarcode(req, res) {
       `SELECT
         code AS id,
         code,
-        COALESCE(barcode, '') AS barcode,
+            COALESCE(product_type, 'cv') AS productType,
         name,
         price,
         COALESCE(image_url, '') AS image_url,
-        COALESCE(description, '') AS description,
+            AND product_type = 'cv'
         product_type,
         is_recommended AS isRecommended,
         cashback_reward AS cashbackReward,

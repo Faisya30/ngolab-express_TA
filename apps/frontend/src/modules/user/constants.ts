@@ -1,8 +1,6 @@
 import { Product, Member, Voucher } from './types';
 
 export const CATEGORIES = [
-  { id: 'recommended', name: 'Andalan', icon: '★' },
-  { id: 'all', name: 'Semua Menu', icon: '◉' },
   { id: 'bakso', name: 'Bakso', icon: '🍲' },
   { id: 'mie', name: 'Mie Yamin', icon: '🍜' },
   { id: 'icecream', name: 'Es Krim', icon: '🍦' },

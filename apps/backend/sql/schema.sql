@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS categories (
   id INT AUTO_INCREMENT PRIMARY KEY,
   code VARCHAR(50) NOT NULL UNIQUE,
   name VARCHAR(100) NOT NULL,
-  product_type ENUM('kiosk','cv','all') NOT NULL DEFAULT 'all',
+  product_type ENUM('kiosk','cv') NOT NULL DEFAULT 'kiosk',
   is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -75,8 +75,6 @@ CREATE TABLE IF NOT EXISTS order_items (
 
 
 INSERT IGNORE INTO categories (code, name, product_type, is_active) VALUES
-('recommended', 'Andalan', 'all', 1),
-('all', 'Semua Menu', 'all', 1),
 ('bakso', 'Bakso', 'kiosk', 1),
 ('mie', 'Mie Yamin', 'kiosk', 1),
 ('drinks', 'Minuman', 'kiosk', 1),

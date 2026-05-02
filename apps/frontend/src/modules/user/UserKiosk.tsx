@@ -293,9 +293,6 @@ const UserKiosk: React.FC = () => {
           finalCategories = FALLBACK_CATEGORIES;
         }
 
-        if (!finalCategories.find((c: any) => c.id === 'all')) {
-          finalCategories.splice(1, 0, { id: 'all', name: 'Semua Menu', icon: '◉' });
-        }
         setCategories(finalCategories);
 
         if (rawData.vouchers) {

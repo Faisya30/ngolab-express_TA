@@ -48,7 +48,7 @@ function resolveRequestProductType(req) {
 function resolveCategoryProductType(requestProductType, categoryValue) {
   const raw = String(categoryValue || '').trim().toLowerCase();
 
-  if (raw === 'cv' || raw === 'kiosk' || raw === 'all') {
+  if (raw === 'cv' || raw === 'kiosk') {
     return raw;
   }
 
@@ -56,7 +56,7 @@ function resolveCategoryProductType(requestProductType, categoryValue) {
     return requestProductType;
   }
 
-  return 'all';
+  return null;
 }
 
 export async function getOrders(req, res) {
@@ -227,23 +227,16 @@ export async function getCategories(req, res) {
 
     const rows = hasCategoryType
       ? await query(
-          requestProductType === 'all'
-            ? `SELECT
-                code AS id,
-                name,
-                COALESCE(product_type, 'all') AS productType,
-                is_active AS isActive
-              FROM categories
-              ORDER BY created_at ASC`
-            : `SELECT
-                code AS id,
-                name,
-                COALESCE(product_type, 'all') AS productType,
-                is_active AS isActive
-              FROM categories
-              WHERE product_type IN (?, 'all')
-              ORDER BY created_at ASC`,
-          requestProductType === 'all' ? [] : [requestProductType]
+          `SELECT
+            code AS id,
+            name,
+            COALESCE(product_type, 'kiosk') AS productType,
+            is_active AS isActive
+          FROM categories
+          WHERE product_type IN ('kiosk', 'cv')
+            ${requestProductType === 'kiosk' || requestProductType === 'cv' ? 'AND product_type = ?' : ''}
+          ORDER BY created_at ASC`,
+          requestProductType === 'kiosk' || requestProductType === 'cv' ? [requestProductType] : []
         )
       : await query(
           `SELECT
@@ -277,18 +270,37 @@ export async function saveProduct(req, res) {
       ? String(product.product_type || product.productType || 'kiosk').toLowerCase()
       : requestProductType;
 
+    if (targetProductType !== 'kiosk' && targetProductType !== 'cv') {
+      return res.status(400).json({
+        success: false,
+        error: 'Tipe produk harus kiosk atau cv.',
+      });
+    }
+
+    const categoryCodeInput = String(product.category || '').trim();
+    if (!categoryCodeInput) {
+      return res.status(400).json({ success: false, error: 'Kategori wajib diisi.' });
+    }
+
     const hasCategoryType = await hasColumn('categories', 'product_type');
     if (hasCategoryType) {
       const categoryTypeRows = await query(
-        `SELECT COALESCE(product_type, 'all') AS productType
+        `SELECT COALESCE(product_type, '') AS productType
         FROM categories
         WHERE code = ?
         LIMIT 1`,
-        [String(product.category || 'recommended')]
+        [categoryCodeInput]
       );
-      const categoryProductType = String(categoryTypeRows[0]?.productType || 'all').toLowerCase();
+      const categoryProductType = String(categoryTypeRows[0]?.productType || '').toLowerCase();
 
-      if (categoryProductType !== 'all' && categoryProductType !== targetProductType) {
+      if (!categoryProductType) {
+        return res.status(400).json({
+          success: false,
+          error: 'Kategori tidak ditemukan. Pilih kategori yang valid.',
+        });
+      }
+
+      if (categoryProductType !== targetProductType) {
         return res.status(400).json({
           success: false,
           error: 'Kategori tidak bisa dipakai untuk scope produk ini.',
@@ -316,7 +328,7 @@ export async function saveProduct(req, res) {
         [
           code,
           String(product.name || ''),
-          String(product.category || 'recommended'),
+          String(product.category || '').trim(),
           Number(product.price || 0),
           String(product.image || ''),
           String(product.description || ''),
@@ -404,6 +416,13 @@ export async function saveCategory(req, res) {
 
     if (!requestProductType) {
       return res.status(403).json({ success: false, error: 'Role admin tidak diizinkan menyimpan kategori.' });
+    }
+
+    if (!targetCategoryType) {
+      return res.status(400).json({
+        success: false,
+        error: 'Tipe kategori harus kiosk atau cv.',
+      });
     }
 
     if (hasCategoryType && requestProductType !== 'all' && targetCategoryType !== requestProductType) {

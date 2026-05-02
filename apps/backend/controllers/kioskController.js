@@ -94,7 +94,7 @@ export async function init(req, res) {
 			WHERE is_active = 1`;
 		
 		if (hasProductType) {
-			categoriesQuery += ` AND (product_type = 'kiosk' OR product_type = 'all')`;
+			categoriesQuery += ` AND product_type = 'kiosk'`;
 		}
 		
 		categoriesQuery += ` ORDER BY created_at ASC`;

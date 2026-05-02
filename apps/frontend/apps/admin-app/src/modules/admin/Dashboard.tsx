@@ -55,19 +55,15 @@ const AdminDashboard: React.FC = () => {
         fetchFromSheet(API_ACTIONS.GET_ORDERS),
         fetchFromSheet(API_ACTIONS.GET_ORDER_DETAILS),
         fetchFromSheet(API_ACTIONS.GET_PRODUCTS),
-        fetch('/api/admin/categories', {
-          headers: {
-            'x-admin-role': user?.role || 'admin',
-          },
-        }).then(r => r.json()),
+        fetchFromSheet(API_ACTIONS.GET_CATEGORIES),
       ]);
 
       setOrders(normalizeRows(ordersRes));
       setOrderDetails(normalizeRows(orderDetailsRes));
       setProducts(normalizeRows(productsRes));
       
-      // Handle categories from backend API
-      const categoryData = categoriesRes.success ? categoriesRes.categories : [];
+      // Handle categories from backend API wrapper
+      const categoryData = categoriesRes?.success ? categoriesRes.categories : categoriesRes;
       setCategories(Array.isArray(categoryData) ? categoryData : []);
     } catch (error) {
       console.error('Failed to load admin dashboard data:', error);

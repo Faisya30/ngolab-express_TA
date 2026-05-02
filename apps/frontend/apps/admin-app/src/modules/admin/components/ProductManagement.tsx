@@ -28,6 +28,37 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const compressImage = (file: File, maxWidth = 1280, quality = 0.75): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Gagal membaca file gambar.'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('Gagal memproses gambar.'));
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ratio = Math.min(1, maxWidth / img.width);
+          canvas.width = Math.max(1, Math.round(img.width * ratio));
+          canvas.height = Math.max(1, Math.round(img.height * ratio));
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Browser tidak mendukung kompresi gambar.'));
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+          const outputQuality = mimeType === 'image/png' ? 0.92 : quality;
+          resolve(canvas.toDataURL(mimeType, outputQuality));
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   useEffect(() => {
     setProducts(initialProducts);
   }, [initialProducts]);
@@ -97,11 +128,21 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      const maxUploadSize = 12 * 1024 * 1024;
+      if (file.size > maxUploadSize) {
+        setSaveError('Ukuran foto terlalu besar. Gunakan foto di bawah 12MB.');
+        return;
+      }
+
+      setSaveError(null);
+      compressImage(file)
+        .then((compressed) => {
+          setImagePreview(compressed);
+        })
+        .catch((error) => {
+          console.error('[❌ IMAGE COMPRESS ERROR]', error);
+          setSaveError('Gagal memproses foto. Coba file yang lebih kecil.');
+        });
     }
   };
 
