@@ -45,6 +45,16 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
     }
   }, [isModalOpen, editingProduct, adminProductType]);
 
+  // Filter categories based on product type
+  const filteredCategories = useMemo(() => {
+    const currentType = selectedProductType || adminProductType || 'kiosk';
+    return categories.filter(c => {
+      const catType = String(c.product_type || c.productType || 'all').toLowerCase();
+      // Show category if it matches product type or is 'all'
+      return catType === currentType || catType === 'all';
+    });
+  }, [categories, selectedProductType, adminProductType]);
+
   // Helper to get category name
   const getCategoryName = (catId: string) => {
     if (!catId) return 'NO CATEGORY';
@@ -179,7 +189,7 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
             className="px-6 py-3.5 bg-white border border-slate-200 rounded-2xl text-[11px] font-black text-slate-600 uppercase tracking-widest outline-none focus:border-blue-200 transition-all shadow-sm appearance-none cursor-pointer"
           >
             <option value="ALL">Semua Kategori</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {filteredCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           
           <button 
@@ -394,10 +404,10 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
                         <select 
                           name="category" 
                           required 
-                          defaultValue={categories.find(c => c.id === editingProduct?.category || c.name === editingProduct?.category)?.id || editingProduct?.category} 
+                          defaultValue={filteredCategories.find(c => c.id === editingProduct?.category || c.name === editingProduct?.category)?.id || editingProduct?.category} 
                           className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-black text-slate-600 text-[11px] appearance-none uppercase tracking-widest"
                         >
-                          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          {filteredCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
                       </div>
                       <div className="space-y-2">

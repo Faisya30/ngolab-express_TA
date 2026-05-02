@@ -125,60 +125,40 @@ export async function saveOrder(req, res) {
 		const total = toNumber(order.total);
 		const pointsEarned = toNumber(order.pointsEarned);
 		const pointsUsed = toNumber(order.pointsUsed);
-		const memberCode = String(order.memberCode || '').trim();
-		const memberName = String(order.member || '').trim();
-		const voucherRaw = String(order.voucher || '').trim();
+		const tipePelanggan = String(order.tipe_pelanggan || order.tipePelanggan || (order.member && String(order.member).toLowerCase() !== 'guest' ? 'MEMBER' : 'GUEST')).toUpperCase();
+		const namaPelanggan = String(order.nama_pelanggan || order.namaPelanggan || order.member || (tipePelanggan === 'MEMBER' ? 'Member' : 'Guest'));
+		const orderType = String(order.order_type || order.orderType || 'kiosk').toLowerCase();
 
-		const usesMemberCode = await hasColumn('orders', 'member_code');
-		const usesVoucherCode = await hasColumn('orders', 'voucher_code');
-		const orderItemsUsesOrderCode = await hasColumn('order_items', 'order_code');
-		const orderItemsUsesProductCode = await hasColumn('order_items', 'product_code');
-		const memberLogsUsesMemberCode = await hasColumn('member_logs', 'member_code');
-		const memberLogsUsesOrderCode = await hasColumn('member_logs', 'order_code');
+		const hasTipePelanggan = await hasColumn('orders', 'tipe_pelanggan');
+		const hasNamaPelanggan = await hasColumn('orders', 'nama_pelanggan');
+		const hasOrderType = await hasColumn('orders', 'order_type');
+		const orderItemsUsesOrderId = await hasColumn('order_items', 'order_id');
+		const orderItemsUsesProductId = await hasColumn('order_items', 'product_id');
 
 		const result = await withTransaction(async (connection) => {
-			const member = usesMemberCode ? null : await resolveMemberByCodeOrName(connection, memberCode, memberName);
-			const voucher = (usesVoucherCode || !voucherRaw || voucherRaw === '-') ? null : await resolveVoucher(connection, voucherRaw);
+			const orderColumns = ['order_code', 'service_type', 'subtotal', 'discount', 'total', 'payment_method', 'points_earned', 'points_used'];
+			const orderValues = [orderCode, serviceType, subtotal, discount, total, paymentMethod, pointsEarned, pointsUsed];
 
-			if (usesMemberCode) {
-				await connection.query(
-					`INSERT INTO orders (
-						order_code, service_type, subtotal, discount, total, payment_method,
-						member_code, voucher_code, points_earned, points_used
-					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
-					[
-						orderCode,
-						serviceType,
-						subtotal,
-						discount,
-						total,
-						paymentMethod,
-						memberCode && memberCode !== '-' ? memberCode : null,
-						voucherRaw && voucherRaw !== '-' ? voucherRaw : null,
-						pointsEarned,
-						pointsUsed,
-					]
-				);
-			} else {
-				await connection.query(
-					`INSERT INTO orders (
-						order_code, service_type, subtotal, discount, total, payment_method,
-						member_id, voucher_id, points_earned, points_used
-					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
-					[
-						orderCode,
-						serviceType,
-						subtotal,
-						discount,
-						total,
-						paymentMethod,
-						member?.id ?? null,
-						voucher?.id ?? null,
-						pointsEarned,
-						pointsUsed,
-					]
-				);
+			if (hasTipePelanggan) {
+				orderColumns.push('tipe_pelanggan');
+				orderValues.push(tipePelanggan);
 			}
+
+			if (hasNamaPelanggan) {
+				orderColumns.push('nama_pelanggan');
+				orderValues.push(namaPelanggan);
+			}
+
+			if (hasOrderType) {
+				orderColumns.push('order_type');
+				orderValues.push(orderType);
+			}
+
+			const placeholders = orderColumns.map(() => '?').join(', ');
+			await connection.query(
+				`INSERT INTO orders (${orderColumns.join(', ')}) VALUES (${placeholders})`,
+				orderValues
+			);
 
 			const [[savedOrder]] = await connection.query('SELECT id FROM orders WHERE order_code = ? LIMIT 1', [orderCode]);
 			const orderId = savedOrder?.id;
@@ -188,63 +168,27 @@ export async function saveOrder(req, res) {
 				const price = toNumber(item.price);
 				const itemSubtotal = toNumber(item.subtotal) || price * qty;
 				const productCode = String(item.id || item.code || '').trim();
-				let productId = null;
+				const [productRows] = await connection.query('SELECT id FROM products WHERE code = ? LIMIT 1', [productCode]);
+				const productId = productRows[0]?.id ?? null;
 
-				if (!orderItemsUsesProductCode && productCode) {
-					const [productRows] = await connection.query('SELECT id FROM products WHERE code = ? LIMIT 1', [productCode]);
-					productId = productRows[0]?.id ?? null;
+				if (!productId) {
+					throw new Error(`Produk dengan kode ${productCode} tidak ditemukan.`);
 				}
 
-				if (orderItemsUsesOrderCode) {
-					await connection.query(
-						`INSERT INTO order_items (
-							order_code, product_code, product_name_snapshot, price_snapshot, qty, subtotal
-						) VALUES (?, ?, ?, ?, ?, ?)` ,
-						[
-							orderCode,
-							orderItemsUsesProductCode ? (productCode || null) : null,
-							String(item.name || item.productName || 'Unknown Product'),
-							price,
-							qty,
-							itemSubtotal,
-						]
-					);
-				} else {
-					await connection.query(
-						`INSERT INTO order_items (
-							order_id, product_id, product_name_snapshot, price_snapshot, qty, subtotal
-						) VALUES (?, ?, ?, ?, ?, ?)` ,
-						[
-							orderId,
-							productId,
-							String(item.name || item.productName || 'Unknown Product'),
-							price,
-							qty,
-							itemSubtotal,
-						]
-					);
-				}
-			}
-
-			if ((pointsEarned > 0 || pointsUsed > 0) && (memberCode && memberCode !== '-')) {
-				if (memberLogsUsesMemberCode) {
-					await connection.query(
-						`INSERT INTO member_logs (
-							member_code, order_code, points_earned, points_used, note
-						) VALUES (?, ?, ?, ?, ?)` ,
-						[memberCode, memberLogsUsesOrderCode ? orderCode : null, pointsEarned, pointsUsed, 'Order from kiosk']
-					);
-				} else {
-					const member = await resolveMemberByCodeOrName(connection, memberCode, memberName);
-					if (member?.id) {
-						await connection.query(
-							`INSERT INTO member_logs (
-								member_id, order_id, points_earned, points_used, note
-							) VALUES (?, ?, ?, ?, ?)` ,
-							[member.id, orderId, pointsEarned, pointsUsed, 'Order from kiosk']
-						);
-					}
-				}
+				await connection.query(
+					`INSERT INTO order_items (
+						order_id, product_id, product_name_snapshot, price_snapshot, qty, subtotal, order_item_type
+					) VALUES (?, ?, ?, ?, ?, ?, ?)` ,
+					[
+						orderId,
+						productId,
+						String(item.name || item.productName || 'Unknown Product'),
+						price,
+						qty,
+						itemSubtotal,
+						'kiosk',
+					]
+				);
 			}
 
 			return { orderCode };

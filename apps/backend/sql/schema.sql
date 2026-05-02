@@ -75,9 +75,6 @@ CREATE TABLE IF NOT EXISTS order_items (
 
 
 INSERT IGNORE INTO categories (code, name, product_type, is_active) VALUES
-('recommended', 'Andalan', 'all', 1),
-('all', 'Semua Menu', 'all', 1),
-('bakso', 'Bakso', 'kiosk', 1),
 ('mie', 'Mie Yamin', 'kiosk', 1),
 ('drinks', 'Minuman', 'kiosk', 1),
 ('retail', 'Retail', 'cv', 1);

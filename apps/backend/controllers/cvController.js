@@ -350,96 +350,66 @@ export async function getCvProductByBarcode(req, res) {
 export async function getCvOrders(req, res) {
   try {
     const requestedType = normalizeProductType(req.query.order_type);
-    const usesMemberCode = await hasColumn('orders', 'member_code');
-    const hasProductType = await hasColumn('products', 'product_type');
-
-    // Fetch orders (always return consistent fields: id, order_code, created_at, subtotal, discount, total, payment, member)
-    let orders = [];
-
-    if (!hasProductType) {
-      orders = usesMemberCode
-        ? await query(
-            `SELECT
-              id,
-              order_code,
-              created_at,
-              service_type AS service,
-              subtotal,
-              discount,
-              total,
-              payment_method AS payment,
-              COALESCE(member_code, 'Guest') AS member
-            FROM orders
-            ORDER BY created_at DESC`
-          )
-        : await query(
-            `SELECT
-              o.id,
-              o.order_code,
-              o.created_at,
-              o.service_type AS service,
-              o.subtotal,
-              o.discount,
-              o.total,
-              o.payment_method AS payment,
-              COALESCE(m.code, 'Guest') AS member
-            FROM orders o
-            LEFT JOIN members m ON o.member_id = m.id
-            ORDER BY o.created_at DESC`
-          );
-    } else {
-      const hasOrderItemsOrderCode = await hasColumn('order_items', 'order_code');
-      const hasOrderItemsProductCode = await hasColumn('order_items', 'product_code');
-
-      const joinClause1 = hasOrderItemsOrderCode ? 'o.order_code = oi.order_code' : 'o.id = oi.order_id';
-      const joinClause2 = hasOrderItemsProductCode ? 'oi.product_code = p.code' : 'oi.product_id = p.id';
-
-      orders = await query(
-        `SELECT DISTINCT
-          o.id,
-          o.order_code,
-          o.created_at,
-          o.service_type AS service,
-          o.subtotal,
-          o.discount,
-          o.total,
-          o.payment_method AS payment,
-          COALESCE(${usesMemberCode ? 'o.member_code' : 'm.code'}, 'Guest') AS member
-        FROM orders o
-        LEFT JOIN order_items oi ON ${joinClause1}
-        LEFT JOIN products p ON ${joinClause2}
-        ${usesMemberCode ? '' : 'LEFT JOIN members m ON o.member_id = m.id'}
-        WHERE p.product_type = ?
-        ORDER BY o.created_at DESC`,
-        [requestedType]
-      );
+    const hasOrderType = await hasColumn('orders', 'order_type');
+    if (!hasOrderType) {
+      return res.status(500).json({ success: false, error: 'Kolom order_type belum tersedia. Jalankan migrasi database terlebih dahulu.' });
     }
 
-    // Ensure we have array shape
-    if (!Array.isArray(orders)) orders = [];
+    const orders = await query(
+      requestedType === 'all'
+        ? `SELECT
+            id,
+            order_code,
+            created_at,
+            service_type AS service,
+            subtotal,
+            discount,
+            total,
+            payment_method AS payment,
+            COALESCE(tipe_pelanggan, 'GUEST') AS customerType,
+            COALESCE(nama_pelanggan, 'Guest') AS member,
+            order_type AS orderType
+          FROM orders
+          WHERE order_type IN ('cv', 'computervision')
+          ORDER BY created_at DESC`
+        : `SELECT
+            id,
+            order_code,
+            created_at,
+            service_type AS service,
+            subtotal,
+            discount,
+            total,
+            payment_method AS payment,
+            COALESCE(tipe_pelanggan, 'GUEST') AS customerType,
+            COALESCE(nama_pelanggan, 'Guest') AS member,
+            order_type AS orderType
+          FROM orders
+          WHERE order_type IN ('cv', 'computervision')
+          ORDER BY created_at DESC`
+    );
 
-    // Attach items[] for each order
-    const orderItemsUsesOrderCode = await hasColumn('order_items', 'order_code');
+    const orderItemsUsesOrderId = await hasColumn('order_items', 'order_id');
     const orderItemsHasProductNameSnapshot = await hasColumn('order_items', 'product_name_snapshot');
-    const orderItemsHasProductName = await hasColumn('order_items', 'product_name');
     const orderItemsHasPriceSnapshot = await hasColumn('order_items', 'price_snapshot');
-    const orderItemsHasPrice = await hasColumn('order_items', 'price');
 
     for (const o of orders) {
-      const orderKey = orderItemsUsesOrderCode ? o.order_code : o.id;
-      
-      // Build dynamic SELECT based on available columns
       const productNameCol = orderItemsHasProductNameSnapshot ? 'product_name_snapshot' : (orderItemsHasProductName ? 'product_name' : "''");
-      const priceCol = orderItemsHasPriceSnapshot ? 'price_snapshot' : (orderItemsHasPrice ? 'price' : '0');
-      
-      const itemsQuery = orderItemsUsesOrderCode
-        ? `SELECT id, order_code, product_code, ${productNameCol} AS product_name_snapshot, ${priceCol} AS price, qty, subtotal FROM order_items WHERE order_code = ? ORDER BY id ASC`
-        : `SELECT id, order_id, product_id, ${productNameCol} AS product_name_snapshot, ${priceCol} AS price, qty, subtotal FROM order_items WHERE order_id = ? ORDER BY id ASC`;
+      const priceCol = orderItemsHasPriceSnapshot ? 'price_snapshot' : 'price';
 
-      const itemsRows = await query(itemsQuery, [orderKey]);
-      const items = itemsRows || [];
+      const items = await query(
+        orderItemsUsesOrderId
+          ? `SELECT id, order_id, product_id, ${productNameCol} AS product_name_snapshot, ${priceCol} AS price, qty, subtotal
+            FROM order_items
+            WHERE order_id = ? AND COALESCE(order_item_type, 'computervision') IN ('cv', 'computervision')
+            ORDER BY id ASC`
+          : `SELECT id, order_code, product_code, ${productNameCol} AS product_name_snapshot, ${priceCol} AS price, qty, subtotal
+            FROM order_items
+            WHERE order_code = ?
+            ORDER BY id ASC`,
+        [orderItemsUsesOrderId ? o.id : o.order_code]
+      );
 
-      // Normalize item fields for frontend: include product_name_snapshot and productName
       o.items = items.map((it) => ({
         id: it.id,
         product_code: it.product_code ?? it.product_id ?? null,
@@ -468,25 +438,15 @@ export async function saveCvOrder(req, res) {
     }
 
     const hasOrderCode = await hasColumn('orders', 'order_code');
-    const hasMemberCode = await hasColumn('orders', 'member_code');
-    const hasMemberId = await hasColumn('orders', 'member_id');
-    const hasVoucherCode = await hasColumn('orders', 'voucher_code');
-    const hasVoucherId = await hasColumn('orders', 'voucher_id');
     const hasOrderType = await hasColumn('orders', 'order_type');
     const hasTipePelanggan = await hasColumn('orders', 'tipe_pelanggan');
     const hasNamaPelanggan = await hasColumn('orders', 'nama_pelanggan');
 
-    const orderItemsUsesOrderCode = await hasColumn('order_items', 'order_code');
     const orderItemsUsesOrderId = await hasColumn('order_items', 'order_id');
-    const orderItemsUsesProductCode = await hasColumn('order_items', 'product_code');
     const orderItemsUsesProductId = await hasColumn('order_items', 'product_id');
     const hasOrderItemType = await hasColumn('order_items', 'order_item_type');
 
-    if (!hasOrderCode || (!hasMemberCode && !hasMemberId) || (!hasVoucherCode && !hasVoucherId)) {
-      return res.status(500).json({ success: false, error: 'Skema orders tidak sesuai backend pusat (wajib order_code dan relasi member/voucher).' });
-    }
-
-    if ((!orderItemsUsesOrderCode && !orderItemsUsesOrderId) || (!orderItemsUsesProductCode && !orderItemsUsesProductId)) {
+    if (!hasOrderCode || !orderItemsUsesOrderId || !orderItemsUsesProductId) {
       return res.status(500).json({ success: false, error: 'Skema order_items tidak sesuai backend pusat (wajib relasi order dan product).' });
     }
 
@@ -499,47 +459,11 @@ export async function saveCvOrder(req, res) {
     const pointsEarned = toNumber(order.points_earned ?? order.pointsEarned);
     const pointsUsed = toNumber(order.points_used ?? order.pointsUsed ?? order.point_used);
 
-    const memberCodeInput = String(order.member_code || order.memberCode || '').trim();
-    const memberIdInput = order.member_id ?? order.memberId;
-    const voucherCodeInput = String(order.voucher_code || order.voucherCode || '').trim();
-    const voucherIdInput = order.voucher_id ?? order.voucherId;
-
     const orderTypeValue = String(order.order_type || order.orderType || 'computervision').toLowerCase();
-    const tipePelanggan = String(order.tipe_pelanggan || order.tipePelanggan || (memberCodeInput ? 'MEMBER' : 'GUEST')).toUpperCase();
-    const namaPelanggan = String(order.nama_pelanggan || order.namaPelanggan || (tipePelanggan === 'MEMBER' ? 'Member' : 'Guest'));
-
-    const memberLogsUsesMemberCode = await hasColumn('member_logs', 'member_code');
-    const memberLogsUsesOrderCode = await hasColumn('member_logs', 'order_code');
+    const tipePelanggan = String(order.tipe_pelanggan || order.tipePelanggan || 'GUEST').toUpperCase();
+    const namaPelanggan = String(order.nama_pelanggan || order.namaPelanggan || 'Guest');
 
     const result = await withTransaction(async (connection) => {
-      let memberCode = null;
-      let memberId = null;
-      if (memberCodeInput || memberIdInput) {
-        const [memberRows] = memberCodeInput
-          ? await connection.query('SELECT id, code FROM members WHERE code = ? LIMIT 1', [memberCodeInput])
-          : await connection.query('SELECT id, code FROM members WHERE id = ? LIMIT 1', [Number(memberIdInput || 0)]);
-        const member = memberRows[0];
-        if (!member) {
-          throw new Error('Member tidak ditemukan pada backend pusat. Gunakan member_code yang valid.');
-        }
-        memberCode = String(member.code || '');
-        memberId = Number(member.id || 0) || null;
-      }
-
-      let voucherCode = null;
-      let voucherId = null;
-      if (voucherCodeInput || voucherIdInput) {
-        const [voucherRows] = voucherCodeInput
-          ? await connection.query('SELECT id, code FROM vouchers WHERE code = ? LIMIT 1', [voucherCodeInput])
-          : await connection.query('SELECT id, code FROM vouchers WHERE id = ? LIMIT 1', [Number(voucherIdInput || 0)]);
-        const voucher = voucherRows[0];
-        if (!voucher) {
-          throw new Error('Voucher tidak ditemukan pada backend pusat. Gunakan voucher_code yang valid.');
-        }
-        voucherCode = String(voucher.code || '');
-        voucherId = Number(voucher.id || 0) || null;
-      }
-
       const orderColumns = [
         'order_code',
         'service_type',
@@ -560,22 +484,6 @@ export async function saveCvOrder(req, res) {
         pointsEarned,
         pointsUsed,
       ];
-
-      if (hasMemberCode) {
-        orderColumns.push('member_code');
-        orderValues.push(memberCode || null);
-      } else if (hasMemberId) {
-        orderColumns.push('member_id');
-        orderValues.push(memberId || null);
-      }
-
-      if (hasVoucherCode) {
-        orderColumns.push('voucher_code');
-        orderValues.push(voucherCode || null);
-      } else if (hasVoucherId) {
-        orderColumns.push('voucher_id');
-        orderValues.push(voucherId || null);
-      }
 
       if (hasOrderType) {
         orderColumns.push('order_type');
@@ -599,10 +507,8 @@ export async function saveCvOrder(req, res) {
       );
 
       let insertedOrderId = null;
-      if (orderItemsUsesOrderId) {
-        const [savedRows] = await connection.query('SELECT id FROM orders WHERE order_code = ? LIMIT 1', [orderCode]);
-        insertedOrderId = savedRows[0]?.id ?? null;
-      }
+      const [savedRows] = await connection.query('SELECT id FROM orders WHERE order_code = ? LIMIT 1', [orderCode]);
+      insertedOrderId = savedRows[0]?.id ?? null;
 
       for (const item of items) {
         const productCodeInput = String(item.product_code || item.productCode || item.code || '').trim();
@@ -639,7 +545,6 @@ export async function saveCvOrder(req, res) {
             throw new Error(`Produk ${product.code || product.id} bukan produk computer vision.`);
           }
 
-          productCode = String(product.code || '') || productCode;
           productId = Number(product.id || 0) || productId;
 
           if (!productName) productName = String(product.name || 'Unknown Product');
@@ -649,24 +554,8 @@ export async function saveCvOrder(req, res) {
         }
 
         const subtotalItem = toNumber(item.subtotal) || (price * qty);
-        const itemColumns = ['product_name_snapshot', 'price_snapshot', 'qty', 'subtotal'];
-        const itemValues = [productName || 'Unknown Product', price, qty, subtotalItem];
-
-        if (orderItemsUsesOrderCode) {
-          itemColumns.unshift('order_code');
-          itemValues.unshift(orderCode);
-        } else if (orderItemsUsesOrderId) {
-          itemColumns.unshift('order_id');
-          itemValues.unshift(insertedOrderId);
-        }
-
-        if (orderItemsUsesProductCode) {
-          itemColumns.splice(1, 0, 'product_code');
-          itemValues.splice(1, 0, productCode || null);
-        } else if (orderItemsUsesProductId) {
-          itemColumns.splice(1, 0, 'product_id');
-          itemValues.splice(1, 0, productId || null);
-        }
+        const itemColumns = ['order_id', 'product_id', 'product_name_snapshot', 'price_snapshot', 'qty', 'subtotal'];
+        const itemValues = [insertedOrderId, productId, productName || 'Unknown Product', price, qty, subtotalItem];
 
         if (hasOrderItemType) {
           itemColumns.push('order_item_type');
@@ -677,15 +566,6 @@ export async function saveCvOrder(req, res) {
         await connection.query(
           `INSERT INTO order_items (${itemColumns.join(', ')}) VALUES (${itemPlaceholders})`,
           itemValues
-        );
-      }
-
-      if ((pointsEarned > 0 || pointsUsed > 0) && memberCode && memberLogsUsesMemberCode) {
-        await connection.query(
-          `INSERT INTO member_logs (
-            member_code, order_code, points_earned, points_used, note
-          ) VALUES (?, ?, ?, ?, ?)`,
-          [memberCode, memberLogsUsesOrderCode ? orderCode : null, pointsEarned, pointsUsed, 'Order from computer vision']
         );
       }
 

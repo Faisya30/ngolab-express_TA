@@ -231,17 +231,18 @@ export async function getCategories(req, res) {
             ? `SELECT
                 code AS id,
                 name,
-                COALESCE(product_type, 'all') AS productType,
+                COALESCE(product_type, 'kiosk') AS productType,
                 is_active AS isActive
               FROM categories
+              WHERE product_type IN ('kiosk', 'cv')
               ORDER BY created_at ASC`
             : `SELECT
                 code AS id,
                 name,
-                COALESCE(product_type, 'all') AS productType,
+                COALESCE(product_type, 'kiosk') AS productType,
                 is_active AS isActive
               FROM categories
-              WHERE product_type IN (?, 'all')
+              WHERE product_type = ?
               ORDER BY created_at ASC`,
           requestProductType === 'all' ? [] : [requestProductType]
         )
@@ -253,7 +254,7 @@ export async function getCategories(req, res) {
           FROM categories
           ORDER BY created_at ASC`
         );
-    res.json(rows);
+    res.json({ success: true, categories: rows });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
