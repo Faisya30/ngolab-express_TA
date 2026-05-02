@@ -231,18 +231,17 @@ export async function getCategories(req, res) {
             ? `SELECT
                 code AS id,
                 name,
-                COALESCE(product_type, 'kiosk') AS productType,
+                COALESCE(product_type, 'all') AS productType,
                 is_active AS isActive
               FROM categories
-              WHERE product_type IN ('kiosk', 'cv')
               ORDER BY created_at ASC`
             : `SELECT
                 code AS id,
                 name,
-                COALESCE(product_type, 'kiosk') AS productType,
+                COALESCE(product_type, 'all') AS productType,
                 is_active AS isActive
               FROM categories
-              WHERE product_type = ?
+              WHERE product_type IN (?, 'all')
               ORDER BY created_at ASC`,
           requestProductType === 'all' ? [] : [requestProductType]
         )
