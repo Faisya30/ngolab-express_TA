@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS products (
   name VARCHAR(150) NOT NULL,
   category_code VARCHAR(50) NOT NULL,
   price DECIMAL(12,2) NOT NULL DEFAULT 0,
-  image_url TEXT NULL,
+  image_url LONGTEXT NULL,
   description TEXT NULL,
   product_type ENUM('kiosk','cv') NOT NULL DEFAULT 'kiosk',
   is_recommended TINYINT(1) NOT NULL DEFAULT 0,
