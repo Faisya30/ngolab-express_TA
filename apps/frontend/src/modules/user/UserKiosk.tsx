@@ -8,7 +8,6 @@ import {
   Member,
   Voucher,
 } from './types';
-import { CATEGORIES as FALLBACK_CATEGORIES } from './constants';
 import WelcomeScreen from './components/screens/WelcomeScreen';
 import ServiceTypeScreen from './components/screens/ServiceTypeScreen';
 import MenuScreen from './components/screens/MenuScreen';
@@ -26,7 +25,7 @@ const UserKiosk: React.FC = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
-  const [categories, setCategories] = useState<any[]>(FALLBACK_CATEGORIES);
+  const [categories, setCategories] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [serviceType, setServiceType] = useState<ServiceType | null>(null);
   const [member, setMember] = useState<Member | null>(null);
@@ -277,20 +276,17 @@ const UserKiosk: React.FC = () => {
 
         setProducts(formattedProducts);
 
-        let finalCategories = [];
+        let finalCategories: any[] = [];
         if (rawData.categories && rawData.categories.length > 0) {
           const normalizedCats = normalizeData(rawData.categories);
           finalCategories = normalizedCats.map((c: any) => {
             const catId = String(c.id || c.name || c.kategori || '').toLowerCase().trim();
-            const fallback = FALLBACK_CATEGORIES.find((f) => f.id.toLowerCase() === catId);
             return {
               id: catId,
               name: String(c.name || c.nama || c.id),
-              icon: fallback?.icon || '◉',
+              icon: c.icon || '◉',
             };
           });
-        } else {
-          finalCategories = FALLBACK_CATEGORIES;
         }
 
         setCategories(finalCategories);

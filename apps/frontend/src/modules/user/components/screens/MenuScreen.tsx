@@ -22,34 +22,23 @@ const PLACEHOLDER_IMAGE = "https://images.unsplash.com/photo-1546069901-ba9599a7
 const BRAND_LOGO_PATH = logoNgolab;
 
 const normalizeCategoryId = (value: string | undefined | null) => String(value || '').toLowerCase().trim();
-const isRecommendedCategory = (categoryId: string) => {
-  const normalized = normalizeCategoryId(categoryId);
-  return normalized === 'recommended' || normalized === 'andalan' || normalized === 'best';
-};
 
 const MenuScreen: React.FC<Props> = ({ cart, member, potentialPoints, products, categories, onAddToCart, onUpdateQty, onRemove, onClearCart, onOpenCart, onBack, total }) => {
-  const [activeCategory, setActiveCategory] = useState(
-    categories.find((c) => normalizeCategoryId(c?.id) === 'all')?.id || categories[0]?.id || 'all'
-  );
+  const [activeCategory, setActiveCategory] = useState(categories[0]?.id || '');
   const [showBrandLogo, setShowBrandLogo] = useState(true);
 
   useEffect(() => {
     if (!categories?.length) return;
     const hasActiveCategory = categories.some((c) => normalizeCategoryId(c?.id) === normalizeCategoryId(activeCategory));
     if (!hasActiveCategory) {
-      const allCategory = categories.find((c) => normalizeCategoryId(c?.id) === 'all');
-      setActiveCategory(allCategory?.id || categories[0]?.id || 'all');
+      setActiveCategory(categories[0]?.id || '');
     }
   }, [categories, activeCategory]);
 
   const filteredProducts = useMemo(() => {
-    const normalizedActive = normalizeCategoryId(activeCategory);
-    if (normalizedActive === 'all') return products;
-    if (isRecommendedCategory(normalizedActive)) {
-      const recommendedProducts = products.filter((p) => Boolean(p.isRecommended));
-      return recommendedProducts.length > 0 ? recommendedProducts : products;
-    }
+    if (!activeCategory) return products;
 
+    const normalizedActive = normalizeCategoryId(activeCategory);
     const byCategory = products.filter((p) => normalizeCategoryId(p.category) === normalizedActive);
     return byCategory.length > 0 ? byCategory : products;
   }, [activeCategory, products]);
