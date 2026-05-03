@@ -554,8 +554,8 @@ export async function saveCvOrder(req, res) {
         }
 
         const subtotalItem = toNumber(item.subtotal) || (price * qty);
-        const itemColumns = ['order_id', 'product_id', 'product_name_snapshot', 'price_snapshot', 'qty', 'subtotal'];
-        const itemValues = [insertedOrderId, productId, productName || 'Unknown Product', price, qty, subtotalItem];
+        const itemColumns = ['order_code', 'product_code', 'product_name_snapshot', 'price_snapshot', 'qty', 'subtotal'];
+        const itemValues = [orderCode, productCode, productName || 'Unknown Product', price, qty, subtotalItem];
 
         if (hasOrderItemType) {
           itemColumns.push('order_item_type');
