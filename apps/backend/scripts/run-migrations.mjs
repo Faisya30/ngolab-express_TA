@@ -71,6 +71,23 @@ async function runMigrations() {
         }
       }
     }
+
+    // Run migration_membership.sql
+    const migrationPath4 = path.join(process.cwd(), 'sql', 'migration_membership.sql');
+    const migrationSQL4 = fs.readFileSync(migrationPath4, 'utf8');
+
+    console.log('\n> Running migration_membership.sql');
+    const statements4 = migrationSQL4.split(';').filter(s => s.trim());
+    for (const statement of statements4) {
+      if (statement.trim()) {
+        try {
+          await conn.query(statement);
+          console.log('  ✓ Executed');
+        } catch (err) {
+          console.log('  ✗ Error:', err.message);
+        }
+      }
+    }
     
     console.log('\n✓ Migrations completed!');
     
@@ -81,6 +98,9 @@ async function runMigrations() {
     
     const [categories] = await conn.query(`SHOW COLUMNS FROM categories LIKE 'product_type'`);
     console.log('Categories table has product_type:', categories.length > 0 ? '✓ YES' : '✗ NO');
+
+    const [users] = await conn.query(`SHOW TABLES LIKE 'users'`);
+    console.log('Membership users table exists:', users.length > 0 ? '✓ YES' : '✗ NO');
     
   } catch (error) {
     console.error('Migration failed:', error);

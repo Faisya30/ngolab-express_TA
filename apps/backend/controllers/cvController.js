@@ -501,61 +501,72 @@ export async function saveCvOrder(req, res) {
       }
 
       const placeholders = orderColumns.map(() => '?').join(', ');
-      await connection.query(
+      const [insertResult] = await connection.query(
         `INSERT INTO orders (${orderColumns.join(', ')}) VALUES (${placeholders})`,
         orderValues
       );
 
-      let insertedOrderId = null;
-      const [savedRows] = await connection.query('SELECT id FROM orders WHERE order_code = ? LIMIT 1', [orderCode]);
-      insertedOrderId = savedRows[0]?.id ?? null;
+      const insertedOrderId = insertResult.insertId ?? null;
+      if (!insertedOrderId) {
+        throw new Error('Gagal mendapatkan order_id hasil insert orders.');
+      }
 
       for (const item of items) {
-        const productCodeInput = String(item.product_code || item.productCode || item.code || '').trim();
-        const productIdInput = Number(item.product_id || item.productId || item.id || 0);
+        // Pisahkan numeric ID dari string code
+        const numericProductId = Number(item.product_id || item.productId || 0);
+        const productCodeInput = String(item.product_code || item.productCode || item.code || item.id || '').trim();
+
         const qty = toNumber(item.qty || item.quantity || 1) || 1;
         let price = toNumber(item.price_snapshot ?? item.price);
         let productName = String(item.product_name_snapshot || item.product_name || item.name || '').trim();
-        let productCode = productCodeInput || null;
-        let productId = productIdInput || null;
+        let productId = null;
 
-        if (productCodeInput || productIdInput) {
-          const [productRows] = productCodeInput
-            ? await connection.query(
-              `SELECT id, code, name, price, product_type
-              FROM products
-              WHERE code = ?
-              LIMIT 1`,
-              [productCodeInput]
-            )
-            : await connection.query(
-              `SELECT id, code, name, price, product_type
-              FROM products
-              WHERE id = ?
-              LIMIT 1`,
-              [productIdInput]
-            );
+        // Coba numeric ID dulu, baru code
+        if (numericProductId > 0) {
+          // Query by numeric ID
+          const [productRows] = await connection.query(
+            `SELECT id, code, name, price, product_type FROM products WHERE id = ? LIMIT 1`,
+            [numericProductId]
+          );
 
           const product = productRows[0];
           if (!product) {
-            throw new Error('Produk CV tidak ditemukan dari code/id yang dikirim.');
+            throw new Error(`Produk dengan ID ${numericProductId} tidak ditemukan.`);
           }
 
           if (String(product.product_type || '').toLowerCase() !== 'cv') {
             throw new Error(`Produk ${product.code || product.id} bukan produk computer vision.`);
           }
 
-          productId = Number(product.id || 0) || productId;
+          productId = Number(product.id || 0);
+          if (!productName) productName = String(product.name || 'Unknown Product');
+          if (price <= 0) price = toNumber(product.price);
+        } else if (productCodeInput) {
+          // Query by product code
+          const [productRows] = await connection.query(
+            `SELECT id, code, name, price, product_type FROM products WHERE code = ? LIMIT 1`,
+            [productCodeInput]
+          );
 
+          const product = productRows[0];
+          if (!product) {
+            throw new Error(`Produk dengan code "${productCodeInput}" tidak ditemukan.`);
+          }
+
+          if (String(product.product_type || '').toLowerCase() !== 'cv') {
+            throw new Error(`Produk ${product.code || product.id} bukan produk computer vision.`);
+          }
+
+          productId = Number(product.id || 0);
           if (!productName) productName = String(product.name || 'Unknown Product');
           if (price <= 0) price = toNumber(product.price);
         } else {
-          throw new Error('Setiap item wajib mengirim product_code atau product_id.');
+          throw new Error('Setiap item wajib mengirim product_id atau product_code.');
         }
 
         const subtotalItem = toNumber(item.subtotal) || (price * qty);
-        const itemColumns = ['order_code', 'product_code', 'product_name_snapshot', 'price_snapshot', 'qty', 'subtotal'];
-        const itemValues = [orderCode, productCode, productName || 'Unknown Product', price, qty, subtotalItem];
+        const itemColumns = ['order_id', 'product_id', 'product_name_snapshot', 'price_snapshot', 'qty', 'subtotal'];
+        const itemValues = [insertedOrderId, productId, productName || 'Unknown Product', price, qty, subtotalItem];
 
         if (hasOrderItemType) {
           itemColumns.push('order_item_type');

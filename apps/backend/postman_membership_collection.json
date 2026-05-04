@@ -1,0 +1,157 @@
+{
+  "info": {
+    "name": "ngolab-membership",
+    "_postman_id": "ngolab-membership-collection",
+    "description": "Collection for membership endpoints (register, login, transactions, redeem)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Register",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"testuser\",\n  \"email\": \"test@example.com\",\n  \"password\": \"Secret123!\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": { "raw": "{{API_BASE_URL}}/api/membership/register", "host": ["{{API_BASE_URL}}"], "path": ["api","membership","register"] }
+      }
+      ,
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "try {",
+              "  var json = pm.response.json();",
+              "  if (json && json.data && json.data.user && json.data.user.user_id) {",
+              "    pm.environment.set('user_id', json.data.user.user_id);",
+              "  }",
+              "  if (json && json.data && json.data.referral_code) {",
+              "    pm.environment.set('referral_code', json.data.referral_code);",
+              "  }",
+              "  // optionally set email for convenience",
+              "  if (json && json.data && json.data.user && json.data.user.email) {",
+              "    pm.environment.set('user_email', json.data.user.email);",
+              "  }",
+              "} catch (e) { pm.test('parse response', function(){ pm.expect(true).to.be.ok; }); }"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"username\": \"test@example.com\",\n  \"password\": \"Secret123!\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": { "raw": "{{API_BASE_URL}}/api/membership/login", "host": ["{{API_BASE_URL}}"], "path": ["api","membership","login"] }
+      }
+      ,
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "try {",
+              "  var json = pm.response.json();",
+              "  if (json && json.data && json.data.user && json.data.user.user_id) {",
+              "    pm.environment.set('user_id', json.data.user.user_id);",
+              "  }",
+              "  if (json && json.data && json.data.token) {",
+              "    pm.environment.set('token', json.data.token);",
+              "  }",
+              "} catch (e) { pm.test('parse response', function(){ pm.expect(true).to.be.ok; }); }"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Transaction",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"transaction_code\": \"TRX-{{timestamp}}\",\n  \"user_id\": \"{{user_id}}\",\n  \"transaction_type\": \"kiosk\",\n  \"payment_method\": \"CASH\",\n  \"subtotal\": 100000,\n  \"discount\": 0,\n  \"total\": 100000,\n  \"points_earned\": 100,\n  \"items\": [ { \"menu_item_code\": \"M-001\", \"item_name_snapshot\": \"Coffe\", \"price_snapshot\": 50000, \"qty\": 2, \"subtotal\": 100000 } ]\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": { "raw": "{{API_BASE_URL}}/api/membership/transactions", "host": ["{{API_BASE_URL}}"], "path": ["api","membership","transactions"] }
+      }
+      ,
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "try {",
+              "  var json = pm.response.json();",
+              "  if (json && json.data && json.data.transaction_code) {",
+              "    pm.environment.set('transaction_code', json.data.transaction_code);",
+              "  }",
+              "} catch (e) { pm.test('parse response', function(){ pm.expect(true).to.be.ok; }); }"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Transaction",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "{{API_BASE_URL}}/api/membership/transactions/{{transaction_code}}", "host": ["{{API_BASE_URL}}"], "path": ["api","membership","transactions","{{transaction_code}}"] }
+      }
+    },
+    {
+      "name": "Redeem Points",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"voucher_code\": \"VOUCHER-TEST\",\n  \"points_used\": 100\n}", "options": { "raw": { "language": "json" } } },
+        "url": { "raw": "{{API_BASE_URL}}/api/membership/redeem-points", "host": ["{{API_BASE_URL}}"], "path": ["api","membership","redeem-points"] }
+      }
+    },
+    {
+      "name": "Get Profile",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "{{API_BASE_URL}}/api/membership/profile/{{user_id}}", "host": ["{{API_BASE_URL}}"], "path": ["api","membership","profile","{{user_id}}"] }
+      }
+    },
+    {
+      "name": "Get Point Logs",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "{{API_BASE_URL}}/api/membership/point-logs/{{user_id}}", "host": ["{{API_BASE_URL}}"], "path": ["api","membership","point-logs","{{user_id}}"] }
+      }
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "// set a timestamp variable for transaction code if not provided",
+          "if (!pm.environment.get('timestamp')) {",
+          "  var d = new Date();",
+          "  var ts = d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2)+('0'+d.getHours()).slice(-2)+('0'+d.getMinutes()).slice(-2)+('0'+d.getSeconds()).slice(-2);",
+          "  pm.environment.set('timestamp', ts);",
+          "}"
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ]
+}

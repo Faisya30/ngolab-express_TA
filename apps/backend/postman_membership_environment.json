@@ -1,0 +1,13 @@
+{
+  "id": "ngolab-membership-env",
+  "name": "ngolab-membership-environment",
+  "values": [
+    { "key": "API_BASE_URL", "value": "http://localhost:4000", "enabled": true },
+    { "key": "token", "value": "", "enabled": true },
+    { "key": "user_id", "value": "USR-1777876498858-A0BA7E", "enabled": true },
+    { "key": "transaction_code", "value": "TRX-12345-TEST", "enabled": true },
+    { "key": "timestamp", "value": "", "enabled": true }
+  ],
+  "timestamp": 0,
+  "synced": false
+}
