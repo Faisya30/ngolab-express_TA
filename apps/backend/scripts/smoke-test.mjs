@@ -50,10 +50,10 @@ async function run() {
   });
   assert(listCategories.response.ok, `List categories failed (${listCategories.response.status})`);
 
-  const categoryId = Array.isArray(listCategories.body) && listCategories.body.length
-    ? String(listCategories.body[0].id || '')
-    : '';
-  assert(Boolean(categoryId), 'No categories found; cannot run product create smoke test.');
+  const categories = Array.isArray(listCategories.body) ? listCategories.body : (listCategories.body?.categories || []);
+  const kioskCategory = categories.find(c => c.productType === 'kiosk');
+  const categoryId = kioskCategory ? String(kioskCategory.id || '') : '';
+  assert(Boolean(categoryId), 'No kiosk categories found; cannot run product create smoke test.');
 
   const createProduct = await request('/api/admin/products', {
     method: 'POST',

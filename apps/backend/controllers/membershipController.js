@@ -997,7 +997,7 @@ export async function createTransaction(_req, res) {
   try {
     const body = _req.body || {};
     const transaction = body.transaction || body;
-    const items = Array.isArray(body.items) ? body.items : Array.isArray(body.transaction_items) ? body.transaction_items : [];
+    const items = Array.isArray(body.items) ? body.items : [];
     const transactionCode = normalizeText(transaction.transaction_code || transaction.transactionCode || `TRX-${Date.now()}`);
     const userId = normalizeText(transaction.user_id || transaction.userId);
     const transactionType = normalizeText(transaction.transaction_type || transaction.transactionType || 'manual').toLowerCase();
@@ -1014,7 +1014,7 @@ export async function createTransaction(_req, res) {
 
     const result = await withTransaction(async (connection) => {
       const [transactionRows] = await connection.query(
-        `SELECT id FROM transactions WHERE transaction_code = ? LIMIT 1`,
+        `SELECT order_code FROM orders WHERE order_code = ? LIMIT 1`,
         [transactionCode]
       );
 
@@ -1030,20 +1030,19 @@ export async function createTransaction(_req, res) {
       }
 
       await connection.query(
-        `INSERT INTO transactions (
-          transaction_code,
-          user_id,
-          transaction_type,
+        `INSERT INTO orders (
+          order_code,
+          service_type,
           subtotal,
           discount,
           total,
           points_earned,
           points_used,
-          payment_method
+          payment_method,
+          member_code
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           transactionCode,
-          userId || null,
           transactionType,
           subtotal,
           discount,
@@ -1051,6 +1050,7 @@ export async function createTransaction(_req, res) {
           pointsEarned,
           pointsUsed,
           paymentMethod,
+          userId || null,
         ]
       );
 
@@ -1065,28 +1065,28 @@ export async function createTransaction(_req, res) {
           throw new Error('Setiap item wajib punya nama.');
         }
 
-        // ensure referenced menu_item_code exists, otherwise insert NULL to avoid FK failure
-        let menuItemCodeToInsert = itemCode || null;
-        if (menuItemCodeToInsert) {
-          const [menuRows] = await connection.query(
-            `SELECT code FROM menu_items WHERE code = ? LIMIT 1`,
-            [menuItemCodeToInsert]
+        // ensure referenced product_code exists, otherwise insert NULL to avoid FK failure
+        let productCodeToInsert = itemCode || null;
+        if (productCodeToInsert) {
+          const [productRows] = await connection.query(
+            `SELECT code FROM products WHERE code = ? LIMIT 1`,
+            [productCodeToInsert]
           );
-          if (!menuRows.length) {
-            menuItemCodeToInsert = null;
+          if (!productRows.length) {
+            productCodeToInsert = null;
           }
         }
 
         await connection.query(
-          `INSERT INTO transaction_items (
-            transaction_code,
-            menu_item_code,
-            item_name_snapshot,
+          `INSERT INTO order_items (
+            order_code,
+            product_code,
+            product_name_snapshot,
             price_snapshot,
             qty,
             subtotal
           ) VALUES (?, ?, ?, ?, ?, ?)`,
-          [transactionCode, menuItemCodeToInsert, itemName, price, qty, itemSubtotal]
+          [transactionCode, productCodeToInsert, itemName, price, qty, itemSubtotal]
         );
       }
 
@@ -1137,9 +1137,9 @@ export async function getTransactionDetail(_req, res) {
     const transactionRows = await query(
       `SELECT
         id,
-        transaction_code,
-        user_id,
-        transaction_type,
+        order_code,
+        member_code,
+        service_type,
         subtotal,
         discount,
         total,
@@ -1147,8 +1147,8 @@ export async function getTransactionDetail(_req, res) {
         points_used,
         payment_method,
         created_at
-      FROM transactions
-      WHERE transaction_code = ?
+      FROM orders
+      WHERE order_code = ?
       LIMIT 1`,
       [transactionCode]
     );
@@ -1160,14 +1160,14 @@ export async function getTransactionDetail(_req, res) {
     const itemRows = await query(
       `SELECT
         id,
-        transaction_code,
-        menu_item_code,
-        item_name_snapshot,
+        order_code,
+        product_code,
+        product_name_snapshot,
         price_snapshot,
         qty,
         subtotal
-      FROM transaction_items
-      WHERE transaction_code = ?
+      FROM order_items
+      WHERE order_code = ?
       ORDER BY id ASC`,
       [transactionCode]
     );
