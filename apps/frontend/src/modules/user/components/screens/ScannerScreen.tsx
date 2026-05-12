@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Member } from '../../types.ts';
+import jsQR from 'jsqr';
 import { DUMMY_MEMBER } from '../../constants.ts';
 
 interface Props {
@@ -13,21 +14,74 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
+    let scanning = true;
+    let activeStream: MediaStream | null = null;
+
     async function setupCamera() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: 'environment' } } });
+        activeStream = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const tick = () => {
+          if (!scanning) return;
+          try {
+            if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA && ctx) {
+              const vw = videoRef.current.videoWidth;
+              const vh = videoRef.current.videoHeight;
+              if (vw && vh) {
+                canvas.width = vw;
+                canvas.height = vh;
+                ctx.drawImage(videoRef.current, 0, 0, vw, vh);
+                const imageData = ctx.getImageData(0, 0, vw, vh);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+                if (code && code.data) {
+                  scanning = false;
+                  // stop camera
+                  try {
+                    (stream as MediaStream).getTracks().forEach((t) => t.stop());
+                  } catch (_e) {}
+                  onScanSuccess({ code: code.data } as any);
+                  return;
+                }
+              }
+            }
+          } catch (err) {
+            // ignore decode errors
+          }
+          requestAnimationFrame(tick);
+        };
+
+        requestAnimationFrame(tick);
       } catch (err) {
-        console.error("Akses kamera ditolak atau tidak tersedia", err);
+        // fallback to generic camera if exact environment constraint fails
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+          activeStream = stream;
+          if (videoRef.current) videoRef.current.srcObject = stream;
+        } catch (err2) {
+          console.error("Akses kamera ditolak atau tidak tersedia", err2);
+        }
       }
     }
     setupCamera();
 
     return () => {
+      scanning = false;
+      if (activeStream) {
+        try {
+          activeStream.getTracks().forEach((t) => t.stop());
+        } catch (_e) {}
+      }
       if (videoRef.current && videoRef.current.srcObject) {
-        (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+        try {
+          (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+        } catch (_e) {}
       }
     };
   }, []);

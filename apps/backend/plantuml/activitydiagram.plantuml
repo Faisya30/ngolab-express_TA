@@ -1,0 +1,81 @@
+@startuml
+start
+
+:Customer datang ke layar kiosk;
+:Welcome Screen;
+:Gesture telunjuk + jempol untuk lanjut;
+
+:Pilih tipe pesanan;
+
+if (Tipe pesanan?) then (Dine In)
+  :Simpan tipe pesanan Dine In;
+else (Take Away)
+  :Simpan tipe pesanan Take Away;
+endif
+
+:Masuk halaman katalog menu;
+
+repeat
+  :Customer memilih menu;
+  :Tambah / kurangi quantity;
+repeat while (Masih ingin pesan?) is (Ya)
+
+:Klik tombol Bayar;
+:Masuk halaman Ringkasan Pesanan;
+:Tampilkan daftar pesanan dan subtotal;
+
+if (Customer punya membership?) then (Ya)
+  :Scan QR Membership;
+  if (Membership valid?) then (Ya)
+    :Masuk sebagai member;
+    :Tampilkan saldo poin dan voucher;
+
+    if (Gunakan poin?) then (Ya)
+      :Aktifkan saldo poin;
+      :Kurangi total dengan poin;
+    else (Tidak)
+      :Lanjut tanpa poin;
+    endif
+
+    if (Pilih voucher?) then (Ya)
+      :Validasi voucher;
+      :Terapkan voucher;
+    else (Tidak)
+      :Lanjut tanpa voucher;
+    endif
+
+  else (Tidak)
+    :Tampilkan pesan membership tidak valid;
+    :Lanjut tanpa member;
+  endif
+else (Tidak)
+  :Lanjut tanpa member;
+endif
+
+:Pilih metode pembayaran;
+
+if (Metode pembayaran?) then (QRIS)
+  :Generate QRIS;
+  :Tampilkan QRIS;
+  :Customer melakukan pembayaran;
+  if (Pembayaran berhasil?) then (Ya)
+    :Finalisasi pesanan;
+  else (Tidak)
+    :Tampilkan pesan pembayaran gagal;
+    :Ulangi pembayaran QRIS;
+  endif
+else (Cash)
+  :Tampilkan halaman arahan ke kasir;
+  :Cetak struk pesanan;
+  :Customer menuju kasir;
+  :Kasir menerima pembayaran;
+  :Kasir konfirmasi pembayaran;
+  :Finalisasi pesanan;
+endif
+
+:Tampilkan detail pesanan;
+:Tampilkan nomor antrian;
+:Pesanan sukses;
+
+stop
+@enduml

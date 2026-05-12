@@ -1,0 +1,9 @@
+# Use this workspace to collaborate
+workspace:
+  id: 83c09ca4-ff8b-483d-8132-0bcce4f1877f
+
+localResources:
+  collections:
+    - ..\apps\backend\postman_membership_collection.json
+  environments:
+    - ..\apps\backend\postman_membership_environment.json

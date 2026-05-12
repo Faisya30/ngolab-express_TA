@@ -1273,3 +1273,46 @@ export async function earnPoints(_req, res) {
     return res.status(500).json({ success: false, error: error.message });
   }
 }
+
+export async function lookupMember(req, res) {
+  try {
+    const body = req.body || {};
+    const code = normalizeText(body.code || req.query?.code || req.params?.code);
+
+    if (!code) {
+      return res.status(400).json({ success: false, error: 'code/member identifier wajib diisi.' });
+    }
+
+    const rows = await query(
+      `SELECT user_id, username, email, role, status, membership_level, referred_by, created_at, phone_number, profile_picture
+      FROM users
+      WHERE user_id = ? OR username = ? OR phone_number = ?
+      LIMIT 1`,
+      [code, code, code]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ success: false, error: 'User tidak ditemukan.' });
+    }
+
+    const userRow = rows[0];
+
+    const pointsRows = await query(
+      `SELECT total_points, commission_points, mission_points, cashback_points, voucher_points
+      FROM user_points
+      WHERE user_id = ?
+      LIMIT 1`,
+      [userRow.user_id]
+    );
+
+    return res.json({
+      success: true,
+      user: {
+        ...buildPublicUser(userRow),
+        points: pointsRows[0] || { total_points: 0, commission_points: 0, mission_points: 0, cashback_points: 0, voucher_points: 0 },
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}

@@ -107,6 +107,56 @@ export async function init(req, res) {
 	}
 }
 
+export async function getMember(req, res) {
+	try {
+		const code = String(req.params?.code || '').trim();
+		if (!code) return res.status(400).json({ success: false, error: 'code wajib diisi.' });
+
+		const rows = await query(
+			`SELECT user_id, username, phone_number, membership_level, profile_picture
+			FROM users
+			WHERE user_id = ? OR username = ? OR phone_number = ?
+			LIMIT 1`,
+			[code, code, code]
+		);
+
+		if (!rows.length) {
+			return res.status(404).json({ success: false, error: 'User tidak ditemukan.' });
+		}
+
+		const user = rows[0];
+
+		const pointsRows = await query(
+			`SELECT total_points, cashback_points
+			FROM user_points
+			WHERE user_id = ?
+			LIMIT 1`,
+			[user.user_id]
+		);
+
+		const affiliateRows = await query(
+			`SELECT referral_code
+			FROM affiliate_networks
+			WHERE user_id = ?
+			LIMIT 1`,
+			[user.user_id]
+		);
+
+		return res.json({
+			code: user.user_id,
+			name: user.username,
+			phone: user.phone_number || null,
+			membership_level: user.membership_level || null,
+			profile_picture: user.profile_picture || null,
+			points: Number(pointsRows?.[0]?.total_points || 0),
+			cashbackPoints: Number(pointsRows?.[0]?.cashback_points || 0),
+			affiliate: affiliateRows.length ? 'Yes' : 'No',
+		});
+	} catch (error) {
+		return res.status(500).json({ success: false, error: error.message });
+	}
+}
+
 export async function saveOrder(req, res) {
 	try {
 		const body = req.body || {};

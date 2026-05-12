@@ -1,0 +1,69 @@
+@startuml
+left to right direction
+
+actor "Customer" as Customer
+
+rectangle "Self Order POS Gesture" {
+  usecase "Mulai Self Order" as UC1
+  usecase "Navigasi dengan Gesture" as UC2
+  usecase "Pilih Dine In / Take Away" as UC3
+  usecase "Lihat Katalog Menu" as UC4
+  usecase "Pilih Menu" as UC5
+  usecase "Atur Jumlah Pesanan" as UC6
+  usecase "Lihat Ringkasan Pesanan" as UC7
+  usecase "Scan QR Membership" as UC8
+  usecase "Gunakan Poin" as UC9
+  usecase "Pilih Voucher" as UC10
+  usecase "Pilih Metode Pembayaran" as UC11
+  usecase "Bayar dengan QRIS" as UC12
+  usecase "Bayar dengan Cash" as UC13
+  usecase "Konfirmasi Pesanan" as UC14
+  usecase "Lihat Detail Pesanan" as UC15
+  usecase "Terima Nomor Antrian" as UC16
+
+  usecase "Deteksi Gesture Tangan" as UC17
+  usecase "Validasi Membership" as UC18
+  usecase "Proses Pembayaran QRIS" as UC19
+  usecase "Konfirmasi Pembayaran Cash" as UC20
+}
+
+actor "Sistem Computer Vision" as CV
+actor "Sistem Membership" as MemberSystem
+actor "Payment Gateway QRIS" as QRIS
+actor "Kasir" as Kasir
+
+Customer -right-> UC1
+Customer -right-> UC2
+Customer -right-> UC3
+Customer -right-> UC4
+Customer -right-> UC5
+Customer -right-> UC6
+Customer -right-> UC7
+Customer -right-> UC8
+Customer -right-> UC9
+Customer -right-> UC10
+Customer -right-> UC11
+Customer -right-> UC12
+Customer -right-> UC13
+Customer -right-> UC14
+Customer -right-> UC15
+Customer -right-> UC16
+
+CV -left-> UC17
+UC2 .> UC17 : <<include>>
+
+MemberSystem -left-> UC18
+UC8 .> UC18 : <<include>>
+
+QRIS -left-> UC19
+UC12 .> UC19 : <<include>>
+
+Kasir -left-> UC20
+UC13 .> UC20 : <<include>>
+
+UC11 .> UC12 : <<extend>>
+UC11 .> UC13 : <<extend>>
+UC8 .> UC9 : <<extend>>
+UC8 .> UC10 : <<extend>>
+
+@enduml

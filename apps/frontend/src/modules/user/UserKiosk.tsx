@@ -340,6 +340,9 @@ const UserKiosk: React.FC = () => {
         payment: method,
         member: member ? member.name : 'Guest',
         memberCode: member ? member.code : '-',
+        member_id: member ? member.code : null,
+        tipe_pelanggan: member ? 'MEMBER' : 'GUEST',
+        nama_pelanggan: member ? member.name : (member ? String(member.name) : 'Guest'),
         isAffiliate: member?.isAffiliate ? 'Yes' : 'No',
         voucher: appliedVoucher ? appliedVoucher.title : '-',
         pointsEarned,
@@ -461,25 +464,45 @@ const UserKiosk: React.FC = () => {
           <ScannerScreen
             onScanSuccess={async (scanned) => {
               try {
-                const data = await fetchFromSheet('getMember', { code: scanned.code });
-                if (data && !data.error) {
+                const raw = String(scanned?.code || scanned || '').trim();
+                // try to extract standard user id like USR-xxxxx
+                const m = raw.match(/(USR-[A-Z0-9-]+)/i);
+                const code = m ? m[1] : raw;
+
+                const data = await fetchFromSheet('getMember', { code });
+
+                // support two response shapes:
+                // 1) kiosk controller: returns plain member object { code,name,points,... }
+                // 2) membership controller: { success:true, user: { ... } }
+                let src: any = null;
+                if (data) {
+                  if (data.success && data.user) src = data.user;
+                  else src = data;
+                }
+
+                if (src && !src.error) {
                   const nMember: any = {};
-                  Object.keys(data).forEach((k) => {
-                    nMember[k.toLowerCase().trim()] = data[k];
+                  Object.keys(src).forEach((k) => {
+                    nMember[k.toLowerCase().trim()] = src[k];
                   });
                   setMember({
-                    code: String(nMember.code || nMember.Code),
-                    name: String(nMember.name || nMember.Name),
-                    points: cleanNumber(nMember.points),
-                    cashbackPoints: cleanNumber(nMember.cashbackpoints || nMember.poin),
+                    code: String(nMember.code || nMember.user_id || code),
+                    name: String(nMember.name || nMember.username || nMember.user || nMember.user_id || code),
+                    points: cleanNumber(nMember.points || nMember.total_points || 0),
+                    cashbackPoints: cleanNumber(nMember.cashbackpoints || nMember.cashback_points || nMember.poin || 0),
                     vouchers,
-                    isAffiliate: nMember.affiliate === 'Yes' || nMember.isaffiliate === 'TRUE' || !!nMember.isaffiliate,
+                    isAffiliate: (String(nMember.affiliate || nMember.is_affiliate || nMember.isaffiliate || '')).toUpperCase() === 'YES' || !!nMember.isaffiliate,
                   });
                 } else {
-                  setMember(scanned);
+                  // fallback: set minimal member object
+                  setMember({ code, name: code, points: 0, cashbackPoints: 0, vouchers, isAffiliate: false });
                 }
-              } catch {
-                setMember(scanned);
+              } catch (err) {
+                console.error('Lookup member failed', err);
+                const raw = String(scanned?.code || scanned || '').trim();
+                const m = raw.match(/(USR-[A-Z0-9-]+)/i);
+                const code = m ? m[1] : raw;
+                setMember({ code, name: code, points: 0, cashbackPoints: 0, vouchers, isAffiliate: false });
               }
               setCurrentScreen(Screen.CART);
             }}

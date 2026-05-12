@@ -1,0 +1,62 @@
+@startuml
+actor Customer
+participant "Kiosk App" as Kiosk
+participant "Computer Vision" as CV
+participant "Menu Service" as Menu
+participant "Order Service" as Order
+participant "Membership Service" as Member
+participant "Payment Service" as Payment
+participant Kasir
+
+Customer -> Kiosk : Membuka welcome screen
+Customer -> CV : Gesture lanjut
+CV -> Kiosk : Perintah pindah halaman
+
+Customer -> Kiosk : Pilih Dine In / Take Away
+Kiosk -> Order : Simpan tipe pesanan
+
+Kiosk -> Menu : Request daftar menu
+Menu --> Kiosk : Data menu
+Kiosk --> Customer : Tampilkan katalog menu
+
+Customer -> CV : Gesture pilih menu
+CV -> Kiosk : Pilih item menu
+Kiosk -> Order : Tambah item ke keranjang
+
+Customer -> Kiosk : Klik Bayar
+Kiosk -> Order : Buat ringkasan pesanan
+Order --> Kiosk : Data ringkasan pesanan
+Kiosk --> Customer : Tampilkan ringkasan pesanan
+
+alt Customer punya membership
+  Customer -> Kiosk : Scan QR Membership
+  Kiosk -> Member : Validasi QR Membership
+  Member --> Kiosk : Data member valid
+
+  Customer -> Kiosk : Aktifkan poin
+  Kiosk -> Order : Terapkan poin
+
+  Customer -> Kiosk : Pilih voucher
+  Kiosk -> Order : Terapkan voucher
+end
+
+Customer -> Kiosk : Pilih metode pembayaran
+
+alt QRIS
+  Kiosk -> Payment : Generate QRIS
+  Payment --> Kiosk : QRIS
+  Kiosk --> Customer : Tampilkan QRIS
+  Customer -> Payment : Melakukan pembayaran
+  Payment --> Kiosk : Pembayaran berhasil
+else Cash
+  Kiosk --> Customer : Tampilkan arahan ke kasir
+  Kiosk -> Kasir : Kirim / cetak struk pesanan
+  Customer -> Kasir : Bayar cash
+  Kasir --> Kiosk : Konfirmasi pembayaran
+end
+
+Kiosk -> Order : Finalisasi pesanan
+Order --> Kiosk : Nomor antrian dan detail pesanan
+Kiosk --> Customer : Tampilkan pesanan sukses
+
+@enduml

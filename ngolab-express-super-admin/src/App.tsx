@@ -49,10 +49,10 @@ function cn(...inputs: ClassValue[]) {
 // --- Mock Data ---
 
 const APP_TYPES = [
-  { id: 'kiosk', label: 'Kiosk', icon: ShoppingBag, color: 'text-emerald-600', bg: 'bg-emerald-100', adminUrl: 'http://localhost:3003' },
-  { id: 'cv', label: 'Computer Vision', icon: Scan, color: 'text-blue-600', bg: 'bg-blue-100', adminUrl: 'http://localhost:3003/cv' },
-  { id: 'affiliate', label: 'Member & Afiliasi', icon: Users, color: 'text-purple-600', bg: 'bg-purple-100', adminUrl: 'http://localhost:3003/affiliate' },
-  { id: 'game', label: 'Gamefication', icon: Gamepad2, color: 'text-orange-600', bg: 'bg-orange-100', adminUrl: 'http://localhost:3003/game' },
+  { id: 'kiosk', label: 'Kiosk', icon: ShoppingBag, color: 'text-emerald-600', bg: 'bg-emerald-100', adminUrl: 'http://localhost:3002' },
+  { id: 'cv', label: 'Computer Vision', icon: Scan, color: 'text-blue-600', bg: 'bg-blue-100', adminUrl: 'http://localhost:3002/cv' },
+  { id: 'affiliate', label: 'Member & Afiliasi', icon: Users, color: 'text-purple-600', bg: 'bg-purple-100', adminUrl: 'http://localhost:3002/affiliate' },
+  { id: 'game', label: 'Gamefication', icon: Gamepad2, color: 'text-orange-600', bg: 'bg-orange-100', adminUrl: 'http://localhost:3002/game' },
 ];
 
 const ANALYTICS_DATA = [
@@ -385,7 +385,7 @@ export default function App() {
                     <p className="text-sm text-zinc-500">Mode Kiosk menggunakan tampilan operasional asli (bukan data demo).</p>
                   </div>
                   <a
-                    href="http://localhost:3003"
+                    href="http://localhost:3002"
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors"
@@ -397,7 +397,7 @@ export default function App() {
 
                 <div className="rounded-xl border border-zinc-200 overflow-hidden bg-white">
                   <iframe
-                    src="http://localhost:3003"
+                    src="http://localhost:3002"
                     title="Kiosk Admin Live"
                     className="w-full h-[70vh]"
                   />

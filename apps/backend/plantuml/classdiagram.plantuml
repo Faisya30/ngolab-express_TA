@@ -1,0 +1,113 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+class Customer {
+  - id_customer : int
+  - nama : string
+  - is_member : boolean
+}
+
+class Member {
+  - id_member : int
+  - nama_member : string
+  - qr_code : string
+  - saldo_poin : int
+  + scanMembership()
+  + gunakanPoin()
+}
+
+class Voucher {
+  - id_voucher : int
+  - kode_voucher : string
+  - nama_voucher : string
+  - jenis_diskon : string
+  - nilai_diskon : double
+  - status : string
+  + validasiVoucher()
+}
+
+class Menu {
+  - id_menu : int
+  - nama_menu : string
+  - kategori : string
+  - harga : double
+  - gambar : string
+  - status : string
+}
+
+class Order {
+  - id_order : int
+  - order_code : string
+  - nomor_antrian : int
+  - tipe_pesanan : string
+  - tanggal_order : datetime
+  - subtotal : double
+  - total_akhir : double
+  - status_order : string
+  + buatOrder()
+  + hitungTotal()
+  + finalisasiOrder()
+}
+
+class OrderDetail {
+  - id_detail : int
+  - qty : int
+  - harga_satuan : double
+  - subtotal : double
+}
+
+class Payment {
+  - id_payment : int
+  - metode_pembayaran : string
+  - status_payment : string
+  - total_bayar : double
+  - waktu_bayar : datetime
+  + prosesPembayaran()
+}
+
+class QRISPayment {
+  - qr_code : string
+  - expired_time : datetime
+  + generateQRIS()
+  + cekStatusQRIS()
+}
+
+class CashPayment {
+  - status_kasir : string
+  + cetakStruk()
+  + konfirmasiKasir()
+}
+
+class GestureController {
+  - gesture_type : string
+  + detectGesture()
+  + navigatePage()
+  + selectButton()
+}
+
+class KioskScreen {
+  - screen_name : string
+  + showScreen()
+  + nextScreen()
+}
+
+class Kasir {
+  - id_kasir : int
+  - nama_kasir : string
+  + konfirmasiPembayaran()
+}
+
+Customer "0..1" -- "0..1" Member
+Member "1" -- "0..*" Voucher
+Order "1" -- "1..*" OrderDetail
+Menu "1" -- "0..*" OrderDetail
+Order "0..1" -- "1" Member
+Order "0..1" -- "1" Voucher
+Order "1" -- "1" Payment
+Payment <|-- QRISPayment
+Payment <|-- CashPayment
+CashPayment -- Kasir
+GestureController -- KioskScreen
+KioskScreen -- Order
+
+@enduml

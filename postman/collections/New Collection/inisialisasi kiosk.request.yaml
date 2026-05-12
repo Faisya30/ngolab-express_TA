@@ -1,0 +1,5 @@
+$kind: http-request
+name: inisialisasi kiosk
+url: ""
+method: GET
+order: 1778142560923

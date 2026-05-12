@@ -10,6 +10,7 @@ import {
   getPointLogs,
   getTransactionDetail,
   getUserProfile,
+  lookupMember,
   login,
   redeemPoints,
   register,
@@ -24,6 +25,7 @@ const router = Router();
 
 router.post('/register', register);
 router.post('/login', login);
+router.post('/lookup', lookupMember);
 router.get('/profile/:user_id', getUserProfile);
 router.put('/profile/:user_id', updateProfile);
 router.post('/affiliate/verify', verifyAffiliate);
