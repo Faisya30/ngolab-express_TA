@@ -5,11 +5,13 @@ const BCRYPT_HASH_REGEX = /^\$2[aby]\$\d{2}\$/;
 
 export async function login(req, res) {
 	const { username, password } = req.body || {};
+	console.log('[LOGIN] Body:', { username, password, bodyFull: req.body });
 	if (!username || !password) {
 		return res.status(400).json({ success: false, error: 'Username and password are required' });
 	}
 
 	try {
+		console.log('[LOGIN] Querying for user:', username);
 		const rows = await query(
 			`SELECT id, username, password_hash, role
 			FROM admins
@@ -18,6 +20,7 @@ export async function login(req, res) {
 			[String(username)]
 		);
 
+		console.log('[LOGIN] Query result:', rows.length, 'rows');
 		if (!rows.length) {
 			return res.status(401).json({ success: false, error: 'Invalid credentials' });
 		}
@@ -25,9 +28,11 @@ export async function login(req, res) {
 		const admin = rows[0];
 		const hash = String(admin.password_hash || '');
 		const looksLikeBcrypt = BCRYPT_HASH_REGEX.test(hash);
+		console.log('[LOGIN] Hash format:', looksLikeBcrypt ? 'bcrypt' : 'plaintext');
 		let validPassword = false;
 
 		if (looksLikeBcrypt) {
+			console.log('[LOGIN] Comparing bcrypt...');
 			validPassword = await bcrypt.compare(String(password), hash);
 		} else if (String(password) === hash) {
 			validPassword = true;
@@ -35,6 +40,7 @@ export async function login(req, res) {
 			await query('UPDATE admins SET password_hash = ? WHERE id = ?', [migratedHash, admin.id]);
 		}
 
+		console.log('[LOGIN] Password valid:', validPassword);
 		if (validPassword) {
 			return res.json({
 				success: true,
@@ -44,6 +50,7 @@ export async function login(req, res) {
 
 		return res.status(401).json({ success: false, error: 'Invalid credentials' });
 	} catch (error) {
+		console.error('[LOGIN] Error:', error);
 		return res.status(500).json({ success: false, error: error.message });
 	}
 }

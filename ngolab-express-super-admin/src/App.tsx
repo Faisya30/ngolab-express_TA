@@ -50,7 +50,7 @@ function cn(...inputs: ClassValue[]) {
 
 const APP_TYPES = [
   { id: 'kiosk', label: 'Kiosk', icon: ShoppingBag, color: 'text-emerald-600', bg: 'bg-emerald-100', adminUrl: 'http://localhost:3002' },
-  { id: 'cv', label: 'Computer Vision', icon: Scan, color: 'text-blue-600', bg: 'bg-blue-100', adminUrl: 'http://localhost:3002/cv' },
+  { id: 'cv', label: 'Computer Vision', icon: Scan, color: 'text-blue-600', bg: 'bg-blue-100', adminUrl: 'http://172.20.10.4:8000/docs' },
   { id: 'affiliate', label: 'Member & Afiliasi', icon: Users, color: 'text-purple-600', bg: 'bg-purple-100', adminUrl: 'http://localhost:3002/affiliate' },
   { id: 'game', label: 'Gamefication', icon: Gamepad2, color: 'text-orange-600', bg: 'bg-orange-100', adminUrl: 'http://localhost:3002/game' },
 ];
@@ -117,7 +117,11 @@ export default function App() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:4000/api/auth/login', {
+      const backendUrl = window.location.hostname === 'localhost' 
+        ? 'http://localhost:4000' 
+        : `http://${window.location.hostname}:4000`;
+      
+      const response = await fetch(`${backendUrl}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -133,7 +137,7 @@ export default function App() {
         setError('Username/Password salah atau bukan super admin');
       }
     } catch (err) {
-      setError('Gagal koneksi ke server. Pastikan backend jalan di http://localhost:4000');
+      setError('Gagal koneksi ke server. Pastikan backend jalan di ' + (window.location.hostname === 'localhost' ? 'http://localhost:4000' : `http://${window.location.hostname}:4000`));
     }
   };
 
@@ -195,7 +199,7 @@ export default function App() {
                 <div className="text-[10px] text-emerald-500/80 leading-relaxed uppercase font-bold">
                   Demo Access:<br />
                   <span className="text-emerald-400">Username: admin</span><br />
-                  <span className="text-emerald-400">Password: admin123</span>
+                  <span className="text-emerald-400">Password: 123</span>
                 </div>
               </div>
 

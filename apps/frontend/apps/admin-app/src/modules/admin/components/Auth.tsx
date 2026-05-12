@@ -30,6 +30,20 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
       const payload = await response.json().catch(() => ({}));
 
       if (response.ok && payload?.success && payload?.user) {
+        const role = String(payload.user.role || '').toLowerCase();
+        
+        // Reject super_admin from admin-app
+        if (role === 'super_admin') {
+          setError('Super Admin hanya bisa login di Super Admin App (http://localhost:3000). Admin App ini khusus untuk Kiosk/CV Admin.');
+          return;
+        }
+        
+        // Only allow kiosk_admin or cv_admin
+        if (role !== 'kiosk_admin' && role !== 'cv_admin') {
+          setError(`Role ${payload.user.role} tidak diizinkan di Admin App. Gunakan akun kiosk_admin atau cv_admin.`);
+          return;
+        }
+        
         const userData = { username: payload.user.username, role: payload.user.role };
         localStorage.setItem('current_admin', JSON.stringify(userData));
         onLogin(userData);
