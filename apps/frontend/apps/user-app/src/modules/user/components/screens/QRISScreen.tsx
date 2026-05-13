@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import qrisImage from '../../../../shared/assets/images/qris.jpg';
 
 interface Props {
   total: number;
@@ -57,12 +58,8 @@ const QRISScreen: React.FC<Props> = ({ total, onComplete, onBack }) => {
         {/* BOX GAMBAR QRIS (Tempat Menempelkan Foto QRIS) */}
           <div className="w-full aspect-square bg-white rounded-4xl p-3 shadow-inner border-2 border-slate-50 relative group mb-5 md:mb-6">
             <div className="w-full h-full rounded-[1.4rem] overflow-hidden border-2 border-orange-500/20 p-3 flex items-center justify-center bg-white relative">
-              {/* 
-                  ANDA DAPAT MENGGANTI URL DI BAWAH INI DENGAN PATH FOTO QRIS ANDA 
-                  Contoh: src="/assets/my-qris.jpg" atau URL Cloudinary/GDrive 
-              */}
               <img 
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=NGOLAB_PAYMENT_ID_${Math.random()}&color=000000&bgcolor=ffffff`} 
+                src={qrisImage} 
                 alt="QRIS Merchant" 
                 className="w-full h-full object-contain"
               />
