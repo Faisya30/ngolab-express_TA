@@ -29,6 +29,27 @@ CREATE TABLE IF NOT EXISTS affiliate_networks (
     ON UPDATE CASCADE ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS affiliate_verifications (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id VARCHAR(50) NOT NULL,
+  registered_nim VARCHAR(64) NOT NULL,
+  detected_nim VARCHAR(64) NOT NULL,
+  ai_is_telkom TINYINT(1) NOT NULL DEFAULT 0,
+  ai_confidence DECIMAL(5,4) NOT NULL DEFAULT 0,
+  ai_reasoning TEXT NULL,
+  status ENUM('PENDING', 'APPROVED', 'REJECTED') NOT NULL DEFAULT 'PENDING',
+  file_url VARCHAR(1024) NULL,
+  reviewed_by VARCHAR(50) NULL,
+  review_notes TEXT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_affiliate_verifications_user_id (user_id),
+  INDEX idx_affiliate_verifications_status (status),
+  CONSTRAINT fk_affiliate_verifications_user_id
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS user_points (
   user_id VARCHAR(50) PRIMARY KEY,
   total_points INT NOT NULL DEFAULT 0,

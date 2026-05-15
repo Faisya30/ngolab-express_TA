@@ -1,8 +1,10 @@
 import { Router } from 'express';
+import multer from 'multer';
 import {
   createTransaction,
   earnPoints,
   getAllAffiliates,
+  getAffiliateVerifications,
   getAllMembers,
   getCommissionLogs,
   getGlobalSettings,
@@ -14,6 +16,7 @@ import {
   login,
   redeemPoints,
   register,
+  reviewAffiliateVerification,
   updateGlobalSetting,
   updateMemberStatus,
   updateProfile,
@@ -22,13 +25,17 @@ import {
 } from '../controllers/membershipController.js';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 router.post('/register', register);
 router.post('/login', login);
 router.post('/lookup', lookupMember);
 router.get('/profile/:user_id', getUserProfile);
 router.put('/profile/:user_id', updateProfile);
-router.post('/affiliate/verify', verifyAffiliate);
+// Accept multipart uploads (ktm_image) but also accept JSON fallback.
+router.post('/affiliate/verify', upload.single('ktm_image'), verifyAffiliate);
+router.get('/admin/affiliate-verifications', getAffiliateVerifications);
+router.patch('/admin/affiliate-verifications/:verification_id/status', reviewAffiliateVerification);
 router.get('/admin/hub-data', getHubDataAdmin);
 router.get('/admin/members', getAllMembers);
 router.get('/admin/affiliates', getAllAffiliates);

@@ -19,8 +19,12 @@
     "preview:admin": "npm run preview --prefix apps/frontend/apps/admin-app",
     "preview:user": "npm run preview --prefix apps/frontend/apps/user-app",
     "lint": "npm run lint --prefix apps/frontend/apps/admin-app && npm run lint --prefix apps/frontend/apps/user-app"
-  }, 
+  },
   "devDependencies": {
     "concurrently": "^9.1.2"
+  },
+  "dependencies": {
+    "multer": "^2.1.1",
+    "tesseract.js": "^7.0.0"
   }
 }
