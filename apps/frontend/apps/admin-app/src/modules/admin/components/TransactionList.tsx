@@ -62,6 +62,16 @@ const TransactionList: React.FC<Props> = ({ initialTransactions, allOrderDetails
     return '';
   };
 
+  // Parse number yang presisi, pertahankan titik desimal
+  const parseNumber = (value: any): number => {
+    if (value === undefined || value === null || value === '') return 0;
+    if (typeof value === 'number') return value;
+    const str = String(value).trim();
+    // Jika ada titik/koma, gunakan sebagai decimal separator
+    const num = parseFloat(str);
+    return isNaN(num) ? 0 : num;
+  };
+
   // Seluruh transaksi yang sudah diproses & diurutkan
   const processedTransactions = useMemo(() => {
     if (!initialTransactions) return [];
@@ -82,14 +92,14 @@ const TransactionList: React.FC<Props> = ({ initialTransactions, allOrderDetails
           ...trx,
           id,
           displayId: String(rawId).startsWith('#') ? rawId : `#${rawId}`,
-          total: Number(String(total || 0).replace(/[^\d]/g, '')),
+          total: parseNumber(total),
           method: String(method || 'CASH'),
           customer: String(customer || 'Guest'),
           date: dateRaw,
           timestamp: dateRaw ? new Date(dateRaw).getTime() : 0,
           service: String(service || 'Dine In'),
-          discount: Number(String(discount || 0).replace(/[^\d]/g, '')),
-          subtotal: Number(String(subtotal || 0).replace(/[^\d]/g, ''))
+          discount: parseNumber(discount),
+          subtotal: parseNumber(subtotal)
         };
       })
       .filter(t => t.id !== "" && t.id !== "orderid")
@@ -324,8 +334,8 @@ const TransactionList: React.FC<Props> = ({ initialTransactions, allOrderDetails
                             <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{getValue(item, ['category'], 'f')}</p>
                           </td>
                           <td className="py-5 px-8 text-center font-black text-slate-800 text-xs">{getValue(item, ['qty', 'quantity'], 'c')}x</td>
-                          <td className="py-5 px-8 text-right font-bold text-slate-400 text-[11px]">Rp {Number(getValue(item, ['priceeach', 'price'], 'd') || 0).toLocaleString()}</td>
-                          <td className="py-5 px-8 text-right font-black text-slate-800 text-sm">Rp {Number(getValue(item, ['totalitem', 'subtotal'], 'e') || 0).toLocaleString()}</td>
+                          <td className="py-5 px-8 text-right font-bold text-slate-400 text-[11px]">Rp {parseNumber(getValue(item, ['priceeach', 'price'], 'd')).toLocaleString()}</td>
+                          <td className="py-5 px-8 text-right font-black text-slate-800 text-sm">Rp {parseNumber(getValue(item, ['totalitem', 'subtotal'], 'e')).toLocaleString()}</td>
                         </tr>
                       )) : (
                         <tr>
