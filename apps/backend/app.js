@@ -11,7 +11,11 @@ export function createApp({ frontendOrigins }) {
       origin: (origin, callback) => {
         if (!origin) return callback(null, true);
         if (frontendOrigins.includes(origin)) return callback(null, true);
-        return callback(new Error(`Origin tidak diizinkan oleh CORS: ${origin}`));
+        console.warn(`CORS denied origin: ${origin}`);
+        // Deny the origin without throwing an Error to avoid turning CORS failures
+        // into HTTP 500 responses. The cors middleware will not set the
+        // Access-Control-Allow-Origin header for denied origins.
+        return callback(null, false);
       },
       credentials: true,
     })

@@ -50,7 +50,7 @@ function cn(...inputs: ClassValue[]) {
 
 const APP_TYPES = [
   { id: 'kiosk', label: 'Kiosk', icon: ShoppingBag, color: 'text-emerald-600', bg: 'bg-emerald-100', adminUrl: 'http://localhost:3002' },
-  { id: 'cv', label: 'Computer Vision', icon: Scan, color: 'text-blue-600', bg: 'bg-blue-100', adminUrl: 'http://172.20.10.4:8000/docs' },
+  { id: 'cv', label: 'Computer Vision', icon: Scan, color: 'text-blue-600', bg: 'bg-blue-100', adminUrl: 'http://10.216.154.31:3001' },
   { id: 'affiliate', label: 'Member & Afiliasi', icon: Users, color: 'text-purple-600', bg: 'bg-purple-100', adminUrl: 'http://localhost:3002/affiliate' },
   { id: 'game', label: 'Gamefication', icon: Gamepad2, color: 'text-orange-600', bg: 'bg-orange-100', adminUrl: 'http://localhost:3002/game' },
 ];
@@ -352,7 +352,12 @@ export default function App() {
               {APP_TYPES.slice(0, 4).map(app => (
                 <div key={app.id} className="flex">
                   <button
-                    onClick={() => setActiveApp(app.id)}
+                    onClick={() => {
+                      setActiveApp(app.id);
+                      if (app.id === 'cv') {
+                        window.location.href = app.adminUrl;
+                      }
+                    }}
                     className={cn(
                       "px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2",
                       activeApp === app.id 
