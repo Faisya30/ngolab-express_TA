@@ -500,6 +500,7 @@ export async function verifyAffiliate(_req, res) {
   try {
     const body = _req.body || {};
     // If multipart with file upload, run OCR flow
+    let ocrResult = null;
     if (_req.file && _req.file.buffer) {
       const fileBuffer = _req.file.buffer;
       const userIdFromForm = normalizeText(body.user_id || body.userId || _req.body?.user_id);
@@ -570,6 +571,13 @@ export async function verifyAffiliate(_req, res) {
       body.ai_confidence = Number(avgConfidence);
       body.ai_reasoning = aiReasoning;
       body.file_url = fileUrl;
+      ocrResult = {
+        detectedNim,
+        registeredNim,
+        containsTelkom,
+        avgConfidence: Number(avgConfidence),
+        autoApproved,
+      };
       // continue to existing logic (will insert affiliate_verifications, update user, etc.)
     }
     const userId = normalizeText(body.user_id || body.userId);
@@ -609,6 +617,8 @@ export async function verifyAffiliate(_req, res) {
     const detectedMatchesRegistered = registeredNim === detectedNim;
     const approved = aiIsTelkom && detectedMatchesRegistered && aiConfidence >= confidenceThreshold;
     const verificationStatus = approved ? 'APPROVED' : 'PENDING';
+    const nextUserRole = approved ? 'MEMBER_AFFILIATE' : existingRows[0].role;
+    const nextUserStatus = approved ? 'ACTIVE' : existingRows[0].status;
 
     const result = await withTransaction(async (connection) => {
       const [verificationInsert] = await connection.query(
@@ -638,12 +648,14 @@ export async function verifyAffiliate(_req, res) {
         `UPDATE users
         SET is_ktm = ?,
             role = ?,
+            status = ?,
             ai_reasoning = ?,
             ktm_picture = COALESCE(?, ktm_picture)
         WHERE user_id = ?`,
         [
           approved ? 1 : 0,
-          approved ? 'MEMBER_AFFILIATE' : existingRows[0].role,
+          nextUserRole,
+          nextUserStatus,
           aiReasoning || null,
           fileUrl || null,
           userId,
@@ -713,10 +725,12 @@ export async function verifyAffiliate(_req, res) {
         ? 'Akun berhasil diverifikasi sebagai affiliate.'
         : 'Hasil OCR berhasil disimpan dan masuk antrean review.',
       data: {
+        verification_id: String(result.verificationId),
         user: buildPublicUser(updatedUserRows[0]),
         verification: buildVerificationPayload(verificationRows[0]),
         affiliate_network: updatedAffiliateRows[0] || null,
         referral_code: result.referralCode,
+        ocr: ocrResult,
       },
     });
   } catch (error) {
@@ -802,7 +816,8 @@ export async function reviewAffiliateVerification(_req, res) {
         await connection.query(
           `UPDATE users
           SET is_ktm = 1,
-              role = 'MEMBER_AFFILIATE'
+              role = 'MEMBER_AFFILIATE',
+              status = 'ACTIVE'
           WHERE user_id = ?`,
           [currentVerification.user_id]
         );

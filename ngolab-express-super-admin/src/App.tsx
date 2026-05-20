@@ -110,6 +110,8 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
+  const normalizeRole = (role: unknown) => String(role || '').trim().toLowerCase().replace(/\s+/g, '_');
+
   const filteredInventory = useMemo(() => {
     return INVENTORY.filter(item => activeApp === 'all' || item.tag === activeApp || (activeApp !== 'kiosk' && activeApp !== 'cv'));
   }, [activeApp]);
@@ -129,7 +131,7 @@ export default function App() {
       const data = await response.json();
       
       // Cek apakah login berhasil DAN role super_admin
-      if (data.success && data.user && data.user.role === 'super_admin') {
+      if (data.success && data.user && normalizeRole(data.user.role) === 'super_admin') {
         setIsLoggedIn(true);
         setHasEnteredDashboard(false);
         setError('');

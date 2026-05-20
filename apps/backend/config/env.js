@@ -14,6 +14,7 @@ export function getServerConfig() {
     'http://localhost:3002',
     'http://localhost:3004',
     'http://localhost:3005',
+    'http://localhost:5173',
     ...String(process.env.FRONTEND_ORIGIN || '')
       .split(',')
       .map((origin) => origin.trim())

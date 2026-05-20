@@ -3,6 +3,24 @@ import { query } from '../config/db.js';
 
 const BCRYPT_HASH_REGEX = /^\$2[aby]\$\d{2}\$/;
 
+function normalizeRole(rawRole) {
+	const role = String(rawRole || '').trim().toLowerCase();
+
+	if (role === 'super admin' || role === 'super_admin' || role === 'admin') {
+		return 'super_admin';
+	}
+
+	if (role === 'kiosk admin' || role === 'kiosk_admin' || role === 'kiosk') {
+		return 'kiosk_admin';
+	}
+
+	if (role === 'cv admin' || role === 'cv_admin' || role === 'cv') {
+		return 'cv_admin';
+	}
+
+	return role || 'super_admin';
+}
+
 export async function login(req, res) {
 	const { username, password } = req.body || {};
 	console.log('[LOGIN] Body:', { username, password, bodyFull: req.body });
@@ -44,7 +62,7 @@ export async function login(req, res) {
 		if (validPassword) {
 			return res.json({
 				success: true,
-				user: { username: admin.username, role: admin.role || 'Super Admin' },
+				user: { username: admin.username, role: normalizeRole(admin.role) },
 			});
 		}
 

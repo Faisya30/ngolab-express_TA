@@ -3,6 +3,10 @@ import cors from 'cors';
 import { pingDatabase } from './config/db.js';
 import { registerRoutes } from './routes/index.js';
 
+function isAllowedLanFrontendOrigin(origin) {
+  return /^http:\/\/(\d{1,3}\.){3}\d{1,3}:(3000|5173)$/.test(origin);
+}
+
 export function createApp({ frontendOrigins }) {
   const app = express();
 
@@ -11,6 +15,7 @@ export function createApp({ frontendOrigins }) {
       origin: (origin, callback) => {
         if (!origin) return callback(null, true);
         if (frontendOrigins.includes(origin)) return callback(null, true);
+        if (isAllowedLanFrontendOrigin(origin)) return callback(null, true);
         console.warn(`CORS denied origin: ${origin}`);
         // Deny the origin without throwing an Error to avoid turning CORS failures
         // into HTTP 500 responses. The cors middleware will not set the

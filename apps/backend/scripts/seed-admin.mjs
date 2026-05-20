@@ -6,7 +6,7 @@ dotenv.config();
 
 const username = String(process.env.SEED_ADMIN_USERNAME || 'admin').trim();
 const password = String(process.env.SEED_ADMIN_PASSWORD || '123');
-const role = String(process.env.SEED_ADMIN_ROLE || 'Super Admin').trim();
+const role = String(process.env.SEED_ADMIN_ROLE || 'super_admin').trim();
 
 if (!username || !password || !role) {
   console.error('SEED_ADMIN_USERNAME, SEED_ADMIN_PASSWORD, and SEED_ADMIN_ROLE must not be empty.');
