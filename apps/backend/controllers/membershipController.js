@@ -528,24 +528,59 @@ export async function verifyAffiliate(_req, res) {
       await fs.promises.writeFile(filePath, fileBuffer);
       const fileUrl = `/uploads/${filename}`;
 
-      // run OCR
-      const worker = createWorker();
-      await worker.load();
-      await worker.loadLanguage('eng');
-      await worker.initialize('eng');
-      const { data } = await worker.recognize(fileBuffer);
-      await worker.terminate();
+      // run OCR with better error handling
+      let text = '';
+      let avgConfidence = 1.0;
+      let worker = null;
+      
+      try {
+        // Validate file size (max 10MB)
+        const MAX_FILE_SIZE = 10 * 1024 * 1024;
+        if (fileBuffer.length > MAX_FILE_SIZE) {
+          return res.status(400).json({ success: false, error: 'Ukuran file terlalu besar (max 10MB).' });
+        }
 
-      const text = String(data?.text || '').trim();
-      const words = Array.isArray(data?.words) ? data.words : [];
-      let avgConfidence = null;
-      if (words.length) {
-        const sum = words.reduce((s, w) => s + (Number(w.confidence) || 0), 0);
-        avgConfidence = sum / words.length / 100; // normalize 0..1
-      } else if (typeof data?.confidence === 'number') {
-        avgConfidence = Number(data.confidence) / 100;
-      } else {
-        avgConfidence = 1.0;
+        // Initialize Tesseract worker with proper configuration
+        worker = await createWorker();
+
+        console.log('[OCR] Worker created successfully');
+
+        console.log('[OCR] Starting recognition...');
+        
+        const startTime = Date.now();
+        const { data } = await worker.recognize(fileBuffer, 'eng');
+        const duration = Date.now() - startTime;
+        console.log(`[OCR] Recognition completed in ${duration}ms`);
+
+        text = String(data?.text || '').trim();
+        const words = Array.isArray(data?.words) ? data.words : [];
+        
+        if (words.length) {
+          const sum = words.reduce((s, w) => s + (Number(w.confidence) || 0), 0);
+          avgConfidence = sum / words.length / 100; // normalize 0..1
+        } else if (typeof data?.confidence === 'number') {
+          avgConfidence = Number(data.confidence) / 100;
+        } else {
+          avgConfidence = Math.max(0.5, 1.0); // Default confidence jika tidak ada data
+        }
+        
+        console.log(`[OCR] Extracted text length: ${text.length}, confidence: ${avgConfidence.toFixed(4)}`);
+      } catch (ocrError) {
+        console.error('[OCR] Recognition error:', ocrError);
+        // Fallback: try to extract text anyway or use empty
+        if (text.length === 0) {
+          console.warn('[OCR] Failed to extract text from image');
+        }
+      } finally {
+        // Clean up worker properly
+        if (worker) {
+          try {
+            await worker.terminate();
+            console.log('[OCR] Worker terminated successfully');
+          } catch (termError) {
+            console.error('[OCR] Error terminating worker:', termError);
+          }
+        }
       }
 
       const containsTelkom = /telkom|university/i.test(text);
@@ -581,7 +616,7 @@ export async function verifyAffiliate(_req, res) {
       // continue to existing logic (will insert affiliate_verifications, update user, etc.)
     }
     const userId = normalizeText(body.user_id || body.userId);
-    const registeredNim = normalizeNim(body.registered_nim || body.registeredNim);
+    let registeredNim = normalizeNim(body.registered_nim || body.registeredNim);
     const detectedNim = normalizeNim(body.detected_nim || body.detectedNim);
     const aiIsTelkom = parseBoolean(body.ai_is_telkom ?? body.aiIsTelkom ?? body.is_telkom ?? body.isTelkom);
     const aiConfidence = parseConfidence(body.ai_confidence ?? body.aiConfidence);
@@ -592,6 +627,18 @@ export async function verifyAffiliate(_req, res) {
 
     if (!userId) {
       return res.status(400).json({ success: false, error: 'user_id wajib diisi.' });
+    }
+
+    if (!registeredNim) {
+      const fallbackRows = await query(
+        `SELECT nim
+        FROM users
+        WHERE user_id = ?
+        LIMIT 1`,
+        [userId]
+      );
+
+      registeredNim = normalizeNim(fallbackRows[0]?.nim || '');
     }
 
     if (!registeredNim || !detectedNim) {
