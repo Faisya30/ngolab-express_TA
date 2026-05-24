@@ -3,92 +3,35 @@ left to right direction
 skinparam packageStyle rectangle
 skinparam shadowing false
 
-actor Customer as C
-actor "Sistem Computer Vision" as CV
-actor "Sistem Membership" as MS
-actor "Payment Gateway QRIS" as PG
-actor Kasir as K
+actor Admin
 
-rectangle "Aplikasi Kiosk Self Order Gesture" {
+rectangle "Sistem Admin Kiosk Ngolab Express" {
 
-  package "Proses Pemesanan" {
-    usecase "Mulai Self Order" as UC1
-    usecase "Navigasi Gesture" as UC2
-    usecase "Pilih Dine In /\nTake Away" as UC3
-    usecase "Melihat Katalog Menu" as UC4
-    usecase "Memilih Menu" as UC5
-    usecase "Mengatur Jumlah\nPesanan" as UC6
-    usecase "Melihat Ringkasan\nPesanan" as UC7
-  }
-
-  package "Membership & Promo" {
-    usecase "Scan QR\nMembership" as UC8
-    usecase "Validasi Member" as UC9
-    usecase "Menggunakan Poin" as UC10
-    usecase "Validasi Poin" as UC11
-    usecase "Memilih Voucher" as UC12
-    usecase "Validasi Voucher" as UC13
-  }
-
-  package "Pembayaran" {
-    usecase "Memilih Metode\nPembayaran" as UC14
-    usecase "Bayar QRIS" as UC15
-    usecase "Proses QRIS" as UC16
-    usecase "Bayar Cash" as UC17
-    usecase "Konfirmasi\nPembayaran Cash" as UC18
-  }
-
-  package "Penyelesaian Pesanan" {
-    usecase "Konfirmasi Pesanan" as UC19
-    usecase "Melihat Detail\nPesanan" as UC20
-    usecase "Menerima Nomor\nAntrian" as UC21
-  }
-
-  usecase "Deteksi Gesture" as UC22
+  usecase "Login" as UC1
+  usecase "Mengelola Data Menu" as UC2
+  usecase "Mengelola Kategori Menu" as UC3
+  usecase "Mengelola Data Voucher" as UC4
+  usecase "Mengelola Data Member" as UC5
+  usecase "Monitoring Pesanan" as UC6
+  usecase "Monitoring Transaksi" as UC7
+  usecase "Melihat Laporan Penjualan" as UC8
 }
 
-C --> UC1
-C --> UC3
-C --> UC5
-C --> UC6
-C --> UC7
-C --> UC8
-C --> UC10
-C --> UC12
-C --> UC14
-C --> UC19
-C --> UC20
-C --> UC21
+Admin --> UC1
+Admin --> UC2
+Admin --> UC3
+Admin --> UC4
+Admin --> UC5
+Admin --> UC6
+Admin --> UC7
+Admin --> UC8
 
-CV --> UC22
-MS --> UC9
-MS --> UC11
-MS --> UC13
-PG --> UC16
-K --> UC18
-
-UC2 ..> UC22 : <<include>>
-UC5 ..> UC22 : <<include>>
-
-UC8 ..> UC9 : <<include>>
-UC10 ..> UC11 : <<include>>
-UC12 ..> UC13 : <<include>>
-
-UC14 ..> UC15 : <<extend>>
-UC14 ..> UC17 : <<extend>>
-
-UC15 ..> UC16 : <<include>>
-UC17 ..> UC18 : <<include>>
-
-UC1 --> UC2
-UC2 --> UC3
-UC3 --> UC4
-UC4 --> UC5
-UC5 --> UC6
-UC6 --> UC7
-UC7 --> UC14
-UC14 --> UC19
-UC19 --> UC20
-UC20 --> UC21
+UC2 ..> UC1 : <<include>>
+UC3 ..> UC1 : <<include>>
+UC4 ..> UC1 : <<include>>
+UC5 ..> UC1 : <<include>>
+UC6 ..> UC1 : <<include>>
+UC7 ..> UC1 : <<include>>
+UC8 ..> UC1 : <<include>>
 
 @enduml
