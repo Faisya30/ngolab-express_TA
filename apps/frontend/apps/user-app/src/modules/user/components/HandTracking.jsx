@@ -50,6 +50,7 @@ const HandTracking = ({ onLandmarks }) => {
   const streamRef = useRef(null);
   const restartTimerRef = useRef(null);
   const [status, setStatus] = useState('Meminta izin webcam...');
+  const [showPreview, setShowPreview] = useState(true);
 
   useEffect(() => {
     let stream;
@@ -292,12 +293,21 @@ const HandTracking = ({ onLandmarks }) => {
 
   return (
     <div className="fixed top-4 left-4 z-10000 w-[300px] rounded-2xl border border-white/20 bg-slate-900/85 backdrop-blur-md p-3 shadow-2xl">
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-[10px] uppercase tracking-wider text-white/80">Hand Tracking</p>
-        <span className="text-[9px] text-emerald-300">{status}</span>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-white/80">Hand Tracking</p>
+          <span className="text-[9px] text-emerald-300">{status}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowPreview((prev) => !prev)}
+          className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[9px] font-black uppercase tracking-wider text-white/80 transition hover:bg-white/10 hover:text-white"
+        >
+          {showPreview ? 'Hide Preview' : 'Show Preview'}
+        </button>
       </div>
 
-      <div className="relative overflow-hidden rounded-xl border border-white/10 bg-black">
+      <div className={`relative overflow-hidden rounded-xl border border-white/10 bg-black ${showPreview ? '' : 'hidden'}`}>
         <video
           ref={videoRef}
           autoPlay

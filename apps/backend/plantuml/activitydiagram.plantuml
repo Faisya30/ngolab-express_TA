@@ -1,81 +1,167 @@
 @startuml
-start
+hide circle
+skinparam linetype ortho
+skinparam shadowing false
 
-:Customer datang ke layar kiosk;
-:Welcome Screen;
-:Gesture telunjuk + jempol untuk lanjut;
+entity "customer" as customer {
+  * customer_id : int <<PK>>
+  --
+  nama : varchar
+  no_hp : varchar
+  status_member : boolean
+}
 
-:Pilih tipe pesanan;
+entity "member" as member {
+  * member_id : int <<PK>>
+  --
+  customer_id : int <<FK>>
+  qr_membership : varchar
+  saldo_poin : int
+  status_member : varchar
+  tanggal_daftar : date
+}
 
-if (Tipe pesanan?) then (Dine In)
-  :Simpan tipe pesanan Dine In;
-else (Take Away)
-  :Simpan tipe pesanan Take Away;
-endif
+entity "admin" as admin {
+  * admin_id : int <<PK>>
+  --
+  nama_admin : varchar
+  username : varchar
+  password : varchar
+  status_aktif : varchar
+}
 
-:Masuk halaman katalog menu;
+entity "kiosk_device" as kiosk_device {
+  * device_id : int <<PK>>
+  --
+  nama_device : varchar
+  lokasi : varchar
+  status_device : varchar
+}
 
-repeat
-  :Customer memilih menu;
-  :Tambah / kurangi quantity;
-repeat while (Masih ingin pesan?) is (Ya)
+entity "gesture_log" as gesture_log {
+  * gesture_log_id : int <<PK>>
+  --
+  device_id : int <<FK>>
+  order_id : int <<FK>>
+  customer_id : int <<FK>>
+  gesture_type : varchar
+  screen_name : varchar
+  action_result : varchar
+  detected_at : datetime
+}
 
-:Klik tombol Bayar;
-:Masuk halaman Ringkasan Pesanan;
-:Tampilkan daftar pesanan dan subtotal;
+entity "category" as category {
+  * category_id : int <<PK>>
+  --
+  category_name : varchar
+  description : text
+}
 
-if (Customer punya membership?) then (Ya)
-  :Scan QR Membership;
-  if (Membership valid?) then (Ya)
-    :Masuk sebagai member;
-    :Tampilkan saldo poin dan voucher;
+entity "product" as product {
+  * product_id : int <<PK>>
+  --
+  category_id : int <<FK>>
+  product_name : varchar
+  description : text
+  price : decimal
+  image : varchar
+  status : varchar
+}
 
-    if (Gunakan poin?) then (Ya)
-      :Aktifkan saldo poin;
-      :Kurangi total dengan poin;
-    else (Tidak)
-      :Lanjut tanpa poin;
-    endif
+entity "voucher" as voucher {
+  * voucher_id : int <<PK>>
+  --
+  voucher_code : varchar
+  voucher_name : varchar
+  discount_type : varchar
+  discount_value : decimal
+  minimum_purchase : decimal
+  start_date : date
+  end_date : date
+  status : varchar
+}
 
-    if (Pilih voucher?) then (Ya)
-      :Validasi voucher;
-      :Terapkan voucher;
-    else (Tidak)
-      :Lanjut tanpa voucher;
-    endif
+entity "member_voucher" as member_voucher {
+  * member_id : int <<PK, FK>>
+  * voucher_id : int <<PK, FK>>
+  --
+  status_pakai : boolean
+  tanggal_dipakai : datetime
+}
 
-  else (Tidak)
-    :Tampilkan pesan membership tidak valid;
-    :Lanjut tanpa member;
-  endif
-else (Tidak)
-  :Lanjut tanpa member;
-endif
+entity "pesanan" as pesanan {
+  * order_id : int <<PK>>
+  --
+  customer_id : int <<FK>>
+  member_id : int <<FK>>
+  kiosk_device_id : int <<FK>>
+  voucher_id : int <<FK>>
+  order_code : varchar
+  queue_number : int
+  order_type : varchar
+  subtotal : decimal
+  point_discount : decimal
+  voucher_discount : decimal
+  total_amount : decimal
+  order_status : varchar
+  created_at : datetime
+}
 
-:Pilih metode pembayaran;
+entity "detail_pesanan" as detail_pesanan {
+  * detail_id : int <<PK>>
+  --
+  order_id : int <<FK>>
+  product_id : int <<FK>>
+  quantity : int
+  price : decimal
+  subtotal : decimal
+}
 
-if (Metode pembayaran?) then (QRIS)
-  :Generate QRIS;
-  :Tampilkan QRIS;
-  :Customer melakukan pembayaran;
-  if (Pembayaran berhasil?) then (Ya)
-    :Finalisasi pesanan;
-  else (Tidak)
-    :Tampilkan pesan pembayaran gagal;
-    :Ulangi pembayaran QRIS;
-  endif
-else (Cash)
-  :Tampilkan halaman arahan ke kasir;
-  :Cetak struk pesanan;
-  :Customer menuju kasir;
-  :Kasir menerima pembayaran;
-  :Kasir konfirmasi pembayaran;
-  :Finalisasi pesanan;
-endif
+entity "pembayaran" as pembayaran {
+  * payment_id : int <<PK>>
+  --
+  order_id : int <<FK>>
+  payment_method : varchar
+  payment_status : varchar
+  total_paid : decimal
+  paid_at : datetime
+}
 
-:Tampilkan detail pesanan;
-:Tampilkan nomor antrian;
-:Pesanan sukses;
+entity "qris_payment" as qris_payment {
+  * payment_id : int <<PK, FK>>
+  --
+  qr_text : varchar
+  payment_timeout_at : datetime
+  payment_status_manual : varchar
+}
 
-stop
-@enduml
+entity "cash_payment" as cash_payment {
+  * payment_id : int <<PK, FK>>
+  --
+  confirmed_by_admin_id : int <<FK>>
+  confirmed_at : datetime
+}
+
+customer ||--o| member : memiliki
+customer ||--o{ pesanan : membuat
+member ||--o{ pesanan : digunakan_pada
+
+category ||--o{ product : memiliki
+pesanan ||--|{ detail_pesanan : berisi
+product ||--o{ detail_pesanan : dipilih
+
+pesanan ||--|| pembayaran : dibayar_dengan
+pembayaran ||--o| qris_payment : qris
+pembayaran ||--o| cash_payment : cash
+admin ||--o{ cash_payment : mengonfirmasi
+
+kiosk_device ||--o{ pesanan : memproses
+kiosk_device ||--o{ gesture_log : mencatat
+customer ||--o{ gesture_log : melakukan
+pesanan ||--o{ gesture_log : memiliki_log
+
+member ||--o{ member_voucher : memiliki
+voucher ||--o{ member_voucher : dialokasikan
+voucher ||--o{ pesanan : digunakan_pada
+
+@enduml 

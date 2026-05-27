@@ -5,7 +5,7 @@ import path from 'path';
 import { createWorker } from 'tesseract.js';
 import { query, withTransaction } from '../config/db.js';
 
-const AFFILIATE_OCR_CONFIDENCE_THRESHOLD = Number(process.env.AFFILIATE_OCR_CONFIDENCE_THRESHOLD || 0.9);
+const AFFILIATE_OCR_CONFIDENCE_THRESHOLD = Number(process.env.AFFILIATE_OCR_CONFIDENCE_THRESHOLD || 0.5);
 
 const BCRYPT_HASH_REGEX = /^\$2[aby]\$\d{2}\$/;
 
@@ -54,6 +54,7 @@ function buildPublicUser(row) {
     status: row.status,
     membership_level: row.membership_level,
     referred_by: row.referred_by,
+    affiliate_upline: row.affiliate_upline || null,
     created_at: row.created_at,
     phone_number: row.phone_number,
     profile_picture: row.profile_picture,
@@ -83,7 +84,7 @@ function buildVerificationPayload(row) {
   };
 }
 
-async function resolveReferralUserId(input) {
+async function resolveReferralTarget(input) {
   const raw = normalizeText(input);
   if (!raw) return null;
 
@@ -91,14 +92,32 @@ async function resolveReferralUserId(input) {
     `SELECT user_id FROM users WHERE user_id = ? LIMIT 1`,
     [raw]
   );
-  if (directUser?.user_id) return String(directUser.user_id);
+  if (directUser?.user_id) {
+    const affiliateRows = await query(
+      `SELECT affiliate_id
+      FROM affiliate_networks
+      WHERE user_id = ?
+      LIMIT 1`,
+      [directUser.user_id]
+    );
+
+    return {
+      user_id: String(directUser.user_id),
+      affiliate_id: affiliateRows[0]?.affiliate_id ? String(affiliateRows[0].affiliate_id) : null,
+    };
+  }
 
   const [affiliateRow] = await query(
-    `SELECT user_id FROM affiliate_networks WHERE referral_code = ? LIMIT 1`,
+    `SELECT user_id, affiliate_id FROM affiliate_networks WHERE referral_code = ? LIMIT 1`,
     [raw]
   );
 
-  return affiliateRow?.user_id ? String(affiliateRow.user_id) : null;
+  if (!affiliateRow?.user_id) return null;
+
+  return {
+    user_id: String(affiliateRow.user_id),
+    affiliate_id: affiliateRow.affiliate_id ? String(affiliateRow.affiliate_id) : null,
+  };
 }
 
 async function ensureUniqueReferralCode(connection) {
@@ -149,12 +168,14 @@ export async function register(req, res) {
       });
     }
 
-    const referredBy = await resolveReferralUserId(referredByInput);
+    const referralTarget = await resolveReferralTarget(referredByInput);
+    const referredBy = referralTarget?.user_id || null;
+    const affiliateUpline = referralTarget?.affiliate_id || null;
     const userId = generateUserId();
     const passwordHash = await bcrypt.hash(password, 10);
 
     const result = await withTransaction(async (connection) => {
-      console.log('[REGISTER] inserting user values:', { userId, username, email, referredBy, phoneNumber, nim, profilePicture, ktmPicture });
+      console.log('[REGISTER] inserting user values:', { userId, username, email, referredBy, affiliateUpline, phoneNumber, nim, profilePicture, ktmPicture });
       
       await connection.query(
         `INSERT INTO users (
@@ -166,19 +187,21 @@ export async function register(req, res) {
           status,
           membership_level,
           referred_by,
+          affiliate_upline,
           phone_number,
           nim,
           profile_picture,
           ktm_picture,
           is_ktm,
           ai_reasoning
-        ) VALUES (?, ?, ?, ?, 'MEMBER', 'ACTIVE', 'Silver', ?, ?, ?, ?, ?, 0, NULL)`,
+        ) VALUES (?, ?, ?, ?, 'MEMBER', 'ACTIVE', 'Silver', ?, ?, ?, ?, ?, ?, 0, NULL)`,
         [
           userId,
           username,
           email,
           passwordHash,
           referredBy,
+          affiliateUpline,
           phoneNumber || null,
           nim || null,
           profilePicture || null,
@@ -190,11 +213,13 @@ export async function register(req, res) {
       await connection.query(
         `INSERT INTO affiliate_networks (
           user_id,
+          affiliate_id,
           referral_code,
           affiliate_tier,
-          total_referrals
-        ) VALUES (?, ?, 'Basic', 0)`,
-        [userId, referralCode]
+          total_referrals,
+          total_downlines
+        ) VALUES (?, ?, ?, 'Basic', 0, 0)`,
+        [userId, `AFF-${userId}`, referralCode]
       );
 
       await connection.query(
@@ -212,7 +237,8 @@ export async function register(req, res) {
       if (referredBy) {
         await connection.query(
           `UPDATE affiliate_networks
-          SET total_referrals = total_referrals + 1
+          SET total_referrals = total_referrals + 1,
+              total_downlines = total_downlines + 1
           WHERE user_id = ?`,
           [referredBy]
         );
@@ -222,7 +248,7 @@ export async function register(req, res) {
     });
 
     const createdRows = await query(
-      `SELECT user_id, username, email, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm, ai_reasoning
+      `SELECT user_id, username, email, role, status, membership_level, referred_by, affiliate_upline, created_at, phone_number, profile_picture, ktm_picture, is_ktm, ai_reasoning
       FROM users
       WHERE user_id = ?
       LIMIT 1`,
@@ -256,7 +282,7 @@ export async function login(req, res) {
       });
     }
     const rows = await query(
-      `SELECT user_id, username, email, password, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm, ai_reasoning
+      `SELECT user_id, username, email, password, role, status, membership_level, referred_by, affiliate_upline, created_at, phone_number, profile_picture, ktm_picture, is_ktm, ai_reasoning
       FROM users
       WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)
       LIMIT 1`,
@@ -286,7 +312,7 @@ export async function login(req, res) {
     }
 
     const affiliateRows = await query(
-      `SELECT referral_code, affiliate_tier, total_referrals
+      `SELECT referral_code, affiliate_tier, total_referrals, level, commission_points, total_downlines, commission_rate
       FROM affiliate_networks
       WHERE user_id = ?
       LIMIT 1`,
@@ -323,7 +349,7 @@ export async function getUserProfile(_req, res) {
     }
 
     const users = await query(
-      `SELECT user_id, username, email, nim, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm, ai_reasoning
+      `SELECT user_id, username, email, nim, role, status, membership_level, referred_by, affiliate_upline, created_at, phone_number, profile_picture, ktm_picture, is_ktm, ai_reasoning
       FROM users
       WHERE user_id = ?
       LIMIT 1`,
@@ -335,7 +361,7 @@ export async function getUserProfile(_req, res) {
     }
 
     const affiliateRows = await query(
-      `SELECT referral_code, affiliate_tier, total_referrals
+      `SELECT referral_code, affiliate_tier, total_referrals, level, commission_points, total_downlines, commission_rate
       FROM affiliate_networks
       WHERE user_id = ?
       LIMIT 1`,
@@ -359,11 +385,27 @@ export async function getUserProfile(_req, res) {
       [userId]
     );
 
+    const affiliateNetwork = affiliateRows[0]
+      ? {
+          referralCode: affiliateRows[0].referral_code,
+          level: affiliateRows[0].level || 'Starter',
+          commissionPoints: Number(affiliateRows[0].commission_points || 0),
+          totalDownlines: Number(affiliateRows[0].total_downlines || 0),
+          commissionRate: Number(affiliateRows[0].commission_rate || 0.02),
+          referral_code: affiliateRows[0].referral_code,
+          affiliate_tier: affiliateRows[0].affiliate_tier,
+          total_referrals: Number(affiliateRows[0].total_referrals || 0),
+          commission_points: Number(affiliateRows[0].commission_points || 0),
+          total_downlines: Number(affiliateRows[0].total_downlines || 0),
+          commission_rate: Number(affiliateRows[0].commission_rate || 0.02),
+        }
+      : null;
+
     return res.json({
       success: true,
       data: {
         user: buildPublicUser(users[0]),
-        affiliate_network: affiliateRows[0] || null,
+        affiliate_network: affiliateNetwork,
         points: pointsRows[0] || null,
         ai_insight: insightRows[0] || null,
       },
@@ -587,7 +629,7 @@ export async function verifyAffiliate(_req, res) {
       const nimMatch = text.match(/\b(\d{8,15})\b/);
       const detectedNim = nimMatch ? nimMatch[1] : null;
       const detectedMatchesRegistered = detectedNim && registeredNim && normalizeNim(detectedNim) === normalizeNim(registeredNim);
-      const threshold = Number(process.env.AUTO_APPROVE_CONFIDENCE ?? process.env.AFFILIATE_OCR_CONFIDENCE_THRESHOLD ?? 0.9);
+      const threshold = Number(process.env.AUTO_APPROVE_CONFIDENCE ?? process.env.AFFILIATE_OCR_CONFIDENCE_THRESHOLD ?? 0.5);
       const autoApproved = Boolean(containsTelkom && detectedMatchesRegistered && Number(avgConfidence) >= Number(threshold));
 
       // prepare ai_reasoning
@@ -617,13 +659,13 @@ export async function verifyAffiliate(_req, res) {
     }
     const userId = normalizeText(body.user_id || body.userId);
     let registeredNim = normalizeNim(body.registered_nim || body.registeredNim);
-    const detectedNim = normalizeNim(body.detected_nim || body.detectedNim);
+    let detectedNim = normalizeNim(body.detected_nim || body.detectedNim);
     const aiIsTelkom = parseBoolean(body.ai_is_telkom ?? body.aiIsTelkom ?? body.is_telkom ?? body.isTelkom);
-    const aiConfidence = parseConfidence(body.ai_confidence ?? body.aiConfidence);
+    let aiConfidence = parseConfidence(body.ai_confidence ?? body.aiConfidence);
     const aiReasoning = normalizeText(body.ai_reasoning ?? body.aiReasoning);
     const fileUrl = normalizeText(body.file_url || body.fileUrl || body.ktm_picture || body.ktm_url || body.ktmPicture);
     const affiliateTier = normalizeText(body.affiliate_tier || body.affiliateTier) || 'Basic';
-    const confidenceThreshold = Number.isFinite(AFFILIATE_OCR_CONFIDENCE_THRESHOLD) ? AFFILIATE_OCR_CONFIDENCE_THRESHOLD : 0.9;
+    const confidenceThreshold = Number.isFinite(AFFILIATE_OCR_CONFIDENCE_THRESHOLD) ? AFFILIATE_OCR_CONFIDENCE_THRESHOLD : 0.5;
 
     if (!userId) {
       return res.status(400).json({ success: false, error: 'user_id wajib diisi.' });
@@ -641,12 +683,20 @@ export async function verifyAffiliate(_req, res) {
       registeredNim = normalizeNim(fallbackRows[0]?.nim || '');
     }
 
-    if (!registeredNim || !detectedNim) {
-      return res.status(400).json({ success: false, error: 'registered_nim dan detected_nim wajib diisi.' });
+    // Ensure we have a registered NIM (from body or DB). If OCR didn't detect NIM
+    // that's OK: we'll accept the upload and create a PENDING verification.
+    if (!registeredNim) {
+      return res.status(400).json({ success: false, error: 'registered_nim wajib diisi.' });
     }
 
+    // If OCR didn't find a NIM, normalize to empty string instead of rejecting.
+    if (!detectedNim) {
+      detectedNim = '';
+    }
+
+    // If confidence isn't provided or can't be parsed, use 0.0 as default.
     if (aiConfidence === null) {
-      return res.status(400).json({ success: false, error: 'ai_confidence wajib diisi dan harus berupa angka.' });
+      aiConfidence = 0;
     }
 
     const existingRows = await query(
@@ -724,11 +774,13 @@ export async function verifyAffiliate(_req, res) {
         await connection.query(
           `INSERT INTO affiliate_networks (
             user_id,
+            affiliate_id,
             referral_code,
             affiliate_tier,
-            total_referrals
-          ) VALUES (?, ?, ?, 0)`,
-          [userId, referralCode, affiliateTier]
+            total_referrals,
+            total_downlines
+          ) VALUES (?, ?, ?, ?, 0, 0)`,
+          [userId, `AFF-${userId}`, referralCode, affiliateTier]
         );
       } else if (approved) {
         await connection.query(
@@ -877,9 +929,15 @@ export async function reviewAffiliateVerification(_req, res) {
         if (!affiliateRows.length) {
           const referralCode = await ensureUniqueReferralCode(connection);
           await connection.query(
-            `INSERT INTO affiliate_networks (user_id, referral_code, affiliate_tier, total_referrals)
-            VALUES (?, ?, 'Basic', 0)`,
-            [currentVerification.user_id, referralCode]
+            `INSERT INTO affiliate_networks (
+              user_id,
+              affiliate_id,
+              referral_code,
+              affiliate_tier,
+              total_referrals,
+              total_downlines
+            ) VALUES (?, ?, ?, 'Basic', 0, 0)`,
+            [currentVerification.user_id, `AFF-${currentVerification.user_id}`, referralCode]
           );
         }
       }
@@ -957,6 +1015,7 @@ export async function getAllMembers(_req, res) {
         u.status,
         u.membership_level,
         u.referred_by,
+        u.affiliate_upline,
         u.created_at,
         u.phone_number,
         u.profile_picture,
@@ -1002,10 +1061,15 @@ export async function getAllAffiliates(_req, res) {
     const rows = await query(
       `SELECT
         an.user_id,
+        an.affiliate_id,
         u.nim,
         an.referral_code,
         an.affiliate_tier,
         an.total_referrals,
+        an.total_downlines,
+        an.level,
+        an.commission_rate,
+        an.commission_points,
         an.created_at,
         u.username,
         u.email,
@@ -1025,6 +1089,7 @@ export async function getAllAffiliates(_req, res) {
       success: true,
       data: rows.map((row) => ({
         user_id: row.user_id,
+        affiliate_id: row.affiliate_id || null,
         nim: row.nim || null,
         username: row.username,
         email: row.email,
@@ -1038,6 +1103,10 @@ export async function getAllAffiliates(_req, res) {
         referral_code: row.referral_code,
         affiliate_tier: row.affiliate_tier,
         total_referrals: Number(row.total_referrals || 0),
+        total_downlines: Number(row.total_downlines || 0),
+        level: row.level || 'Starter',
+        commission_rate: Number(row.commission_rate || 0.02),
+        commission_points: Number(row.commission_points || 0),
         created_at: row.created_at,
       })),
     });
@@ -1398,7 +1467,13 @@ export async function createTransaction(_req, res) {
       }
 
       if (userId) {
-        const [userRows] = await connection.query(`SELECT user_id FROM users WHERE user_id = ? LIMIT 1`, [userId]);
+        const [userRows] = await connection.query(
+          `SELECT user_id, affiliate_upline
+          FROM users
+          WHERE user_id = ?
+          LIMIT 1`,
+          [userId]
+        );
         if (!userRows.length) {
           throw new Error('User tidak ditemukan.');
         }
@@ -1485,6 +1560,66 @@ export async function createTransaction(_req, res) {
           WHERE user_id = ?`,
           [pointsEarned, pointsEarned, userId]
         );
+      }
+
+      if (userId && total > 0) {
+        const [memberRows] = await connection.query(
+          `SELECT affiliate_upline
+          FROM users
+          WHERE user_id = ?
+          LIMIT 1`,
+          [userId]
+        );
+
+        const affiliateUpline = normalizeText(memberRows[0]?.affiliate_upline || '');
+
+        if (affiliateUpline) {
+          const [uplineRows] = await connection.query(
+            `SELECT affiliate_id, commission_rate, total_downlines
+            FROM affiliate_networks
+            WHERE affiliate_id = ?
+            LIMIT 1
+            FOR UPDATE`,
+            [affiliateUpline]
+          );
+
+          if (uplineRows.length) {
+            const upline = uplineRows[0];
+            const commissionRate = Number(upline.commission_rate || 0.02);
+            const commissionEarned = Number((total * commissionRate).toFixed(2));
+            const totalDownlines = Number(upline.total_downlines || 0);
+
+            let nextLevel = 'Starter';
+            let nextRate = commissionRate;
+            if (totalDownlines >= 30) {
+              nextLevel = 'Elite';
+              nextRate = 0.1;
+            } else if (totalDownlines >= 10) {
+              nextLevel = 'Pro';
+              nextRate = 0.05;
+            }
+
+            await connection.query(
+              `UPDATE affiliate_networks
+              SET commission_points = commission_points + ?,
+                  level = ?,
+                  commission_rate = ?
+              WHERE affiliate_id = ?`,
+              [commissionEarned, nextLevel, nextRate, affiliateUpline]
+            );
+
+            await connection.query(
+              `INSERT INTO affiliate_commission_logs (
+                affiliate_id,
+                member_id,
+                transaction_code,
+                transaction_amount,
+                commission_earned
+              ) VALUES (?, ?, ?, ?, ?)`,
+              [affiliateUpline, userId, transactionCode, total, commissionEarned]
+            );
+          }
+        }
       }
 
       return { transactionCode };

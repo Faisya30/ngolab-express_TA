@@ -88,6 +88,23 @@ async function runMigrations() {
         }
       }
     }
+
+    // Run migration_affiliate_referral_commission.sql
+    const migrationPath5 = path.join(process.cwd(), 'sql', 'migration_affiliate_referral_commission.sql');
+    const migrationSQL5 = fs.readFileSync(migrationPath5, 'utf8');
+
+    console.log('\n> Running migration_affiliate_referral_commission.sql');
+    const statements5 = migrationSQL5.split(';').filter(s => s.trim());
+    for (const statement of statements5) {
+      if (statement.trim()) {
+        try {
+          await conn.query(statement);
+          console.log('  ✓ Executed');
+        } catch (err) {
+          console.log('  ✗ Error:', err.message);
+        }
+      }
+    }
     
     console.log('\n✓ Migrations completed!');
     
@@ -101,6 +118,9 @@ async function runMigrations() {
 
     const [users] = await conn.query(`SHOW TABLES LIKE 'users'`);
     console.log('Membership users table exists:', users.length > 0 ? '✓ YES' : '✗ NO');
+
+    const [commissionLogs] = await conn.query(`SHOW TABLES LIKE 'affiliate_commission_logs'`);
+    console.log('Affiliate commission logs table exists:', commissionLogs.length > 0 ? '✓ YES' : '✗ NO');
     
   } catch (error) {
     console.error('Migration failed:', error);

@@ -4,13 +4,16 @@ import { CartItem, Member } from '../../types.ts';
 
 interface Props {
   orderId: string;
+  queueNumber: number | null;
   total: number;
   member: Member | null;
   items: CartItem[];
   onClose: () => void;
 }
 
-const SuccessScreen: React.FC<Props> = ({ orderId, total, items, onClose }) => {
+const SuccessScreen: React.FC<Props> = ({ orderId, queueNumber, total, items, onClose }) => {
+  const displayQueueNumber = typeof queueNumber === 'number' ? queueNumber : orderId;
+
   useEffect(() => {
     const timer = setTimeout(onClose, 45000);
     return () => clearTimeout(timer);
@@ -45,7 +48,7 @@ const SuccessScreen: React.FC<Props> = ({ orderId, total, items, onClose }) => {
         <div className="w-full bg-yellow-400 rounded-3xl py-4 md:py-5 flex flex-col items-center justify-center mb-5 shadow-lg border-b-4 border-yellow-500 relative">
           <span className="text-[9px] font-black text-slate-900/60 uppercase tracking-[0.4em] mb-1">Nomor Antrian</span>
           <h1 className="text-5xl md:text-6xl font-black text-slate-950 tracking-tighter leading-none">
-            {orderId}
+            {displayQueueNumber}
           </h1>
         </div>
 

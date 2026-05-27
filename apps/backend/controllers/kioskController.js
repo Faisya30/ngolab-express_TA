@@ -45,6 +45,41 @@ function buildOrderCode(rawOrderId) {
 	return input.startsWith('ORD-') ? input : `ORD-${input}`;
 }
 
+async function allocateKioskQueueNumber(connection) {
+	await connection.query(
+		`CREATE TABLE IF NOT EXISTS kiosk_queue_counters (
+			counter_date DATE NOT NULL PRIMARY KEY,
+			last_queue_number INT NOT NULL DEFAULT 0,
+			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+		)`
+	);
+
+	await connection.query(
+		`INSERT INTO kiosk_queue_counters (counter_date, last_queue_number)
+		VALUES (CURRENT_DATE(), 0)
+		ON DUPLICATE KEY UPDATE counter_date = counter_date`
+	);
+
+	const [rows] = await connection.query(
+		`SELECT last_queue_number
+		FROM kiosk_queue_counters
+		WHERE counter_date = CURRENT_DATE()
+		FOR UPDATE`
+	);
+
+	const currentNumber = Number(rows?.[0]?.last_queue_number || 0);
+	const nextNumber = currentNumber + 1;
+
+	await connection.query(
+		`UPDATE kiosk_queue_counters
+		SET last_queue_number = ?
+		WHERE counter_date = CURRENT_DATE()`,
+		[nextNumber]
+	);
+
+	return nextNumber;
+}
+
 export async function init(req, res) {
 	try {
 		const usesCategoryCode = await hasColumn('products', 'category_code');
@@ -182,12 +217,19 @@ export async function saveOrder(req, res) {
 		const hasTipePelanggan = await hasColumn('orders', 'tipe_pelanggan');
 		const hasNamaPelanggan = await hasColumn('orders', 'nama_pelanggan');
 		const hasOrderType = await hasColumn('orders', 'order_type');
+		const hasQueueNumber = await hasColumn('orders', 'queue_number');
 		const orderItemsUsesOrderId = await hasColumn('order_items', 'order_id');
 		const orderItemsUsesProductId = await hasColumn('order_items', 'product_id');
 
 		const result = await withTransaction(async (connection) => {
+			const queueNumber = await allocateKioskQueueNumber(connection);
 			const orderColumns = ['order_code', 'service_type', 'subtotal', 'discount', 'total', 'payment_method', 'points_earned', 'points_used'];
 			const orderValues = [orderCode, serviceType, subtotal, discount, total, paymentMethod, pointsEarned, pointsUsed];
+
+			if (hasQueueNumber) {
+				orderColumns.push('queue_number');
+				orderValues.push(queueNumber);
+			}
 
 			if (hasTipePelanggan) {
 				orderColumns.push('tipe_pelanggan');
@@ -241,10 +283,10 @@ export async function saveOrder(req, res) {
 				);
 			}
 
-			return { orderCode };
+			return { orderCode, queueNumber };
 		});
 
-		return res.json({ success: true, orderCode: result.orderCode });
+		return res.json({ success: true, orderCode: result.orderCode, queueNumber: result.queueNumber });
 	} catch (error) {
 		return res.status(500).json({ success: false, error: error.message });
 	}

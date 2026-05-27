@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   status ENUM('ACTIVE', 'INACTIVE', 'SUSPENDED', 'PENDING') NOT NULL DEFAULT 'ACTIVE',
   membership_level ENUM('Silver', 'Gold', 'Platinum') NOT NULL DEFAULT 'Silver',
   referred_by VARCHAR(50) NULL,
+  affiliate_upline VARCHAR(80) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   phone_number VARCHAR(30) NULL,
   profile_picture VARCHAR(255) NULL,
@@ -20,9 +21,14 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS affiliate_networks (
   user_id VARCHAR(50) PRIMARY KEY,
+  affiliate_id VARCHAR(80) NOT NULL UNIQUE,
   referral_code VARCHAR(50) NOT NULL UNIQUE,
   affiliate_tier VARCHAR(50) NOT NULL DEFAULT 'Basic',
   total_referrals INT NOT NULL DEFAULT 0,
+  total_downlines INT NOT NULL DEFAULT 0,
+  level VARCHAR(50) NOT NULL DEFAULT 'Starter',
+  commission_rate DECIMAL(6,4) NOT NULL DEFAULT 0.02,
+  commission_points DECIMAL(14,2) NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_affiliate_networks_user_id
     FOREIGN KEY (user_id) REFERENCES users(user_id)
@@ -175,5 +181,24 @@ CREATE TABLE IF NOT EXISTS user_ai_insights (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_user_ai_insights_user_id
     FOREIGN KEY (user_id) REFERENCES users(user_id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS affiliate_commission_logs (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  affiliate_id VARCHAR(80) NOT NULL,
+  member_id VARCHAR(50) NOT NULL,
+  transaction_code VARCHAR(50) NULL,
+  transaction_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+  commission_earned DECIMAL(14,2) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_affiliate_commission_affiliate_id (affiliate_id),
+  INDEX idx_affiliate_commission_member_id (member_id),
+  INDEX idx_affiliate_commission_transaction_code (transaction_code),
+  CONSTRAINT fk_affiliate_commission_logs_affiliate_id
+    FOREIGN KEY (affiliate_id) REFERENCES affiliate_networks(affiliate_id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT fk_affiliate_commission_logs_member_id
+    FOREIGN KEY (member_id) REFERENCES users(user_id)
     ON UPDATE CASCADE ON DELETE CASCADE
 );

@@ -33,6 +33,7 @@ const UserKiosk: React.FC = () => {
   const [appliedVoucher, setAppliedVoucher] = useState<Voucher | null>(null);
   const [useKoin, setUseKoin] = useState(false);
   const [orderId, setOrderId] = useState(() => Math.floor(1000 + Math.random() * 9000).toString());
+  const [queueNumber, setQueueNumber] = useState<number | null>(null);
   const [handTrackingEnabled, setHandTrackingEnabled] = useState(false);
   const [virtualCursor, setVirtualCursor] = useState<{ x: number; y: number; pinching: boolean } | null>(null);
 
@@ -158,8 +159,8 @@ const UserKiosk: React.FC = () => {
 
     const now = Date.now();
     const pinchDistance = typeof trackingData.pinchDistance === 'number' ? trackingData.pinchDistance : null;
-    const pinchStartThreshold = 0.055;
-    const pinchReleaseThreshold = 0.075;
+    const pinchStartThreshold = 0.07;
+    const pinchReleaseThreshold = 0.09;
     const isPinching = pinchDistance === null
       ? Boolean(trackingData.pinch)
       : (pinchActiveRef.current ? pinchDistance < pinchReleaseThreshold : pinchDistance < pinchStartThreshold);
@@ -176,8 +177,8 @@ const UserKiosk: React.FC = () => {
       });
     }
 
-    const cooldownMs = 550;
-    const pinchHoldMs = 80;
+    const cooldownMs = 350;
+    const pinchHoldMs = 40;
     if (isPinching && !pinchActiveRef.current) {
       pinchStartedAtRef.current = now;
       pinchTriggeredRef.current = false;
@@ -195,7 +196,7 @@ const UserKiosk: React.FC = () => {
       const session = pinchSessionRef.current;
       const deltaY = y - session.lastY;
       const movedDistance = Math.hypot(x - session.startX, y - session.startY);
-      if (movedDistance > 14) {
+      if (movedDistance > 24) {
         session.moved = true;
       }
 
@@ -333,7 +334,7 @@ const UserKiosk: React.FC = () => {
 
   const total = Math.max(0, subtotal - (voucherDiscount + koinDiscount));
 
-  const handleCompleteOrder = (method: PaymentMethod) => {
+  const handleCompleteOrder = async (method: PaymentMethod) => {
     const pointsEarned = cart.reduce((acc, item) => acc + ((item.cashbackReward || 0) * item.quantity), 0);
 
     const payload = {
@@ -355,11 +356,18 @@ const UserKiosk: React.FC = () => {
       rawCartData: JSON.stringify(cart),
     };
 
-    fetchFromSheet('submitOrder', payload).catch((error) => {
-      console.error('Gagal submit order ke backend:', error);
-    });
+    try {
+      const response = await fetchFromSheet('submitOrder', payload);
+      if (!response?.success) {
+        console.error('Gagal submit order ke backend:', response?.error || response);
+        return;
+      }
 
-    setCurrentScreen(Screen.SUCCESS);
+      setQueueNumber(typeof response.queueNumber === 'number' ? response.queueNumber : null);
+      setCurrentScreen(Screen.SUCCESS);
+    } catch (error) {
+      console.error('Gagal submit order ke backend:', error);
+    }
   };
 
   const resetOrder = () => {
@@ -368,6 +376,7 @@ const UserKiosk: React.FC = () => {
     setMember(null);
     setAppliedVoucher(null);
     setUseKoin(false);
+    setQueueNumber(null);
     setOrderId(Math.floor(1000 + Math.random() * 9000).toString());
     setCurrentScreen(Screen.WELCOME);
     refreshKioskData();
@@ -522,6 +531,7 @@ const UserKiosk: React.FC = () => {
         {currentScreen === Screen.SUCCESS && (
           <SuccessScreen
             orderId={orderId}
+            queueNumber={queueNumber}
             total={total}
             member={member}
             items={cart}
