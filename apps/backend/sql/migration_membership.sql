@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS affiliate_networks (
   level VARCHAR(50) NOT NULL DEFAULT 'Starter',
   commission_rate DECIMAL(6,4) NOT NULL DEFAULT 0.02,
   commission_points DECIMAL(14,2) NOT NULL DEFAULT 0,
+  total_points DECIMAL(14,2) NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_affiliate_networks_user_id
     FOREIGN KEY (user_id) REFERENCES users(user_id)

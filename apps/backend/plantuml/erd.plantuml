@@ -1,140 +1,99 @@
 @startuml
 left to right direction
-skinparam shadowing false
 skinparam linetype ortho
 
-' ================= ENTITAS =================
-rectangle "CUSTOMER" as CUSTOMER
-rectangle "MEMBER" as MEMBER
-rectangle "PESANAN" as PESANAN
-rectangle "DETAIL\nPESANAN" as DETAIL
-rectangle "MENU" as MENU
-rectangle "KATEGORI\nMENU" as KATEGORI
-rectangle "PEMBAYARAN" as PEMBAYARAN
-rectangle "QRIS\nPAYMENT" as QRIS
-rectangle "CASH\nPAYMENT" as CASH
-rectangle "KASIR" as KASIR
-rectangle "VOUCHER" as VOUCHER
-rectangle "KIOSK\nDEVICE" as KIOSK
-rectangle "GESTURE\nLOG" as GESTURE
-rectangle "STRUK" as STRUK
+entity "customers" as customers {
+  * id_customer : int
+  --
+  nama : varchar
+  email : varchar
+  no_hp : varchar
+  qr_member : varchar
+}
 
-' ================= RELASI =================
-diamond "MEMILIKI" as R1
-diamond "MEMBUAT" as R2
-diamond "BERISI" as R3
-diamond "DIPILIH" as R4
-diamond "TERMASUK" as R5
-diamond "DIBAYAR\nDENGAN" as R6
-diamond "QRIS" as R7
-diamond "CASH" as R8
-diamond "DIKONFIRMASI" as R9
-diamond "MENGGUNAKAN" as R10
-diamond "DIPROSES\nDI" as R11
-diamond "MENCATAT" as R12
-diamond "MENGHASILKAN" as R13
+entity "categories" as categories {
+  * id_category : int
+  --
+  nama_category : varchar
+}
 
-' ================= ATRIBUT CUSTOMER =================
-usecase "customer_id" as C1
-usecase "nama" as C2
-usecase "no_hp" as C3
-usecase "status_member" as C4
+entity "products" as products {
+  * id_product : int
+  --
+  id_category : int
+  nama_product : varchar
+  harga : decimal
+  stok : int
+  gambar : varchar
+}
 
-CUSTOMER -- C1
-CUSTOMER -- C2
-CUSTOMER -- C3
-CUSTOMER -- C4
+entity "orders" as orders {
+  * id_order : int
+  --
+  id_customer : int
+  id_voucher : int
+  kode_order : varchar
+  tipe_pesanan : varchar
+  subtotal : decimal
+  diskon : decimal
+  total : decimal
+  status_order : varchar
+}
 
-' ================= ATRIBUT MEMBER =================
-usecase "member_id" as M1
-usecase "qr_membership" as M2
-usecase "saldo_poin" as M3
-usecase "status_member" as M4
+entity "order_items" as order_items {
+  * id_order_item : int
+  --
+  id_order : int
+  id_product : int
+  jumlah : int
+  harga : decimal
+  subtotal : decimal
+}
 
-MEMBER -- M1
-MEMBER -- M2
-MEMBER -- M3
-MEMBER -- M4
+entity "payments" as payments {
+  * id_payment : int
+  --
+  id_order : int
+  metode_pembayaran : varchar
+  status_pembayaran : varchar
+  total_bayar : decimal
+  paid_at : datetime
+}
 
-' ================= ATRIBUT PESANAN =================
-usecase "pesanan_id" as P1
-usecase "kode_pesanan" as P2
-usecase "nomor_antrian" as P3
-usecase "tipe_pesanan" as P4
-usecase "subtotal" as P5
-usecase "total_akhir" as P6
-usecase "status_pesanan" as P7
+entity "vouchers" as vouchers {
+  * id_voucher : int
+  --
+  kode_voucher : varchar
+  nama_voucher : varchar
+  nominal_diskon : decimal
+  status : varchar
+}
 
-PESANAN -- P1
-PESANAN -- P2
-PESANAN -- P3
-PESANAN -- P4
-PESANAN -- P5
-PESANAN -- P6
-PESANAN -- P7
+entity "member_points" as points {
+  * id_point : int
+  --
+  id_customer : int
+  jumlah_poin : int
+  keterangan : text
+}
 
-' ================= ATRIBUT MENU =================
-usecase "menu_id" as MN1
-usecase "nama_menu" as MN2
-usecase "harga" as MN3
-usecase "gambar_menu" as MN4
-usecase "status_menu" as MN5
+entity "admins" as admins {
+  * id_admin : int
+  --
+  nama_admin : varchar
+  email : varchar
+  password : varchar
+}
 
-MENU -- MN1
-MENU -- MN2
-MENU -- MN3
-MENU -- MN4
-MENU -- MN5
-
-' ================= ATRIBUT PEMBAYARAN =================
-usecase "pembayaran_id" as PB1
-usecase "metode_pembayaran" as PB2
-usecase "status_pembayaran" as PB3
-usecase "total_bayar" as PB4
-
-PEMBAYARAN -- PB1
-PEMBAYARAN -- PB2
-PEMBAYARAN -- PB3
-PEMBAYARAN -- PB4
-
-' ================= RELASI + KARDINALITAS =================
-CUSTOMER "1" -- R1
-R1 -- "0..1" MEMBER
-
-CUSTOMER "1" -- R2
-R2 -- "0..*" PESANAN
-
-PESANAN "1" -- R3
-R3 -- "1..*" DETAIL
-
-DETAIL "0..*" -- R4
-R4 -- "1" MENU
-
-KATEGORI "1" -- R5
-R5 -- "0..*" MENU
-
-PESANAN "1" -- R6
-R6 -- "1" PEMBAYARAN
-
-PEMBAYARAN "1" -- R7
-R7 -- "0..1" QRIS
-
-PEMBAYARAN "1" -- R8
-R8 -- "0..1" CASH
-
-KASIR "1" -- R9
-R9 -- "0..*" CASH
-
-PESANAN "0..*" -- R10
-R10 -- "0..1" VOUCHER
-
-KIOSK "1" -- R11
-R11 -- "0..*" PESANAN
-
-KIOSK "1" -- R12
-R12 -- "0..*" GESTURE
-
-PESANAN "1" -- R13
-R13 -- "1" STRUK
+customers ||--o{ orders : melakukan
+orders ||--o{ order_items : memiliki
+products ||--o{ order_items : dipilih
+categories ||--o{ products : memiliki
+orders ||--|| payments : dibayar
+vouchers ||--o{ orders : digunakan
+customers ||--o{ points : memiliki
+admins ||--o{ products : mengelola
+admins ||--o{ categories : mengelola
+admins ||--o{ orders : memonitor
 
 @enduml

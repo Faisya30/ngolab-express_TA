@@ -19,9 +19,16 @@ ALTER TABLE affiliate_networks
 ALTER TABLE affiliate_networks
   ADD COLUMN IF NOT EXISTS commission_points DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER commission_rate;
 
+ALTER TABLE affiliate_networks
+  ADD COLUMN IF NOT EXISTS total_points DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER commission_points;
+
 UPDATE affiliate_networks
 SET affiliate_id = CONCAT('AFF-', user_id)
 WHERE affiliate_id IS NULL OR affiliate_id = '';
+
+UPDATE affiliate_networks
+SET total_points = COALESCE(total_points, commission_points, 0)
+WHERE total_points IS NULL;
 
 ALTER TABLE affiliate_networks
   MODIFY COLUMN affiliate_id VARCHAR(80) NOT NULL;

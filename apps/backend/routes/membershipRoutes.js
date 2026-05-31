@@ -7,6 +7,8 @@ import {
   getAffiliateVerifications,
   getAllMembers,
   getCommissionLogs,
+  getAffiliateNetwork,
+  getAffiliateStats,
   getGlobalSettings,
   getHubDataAdmin,
   getPointLogs,
@@ -23,6 +25,7 @@ import {
   updateUserRole,
   verifyAffiliate,
 } from '../controllers/membershipController.js';
+import { requireMembershipJwt, requireSelfMembershipAccess } from '../middlewares/membershipAuth.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -33,7 +36,9 @@ router.post('/lookup', lookupMember);
 router.get('/profile/:user_id', getUserProfile);
 router.put('/profile/:user_id', updateProfile);
 // Accept multipart uploads (ktm_image) but also accept JSON fallback.
-router.post('/affiliate/verify', upload.single('ktm_image'), verifyAffiliate);
+router.post('/affiliate/verify', upload.single('ktm_image'), requireMembershipJwt, requireSelfMembershipAccess, verifyAffiliate);
+router.get('/affiliate/network/:user_id', requireMembershipJwt, requireSelfMembershipAccess, getAffiliateNetwork);
+router.get('/affiliate/stats/:user_id', requireMembershipJwt, requireSelfMembershipAccess, getAffiliateStats);
 router.get('/admin/affiliate-verifications', getAffiliateVerifications);
 router.patch('/admin/affiliate-verifications/:verification_id/status', reviewAffiliateVerification);
 router.get('/admin/hub-data', getHubDataAdmin);

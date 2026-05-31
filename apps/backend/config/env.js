@@ -25,7 +25,7 @@ export function getServerConfig() {
 }
 
 export function validateEnvironment() {
-  const recommended = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_NAME', 'FRONTEND_ORIGIN'];
+  const recommended = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_NAME', 'FRONTEND_ORIGIN', 'JWT_SECRET'];
   const missing = recommended.filter((key) => !String(process.env[key] || '').trim());
 
   if (missing.length) {
