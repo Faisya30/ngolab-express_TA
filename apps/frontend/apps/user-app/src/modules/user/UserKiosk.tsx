@@ -418,7 +418,11 @@ const UserKiosk: React.FC = () => {
       )}
 
       <div className="flex-1 overflow-auto">
-        {currentScreen === Screen.WELCOME && <WelcomeScreen onStart={() => setCurrentScreen(Screen.SERVICE_TYPE)} />}
+        {currentScreen === Screen.WELCOME && <WelcomeScreen 
+  onStart={() => setCurrentScreen(Screen.SERVICE_TYPE)}
+  onToggleGesture={() => setHandTrackingEnabled(prev => !prev)}
+  handTrackingEnabled={handTrackingEnabled}
+/>}
         {currentScreen === Screen.SERVICE_TYPE && (
           <ServiceTypeScreen
             onSelect={(type) => {

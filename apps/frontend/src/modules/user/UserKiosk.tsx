@@ -342,7 +342,7 @@ const UserKiosk: React.FC = () => {
         memberCode: member ? member.code : '-',
         member_id: member ? member.code : null,
         tipe_pelanggan: member ? 'MEMBER' : 'GUEST',
-        nama_pelanggan: member ? member.name : (member ? String(member.name) : 'Guest'),
+        nama_pelanggan: member ? String(member.name) : 'Guest', 
         isAffiliate: member?.isAffiliate ? 'Yes' : 'No',
         voucher: appliedVoucher ? appliedVoucher.title : '-',
         pointsEarned,
@@ -407,7 +407,11 @@ const UserKiosk: React.FC = () => {
       )}
 
       <div className="flex-1 overflow-auto">
-        {currentScreen === Screen.WELCOME && <WelcomeScreen onStart={() => setCurrentScreen(Screen.SERVICE_TYPE)} />}
+        {currentScreen === Screen.WELCOME && <WelcomeScreen 
+  onStart={() => setCurrentScreen(Screen.SERVICE_TYPE)}
+  onToggleGesture={() => setHandTrackingEnabled(prev => !prev)}
+  handTrackingEnabled={handTrackingEnabled}
+/>}
         {currentScreen === Screen.SERVICE_TYPE && (
           <ServiceTypeScreen
             onSelect={(type) => {
