@@ -4,7 +4,8 @@ import { pingDatabase } from './config/db.js';
 import { registerRoutes } from './routes/index.js';
 
 function isAllowedLanFrontendOrigin(origin) {
-  return /^http:\/\/(\d{1,3}\.){3}\d{1,3}:(3000|5173)$/.test(origin);
+  // Mirror the local dev frontend ports for LAN access (same host, different device).
+  return /^http:\/\/(\d{1,3}\.){3}\d{1,3}:(3000|3001|3002|3004|3005|5173)$/.test(origin);
 }
 
 export function createApp({ frontendOrigins }) {
@@ -42,7 +43,12 @@ export function createApp({ frontendOrigins }) {
 
   app.use((err, _req, res, _next) => {
     console.error(err);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+    const statusCode = Number(err?.status || err?.statusCode || 500);
+    const message = statusCode === 400
+      ? String(err?.message || 'Body JSON tidak valid.')
+      : 'Internal server error';
+
+    res.status(statusCode).json({ success: false, error: message });
   });
 
   return app;

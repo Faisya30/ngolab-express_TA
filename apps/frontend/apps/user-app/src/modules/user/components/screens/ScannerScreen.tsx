@@ -41,7 +41,7 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack }) => {
   };
 
   return (
-    <div className="w-full h-full bg-black flex flex-col items-center justify-center relative overflow-hidden">
+    <div className="w-full h-full bg-transparent flex flex-col items-center justify-center relative overflow-hidden text-[#12201b]">
       {/* Background Decor */}
       <div className="absolute inset-0 z-0">
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-orange-600/10 via-transparent to-transparent" />
@@ -49,7 +49,8 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack }) => {
 
       <button 
         onClick={onBack} 
-        className="absolute top-12 left-12 z-20 text-slate-500 hover:text-white transition flex items-center gap-4 font-black text-xl tracking-widest group uppercase"
+        aria-label="Batal scan"
+        className="absolute top-12 left-12 z-20 text-[#5f716a] hover:text-white transition flex items-center gap-4 font-black text-xl tracking-widest group uppercase"
       >
         <div className="w-14 h-14 rounded-full border-2 border-slate-900 flex items-center justify-center group-hover:bg-white/10 transition-all">
           <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -59,12 +60,12 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack }) => {
 
       <div className="relative z-10 flex flex-col items-center max-w-2xl w-full">
         <header className="text-center mb-12">
-          <h2 className="text-5xl font-black text-white mb-4 tracking-tighter uppercase">SCAN <span className="text-amber-400">MEMBER</span></h2>
-          <p className="text-slate-500 text-xl font-medium px-10">Posisikan kode QR Anda tepat di dalam bingkai.</p>
+          <h2 className="text-5xl font-black text-[#12201b] mb-4 tracking-tighter uppercase">SCAN <span className="text-[#e15b2d]">MEMBER</span></h2>
+          <p className="text-[#5f716a] text-xl font-medium px-10">Posisikan kode QR Anda tepat di dalam bingkai.</p>
         </header>
 
         {/* Scanner Frame */}
-        <div className="relative w-full aspect-square max-w-md bg-slate-900 rounded-[4rem] overflow-hidden border-4 border-slate-800 shadow-2xl">
+        <div className="relative w-full aspect-square max-w-md bg-[#0f1e18]/20 rounded-[4rem] overflow-hidden border-4 border-[#e7ece8] shadow-2xl">
           {/* Camera View */}
           <video 
             ref={videoRef} 
@@ -75,14 +76,14 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack }) => {
 
           {/* Scanner Overlay UI */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-64 h-64 border-2 border-orange-500/30 rounded-4xl relative">
+              <div className="w-64 h-64 border-2 border-[#e15b2d]/30 rounded-4xl relative">
               <div className="absolute -top-1 -left-1 w-12 h-12 border-t-8 border-l-8 border-orange-500 rounded-tl-2xl" />
               <div className="absolute -top-1 -right-1 w-12 h-12 border-t-8 border-r-8 border-orange-500 rounded-tr-2xl" />
               <div className="absolute -bottom-1 -left-1 w-12 h-12 border-b-8 border-l-8 border-orange-500 rounded-bl-2xl" />
               <div className="absolute -bottom-1 -right-1 w-12 h-12 border-b-8 border-r-8 border-orange-500 rounded-br-2xl" />
               
               {/* Animated Scan Line */}
-              <div className="absolute left-0 w-full h-1 bg-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.8)] animate-[scan_3s_infinite_ease-in-out]" />
+              <div className="absolute left-0 w-full h-1 bg-[#ffd173] shadow-[0_0_20px_rgba(225,91,45,0.45)] animate-[scan_3s_infinite_ease-in-out]" />
             </div>
           </div>
 
@@ -99,7 +100,7 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack }) => {
         <button 
           onClick={handleSimulate}
           disabled={isSimulating}
-          className="mt-16 bg-slate-900 hover:bg-slate-800 text-slate-500 hover:text-amber-400 px-12 py-6 rounded-full border border-slate-800 font-black text-lg tracking-[0.2em] transition-all active:scale-95 shadow-xl uppercase"
+          className="mt-16 bg-[#12201b] hover:bg-[#0d1814] text-white px-12 py-6 rounded-full border border-[#12201b] font-black text-lg tracking-[0.12em] transition-all active:scale-95 shadow-xl uppercase"
         >
           Simulasi Scan
         </button>

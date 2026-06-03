@@ -26,12 +26,17 @@ const TakeAwayIcon = () => (
 
 const ServiceTypeScreen: React.FC<Props> = ({ onSelect, onBack }) => {
   return (
-    <div className="w-full h-full flex flex-col p-8 md:p-12 bg-[#F8FAFC] relative overflow-hidden">
+    <div className="w-full h-full flex flex-col p-8 md:p-12 bg-transparent relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -top-28 right-20 w-80 h-80 rounded-full bg-[#e15b2d]/10 blur-3xl" />
+        <div className="absolute -bottom-32 left-16 w-96 h-96 rounded-full bg-[#1d7a63]/10 blur-3xl" />
+      </div>
+
       <button 
         onClick={onBack} 
-        className="relative z-10 mb-8 text-slate-400 hover:text-black transition flex items-center gap-3 font-black text-[9px] tracking-[0.2em] uppercase group"
+        className="relative z-10 mb-8 text-[#5f716a] hover:text-[#12201b] transition flex items-center gap-3 font-black text-[9px] tracking-[0.18em] uppercase group"
       >
-        <div className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center group-hover:bg-white group-hover:border-orange-500 group-hover:text-orange-500 transition-all">
+        <div className="w-9 h-9 rounded-full border border-[#d9e2dc] bg-white/70 flex items-center justify-center group-hover:bg-white group-hover:border-[#e15b2d] group-hover:text-[#e15b2d] transition-all">
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </div>
         Kembali
@@ -39,39 +44,39 @@ const ServiceTypeScreen: React.FC<Props> = ({ onSelect, onBack }) => {
 
       <div className="flex-1 flex flex-col items-center justify-center relative z-10 w-full max-w-4xl mx-auto">
         <div className="text-center mb-12">
-          <div className="inline-block px-5 py-1.5 bg-orange-50 rounded-full border border-orange-100 mb-5">
-             <p className="text-orange-500 font-black text-[9px] uppercase tracking-[0.4em]">LOKASI MAKAN</p>
+          <div className="inline-block px-5 py-1.5 bg-white/85 rounded-full border border-[#d9e2dc] mb-5 shadow-sm">
+             <p className="text-[#1d7a63] font-black text-[9px] uppercase tracking-[0.32em]">LOKASI MAKAN</p>
           </div>
-          <h2 className="text-4xl md:text-5xl font-black text-slate-950 mb-3 tracking-tighter uppercase leading-none">
-            NIKMATI DI <span className="text-orange-600">MANA?</span>
+          <h2 className="text-4xl md:text-5xl font-black text-[#12201b] mb-3 tracking-tighter uppercase leading-none">
+            NIKMATI DI <span className="text-[#e15b2d]">MANA?</span>
           </h2>
-          <p className="text-slate-400 font-bold uppercase tracking-widest text-[11px]">Pilih kenyamanan cara makan Anda hari ini</p>
+          <p className="text-[#5f716a] font-bold uppercase tracking-[0.16em] text-[11px]">Pilih kenyamanan cara makan Anda hari ini</p>
         </div>
 
-        <div className="flex flex-row gap-8 w-full max-w-3xl">
+        <div className="flex flex-col md:flex-row gap-6 md:gap-8 w-full max-w-3xl">
           <button 
             onClick={() => onSelect(ServiceType.DINE_IN)}
-            className="flex-1 group bg-white rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-8 shadow-sm hover:shadow-xl transition-all duration-500 border border-slate-100 hover:border-orange-500 active:scale-[0.98]"
+            className="flex-1 group bg-white/95 rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-8 shadow-sm hover:shadow-xl transition-all duration-500 border border-[#d9e2dc] hover:border-[#e15b2d] active:scale-[0.98] backdrop-blur-md"
           >
             <div className="w-28 h-28 group-hover:scale-105 transition-transform duration-500">
               <DineInIcon />
             </div>
             <div className="text-center">
-              <span className="block text-xl font-black text-slate-900 mb-1 uppercase tracking-tight">Makan Di Sini</span>
-              <p className="text-[9px] text-orange-500 font-black uppercase tracking-[0.3em] opacity-60">Dine In Experience</p>
+              <span className="block text-xl font-black text-[#12201b] mb-1 uppercase tracking-tight">Makan Di Sini</span>
+              <p className="text-[9px] text-[#e15b2d] font-black uppercase tracking-[0.24em] opacity-80">Dine In Experience</p>
             </div>
           </button>
 
           <button 
             onClick={() => onSelect(ServiceType.TAKE_AWAY)}
-            className="flex-1 group bg-white rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-8 shadow-sm hover:shadow-xl transition-all duration-500 border border-slate-100 hover:border-orange-500 active:scale-[0.98]"
+            className="flex-1 group bg-white/95 rounded-[2.5rem] p-10 flex flex-col items-center justify-center gap-8 shadow-sm hover:shadow-xl transition-all duration-500 border border-[#d9e2dc] hover:border-[#e15b2d] active:scale-[0.98] backdrop-blur-md"
           >
             <div className="w-28 h-28 group-hover:scale-105 transition-transform duration-500">
               <TakeAwayIcon />
             </div>
             <div className="text-center">
-              <span className="block text-xl font-black text-slate-900 mb-1 uppercase tracking-tight">Bawa Pulang</span>
-              <p className="text-[9px] text-orange-500 font-black uppercase tracking-[0.3em] opacity-60">Take Away Parcel</p>
+              <span className="block text-xl font-black text-[#12201b] mb-1 uppercase tracking-tight">Bawa Pulang</span>
+              <p className="text-[9px] text-[#e15b2d] font-black uppercase tracking-[0.24em] opacity-80">Take Away Parcel</p>
             </div>
           </button>
         </div>

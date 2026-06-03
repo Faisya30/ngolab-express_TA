@@ -84,19 +84,32 @@ export async function getOrders(req, res) {
             COALESCE(order_type, 'kiosk') AS orderType
           FROM orders
           ORDER BY created_at DESC`
-        : `SELECT
-            order_code AS orderId,
-            created_at AS timestamp,
-            service_type AS service,
-            subtotal,
-            discount,
-            total,
-            payment_method AS payment,
-            COALESCE(order_type, 'kiosk') AS orderType
-          FROM orders
-          WHERE order_type = ?
-          ORDER BY created_at DESC`,
-      requestProductType === 'all' ? [] : [requestProductType]
+        : requestProductType === 'cv'
+          ? `SELECT
+              order_code AS orderId,
+              created_at AS timestamp,
+              service_type AS service,
+              subtotal,
+              discount,
+              total,
+              payment_method AS payment,
+              COALESCE(order_type, 'computervision') AS orderType
+            FROM orders
+            WHERE order_type IN ('cv', 'computervision')
+            ORDER BY created_at DESC`
+          : `SELECT
+              order_code AS orderId,
+              created_at AS timestamp,
+              service_type AS service,
+              subtotal,
+              discount,
+              total,
+              payment_method AS payment,
+              COALESCE(order_type, 'kiosk') AS orderType
+            FROM orders
+            WHERE order_type = ?
+            ORDER BY created_at DESC`,
+      requestProductType === 'all' || requestProductType === 'cv' ? [] : [requestProductType]
     );
 
     res.json(rows);

@@ -31,33 +31,33 @@ const QRISScreen: React.FC<Props> = ({ total, onComplete, onBack }) => {
   }, [onComplete]);
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 font-sans p-3 sm:p-4 md:p-6 overflow-y-auto relative">
+    <div className="w-full h-full flex flex-col items-center justify-center bg-transparent font-sans p-3 sm:p-4 md:p-6 overflow-y-auto relative text-[#12201b]">
       
       {/* Dekorasi Latar Belakang */}
-      <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-orange-600/10 blur-[120px] rounded-full" />
-      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-yellow-400/5 blur-[100px] rounded-full" />
+      <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-[#e15b2d]/10 blur-[120px] rounded-full" />
+      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#ffd173]/5 blur-[100px] rounded-full" />
 
       <div
-        className="w-full max-w-[440px] md:max-w-[500px] bg-white rounded-[2.5rem] p-5 md:p-7 flex flex-col items-center shadow-[0_30px_80px_rgba(0,0,0,0.45)] relative animate-in fade-in zoom-in duration-500"
+        className="w-full max-w-110 md:max-w-125 bg-white rounded-[2.5rem] p-5 md:p-7 flex flex-col items-center shadow-[0_30px_80px_rgba(0,0,0,0.22)] relative animate-in fade-in zoom-in duration-500"
         style={{ transform: 'scale(var(--kiosk-scale))', transformOrigin: 'center center' }}
       >
         
         {/* Header Pembayaran */}
           <div className="flex flex-col items-center mb-5 md:mb-6">
-            <div className="bg-slate-50 px-4 py-1.5 rounded-full border border-slate-100 mb-3">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Metode Pembayaran</p>
+            <div className="bg-white/90 px-4 py-1.5 rounded-full border border-[#d9e2dc] mb-3">
+              <p className="text-[10px] font-black text-[#5f716a] uppercase tracking-[0.32em]">Metode Pembayaran</p>
            </div>
            <div className="flex items-center gap-3">
               <div className="w-10 h-10 md:w-11 md:h-11 bg-white shadow-md rounded-xl flex items-center justify-center p-2 border border-slate-100">
                  <img src="https://upload.wikimedia.org/wikipedia/commons/a/a2/Logo_QRIS.svg" alt="QRIS" className="w-full" />
               </div>
-              <h2 className="text-2xl md:text-[2rem] font-black text-slate-900 tracking-tighter uppercase">SCAN <span className="text-orange-600">QRIS</span></h2>
+              <h2 className="text-2xl md:text-[2rem] font-black text-[#12201b] tracking-tighter uppercase">SCAN <span className="text-[#e15b2d]">QRIS</span></h2>
            </div>
         </div>
 
         {/* BOX GAMBAR QRIS (Tempat Menempelkan Foto QRIS) */}
-          <div className="w-full aspect-square bg-white rounded-4xl p-3 shadow-inner border-2 border-slate-50 relative group mb-5 md:mb-6">
-            <div className="w-full h-full rounded-[1.4rem] overflow-hidden border-2 border-orange-500/20 p-3 flex items-center justify-center bg-white relative">
+          <div className="w-full aspect-square bg-white rounded-4xl p-3 shadow-inner border-2 border-[#e7ece8] relative group mb-5 md:mb-6">
+            <div className="w-full h-full rounded-[1.4rem] overflow-hidden border-2 border-[#e15b2d]/20 p-3 flex items-center justify-center bg-white relative">
               <img 
                 src={qrisImage} 
                 alt="QRIS Merchant" 
@@ -65,7 +65,7 @@ const QRISScreen: React.FC<Props> = ({ total, onComplete, onBack }) => {
               />
               
               {/* Animasi Scan Line */}
-              <div className="absolute inset-x-0 top-0 h-1 bg-orange-500/40 shadow-[0_0_15px_rgba(249,115,22,0.8)] animate-[scan_3s_infinite_ease-in-out]" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-[#ffd173]/40 shadow-[0_0_15px_rgba(225,91,45,0.5)] animate-[scan_3s_infinite_ease-in-out]" />
            </div>
 
            {/* Corner Accents */}

@@ -62,14 +62,14 @@ const MenuScreen: React.FC<Props> = ({ cart, member, potentialPoints, products, 
   };
 
   return (
-    <div className="w-full h-full flex bg-white overflow-hidden text-slate-900 font-sans">
+    <div className="w-full h-full flex bg-transparent overflow-hidden text-[#12201b]">
       
       {/* SIDEBAR - Ramping & Professional */}
-      <div className="w-20 md:w-24 bg-[#F8FAFC] flex flex-col items-center z-20 shrink-0 border-r border-slate-200">
+      <div className="w-20 md:w-24 bg-white/75 backdrop-blur-sm flex flex-col items-center z-20 shrink-0 border-r border-[#d9e2dc]">
         <div className="w-full flex flex-col items-center py-5 gap-4">
           <button 
             onClick={onBack} 
-            className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-300 hover:bg-orange-500 hover:text-white transition-all shadow-sm border border-slate-100"
+            className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-[#5f716a] hover:bg-[#e15b2d] hover:text-white transition-all shadow-sm border border-[#d9e2dc]"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
@@ -96,17 +96,17 @@ const MenuScreen: React.FC<Props> = ({ cart, member, potentialPoints, products, 
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
                 className={`w-full flex flex-col items-center justify-center py-4 px-1 transition-all relative ${
-                  isActive ? 'bg-orange-500 text-white' : 'text-slate-400 hover:bg-slate-100'
+                  isActive ? 'bg-[#e15b2d] text-white' : 'text-[#5f716a] hover:bg-[#edf4ed]'
                 }`}
               >
-                {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-yellow-400" />}
+                {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#ffd173]" />}
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-all ${
-                  isActive ? 'bg-white text-orange-600' : 'bg-white text-slate-300'
+                  isActive ? 'bg-white text-[#e15b2d]' : 'bg-white text-[#8a9b95]'
                 }`}>
                   <div className="w-6 h-6">{cat.icon}</div>
                 </div>
                 <span className={`text-[8px] uppercase tracking-tighter text-center leading-none font-black px-1 ${
-                  isActive ? 'text-white' : 'text-slate-500'
+                  isActive ? 'text-white' : 'text-[#5f716a]'
                 }`}>
                   {cat.name}
                 </span>
@@ -117,14 +117,14 @@ const MenuScreen: React.FC<Props> = ({ cart, member, potentialPoints, products, 
       </div>
 
       {/* CONTENT AREA */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-white">
-        <header className="px-8 py-5 border-b border-slate-50 flex items-end justify-between bg-white/80 backdrop-blur-md z-10">
+      <div className="flex-1 flex flex-col overflow-hidden bg-transparent">
+        <header className="px-8 py-5 border-b border-[#d9e2dc] flex items-end justify-between bg-white/70 backdrop-blur-md z-10">
            <div>
               <div className="flex items-center gap-2 mb-1">
-                 <div className="w-6 h-1 bg-orange-500 rounded-full" />
-                 <p className="text-orange-500 font-black text-[8px] uppercase tracking-[0.4em]">Katalog Menu</p>
+                 <div className="w-6 h-1 bg-[#e15b2d] rounded-full" />
+                 <p className="text-[#1d7a63] font-black text-[8px] uppercase tracking-[0.32em]">Katalog Menu</p>
               </div>
-              <h2 className="text-2xl font-black text-slate-950 tracking-tighter uppercase leading-none">
+              <h2 className="text-2xl font-black text-[#12201b] tracking-tighter uppercase leading-none">
                 {categories.find(c => c.id === activeCategory)?.name || 'Pilihan Kami'}
               </h2>
            </div>
@@ -135,7 +135,7 @@ const MenuScreen: React.FC<Props> = ({ cart, member, potentialPoints, products, 
            </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-8 pt-6 no-scrollbar bg-[#FCFDFE]">
+        <div className="flex-1 overflow-y-auto px-8 pt-6 no-scrollbar bg-transparent">
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 pb-12">
             {filteredProducts.map(product => {
               const qty = getProductQty(product.id);
@@ -146,13 +146,13 @@ const MenuScreen: React.FC<Props> = ({ cart, member, potentialPoints, products, 
                   key={product.id} 
                   onClick={() => onAddToCart(product)}
                   className={`bg-white rounded-[1.8rem] p-3 shadow-sm border transition-all duration-300 flex flex-col relative cursor-pointer group active:scale-[0.97] ${
-                    isSelected ? 'border-orange-500 ring-4 ring-orange-500/5' : 'border-slate-50 hover:border-slate-200'
-                  }`}
+                      isSelected ? 'border-[#e15b2d] ring-4 ring-[#e15b2d]/10' : 'border-[#e7ece8] hover:border-[#c7d2cd]'
+                    }`}
                 >
                   {/* Badges Overlay */}
                   <div className="absolute top-4 left-4 z-10 flex flex-col gap-1 items-start pointer-events-none">
                     {product.isRecommended && (
-                      <div className="bg-yellow-400 text-slate-950 text-[7px] font-black px-2 py-1 rounded-md uppercase tracking-widest shadow-sm">
+                      <div className="bg-[#ffd173] text-slate-950 text-[7px] font-black px-2 py-1 rounded-md uppercase tracking-widest shadow-sm">
                         ⭐ BEST
                       </div>
                     )}
@@ -164,18 +164,18 @@ const MenuScreen: React.FC<Props> = ({ cart, member, potentialPoints, products, 
                   </div>
 
                   {/* Image with subtle hover effect */}
-                  <div className="relative w-full aspect-square rounded-[1.2rem] overflow-hidden mb-4 bg-slate-50 flex items-center justify-center border border-slate-50">
+                  <div className="relative w-full aspect-square rounded-[1.2rem] overflow-hidden mb-4 bg-[#edf4ed] flex items-center justify-center border border-[#e7ece8]">
                     <img 
                       src={product.image || PLACEHOLDER_IMAGE} 
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
                       alt={product.name} 
                     />
                     {/* Hover Overlay */}
-                    <div className="absolute inset-0 bg-orange-600/0 group-hover:bg-orange-600/5 transition-colors duration-300" />
+                    <div className="absolute inset-0 bg-[#e15b2d]/0 group-hover:bg-[#e15b2d]/10 transition-colors duration-300" />
                   </div>
                   
                   <div className="flex-1 px-1 flex flex-col items-center text-center">
-                    <h3 className="text-[13px] font-black text-slate-950 leading-tight mb-1 uppercase tracking-tight line-clamp-2 min-h-[2.2rem] flex items-center justify-center">
+                    <h3 className="text-[13px] font-black text-[#12201b] leading-tight mb-1 uppercase tracking-tight line-clamp-2 min-h-[2.2rem] flex items-center justify-center">
                       {product.name}
                     </h3>
                     <p className="text-[8px] text-slate-400 font-bold mb-4 leading-snug flex-1 line-clamp-2 uppercase opacity-60">
@@ -183,7 +183,7 @@ const MenuScreen: React.FC<Props> = ({ cart, member, potentialPoints, products, 
                     </p>
                     
                     <div className="w-full flex flex-col items-center gap-2 mt-auto">
-                       <span className="text-sm font-black text-slate-950 tracking-tighter">Rp {Number(product.price).toLocaleString()}</span>
+                       <span className="text-sm font-black text-[#12201b] tracking-tighter">Rp {Number(product.price).toLocaleString()}</span>
                        
                        {isSelected ? (
                          <div 
@@ -205,7 +205,7 @@ const MenuScreen: React.FC<Props> = ({ cart, member, potentialPoints, products, 
                            </button>
                          </div>
                        ) : (
-                         <div className="w-full py-2.5 bg-slate-950 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg group-hover:bg-orange-500 transition-all active:scale-95 flex items-center justify-center gap-2">
+                         <div className="w-full py-2.5 bg-[#12201b] text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg group-hover:bg-[#e15b2d] transition-all active:scale-95 flex items-center justify-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                             Pesan
                          </div>
@@ -220,11 +220,11 @@ const MenuScreen: React.FC<Props> = ({ cart, member, potentialPoints, products, 
       </div>
 
       {/* SUMMARY SIDEBAR - Ramping */}
-      <div className="w-70 md:w-[320px] bg-white border-l border-slate-100 flex flex-col shrink-0 z-30 shadow-xl">
+      <div className="w-70 md:w-80 bg-white/85 backdrop-blur-sm border-l border-[#d9e2dc] flex flex-col shrink-0 z-30 shadow-xl">
         <header className="p-6 md:p-8 border-b border-slate-50">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-black text-slate-950 uppercase tracking-tighter">Pesanan</h3>
-            <div className="bg-slate-900 px-3 py-1 rounded-full">
+            <h3 className="text-lg font-black text-[#12201b] uppercase tracking-tighter">Pesanan</h3>
+            <div className="bg-[#12201b] px-3 py-1 rounded-full">
               <span className="text-white text-[8px] font-black uppercase tracking-widest">{itemCount} items</span>
             </div>
           </div>

@@ -61,19 +61,19 @@ const CartScreen: React.FC<Props> = ({
   const finalTotal = Math.max(0, subtotal - (voucherDiscountAmount + koinDiscountAmount));
 
   return (
-    <div className="w-full h-full flex flex-col bg-[#F8FAFC] text-slate-900 overflow-hidden font-sans">
-      <header className="px-8 h-14 bg-white flex items-center justify-between border-b border-slate-100 z-30 shadow-sm">
+      <div className="w-full h-full flex flex-col bg-transparent text-[#12201b] overflow-hidden">
+         <header className="px-8 h-14 bg-white/80 backdrop-blur-md flex items-center justify-between border-b border-[#d9e2dc] z-30 shadow-sm">
         <div className="flex items-center gap-5">
-          <button onClick={onBack} className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-50 border border-slate-100 transition-all hover:bg-slate-100 active:scale-95">
+               <button onClick={onBack} className="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-[#d9e2dc] transition-all hover:bg-[#edf4ed] active:scale-95">
              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
-          <h2 className="text-base font-black text-black tracking-tight uppercase">Ringkasan Pesanan</h2>
+               <h2 className="text-base font-black text-[#12201b] tracking-tight uppercase">Ringkasan Pesanan</h2>
         </div>
 
         {!member ? (
            <div className="flex items-center gap-3">
               <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1.5 rounded-full">+{potentialPoints.toLocaleString()} PTS</span>
-              <button onClick={onScanMember} className="bg-orange-500 text-white px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest shadow-md">Login Member</button>
+              <button onClick={onScanMember} className="bg-[#e15b2d] text-white px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest shadow-md hover:bg-[#c94821] transition">Login Member</button>
            </div>
         ) : (
            <div className="flex items-center gap-3">
@@ -90,11 +90,11 @@ const CartScreen: React.FC<Props> = ({
         <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
           <div className="max-w-2xl mx-auto space-y-5">
             
-            <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-               <div className="divide-y divide-slate-50">
+            <section className="bg-white/90 rounded-2xl shadow-sm border border-[#d9e2dc] overflow-hidden backdrop-blur-sm">
+               <div className="divide-y divide-[#e7ece8]">
                   {cart.map(item => (
                     <div key={item.id} className="p-4 flex items-center gap-4">
-                       <div className="w-12 h-12 bg-slate-50 rounded-lg overflow-hidden shrink-0 border border-slate-100">
+                       <div className="w-12 h-12 bg-[#edf4ed] rounded-lg overflow-hidden shrink-0 border border-[#d9e2dc]">
                           <img 
                             src={item.image || PLACEHOLDER_IMAGE} 
                             className="w-full h-full object-cover" 
@@ -103,17 +103,17 @@ const CartScreen: React.FC<Props> = ({
                           />
                        </div>
                        <div className="flex-1">
-                          <h4 className="text-[12px] font-black text-black uppercase tracking-tight">{item.name}</h4>
+                          <h4 className="text-[12px] font-black text-[#12201b] uppercase tracking-tight">{item.name}</h4>
                           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Qty {item.quantity}</p>
                        </div>
-                       <span className="text-sm font-black text-black tracking-tight">Rp {(item.price * item.quantity).toLocaleString()}</span>
+                       <span className="text-sm font-black text-[#12201b] tracking-tight">Rp {(item.price * item.quantity).toLocaleString()}</span>
                     </div>
                   ))}
                </div>
             </section>
 
             <section className="grid grid-cols-2 gap-5">
-               <div className={`rounded-2xl p-5 border-2 transition-all flex flex-col justify-between h-[150px] ${member ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-50 border-slate-100 opacity-50'}`}>
+               <div className={`rounded-2xl p-5 border-2 transition-all flex flex-col justify-between h-37.5 ${member ? 'bg-[#12201b] border-[#0e1915] text-white' : 'bg-white border-[#d9e2dc] opacity-60'}`}>
                   <div>
                     <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Saldo Poin</p>
                     <h3 className="text-xl font-black">{member ? member.cashbackPoints.toLocaleString() : '0'}</h3>
@@ -121,28 +121,28 @@ const CartScreen: React.FC<Props> = ({
                   <button 
                     onClick={() => member && onToggleKoin()}
                     disabled={!member || member.cashbackPoints === 0}
-                    className={`w-full py-2 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center justify-between px-4 transition-all ${useKoin ? 'bg-emerald-500 text-white' : 'bg-white/5 border border-white/10 text-white'}`}
+                    className={`w-full py-2 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center justify-between px-4 transition-all ${useKoin ? 'bg-[#1d7a63] text-white' : 'bg-white/5 border border-white/10 text-white'}`}
                   >
                     <span>{useKoin ? 'Digunakan' : 'Gunakan'}</span>
                     <div className={`w-5 h-2.5 rounded-full relative ${useKoin ? 'bg-white' : 'bg-slate-700'}`}>
-                        <div className={`w-1.5 h-1.5 rounded-full absolute top-0.5 transition-all ${useKoin ? 'right-0.5 bg-emerald-500' : 'left-0.5 bg-white'}`} />
+                        <div className={`w-1.5 h-1.5 rounded-full absolute top-0.5 transition-all ${useKoin ? 'right-0.5 bg-[#1d7a63]' : 'left-0.5 bg-white'}`} />
                     </div>
                   </button>
                </div>
 
-               <div className="bg-white p-5 rounded-2xl border border-slate-100 flex flex-col justify-between h-[150px]">
+               <div className="bg-white p-5 rounded-2xl border border-[#d9e2dc] flex flex-col justify-between h-37.5">
                   <h3 className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Pembayaran</h3>
                   <div className="grid grid-cols-2 gap-3 flex-1 mt-3">
                      <button 
                         onClick={() => setSelectedMethod(PaymentMethod.QRIS)} 
-                        className={`p-2 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-1.5 ${selectedMethod === PaymentMethod.QRIS ? 'border-orange-500 bg-orange-50/20 text-orange-600' : 'border-slate-50 text-slate-300'}`}
+                        className={`p-2 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-1.5 ${selectedMethod === PaymentMethod.QRIS ? 'border-[#e15b2d] bg-[#fff2e9] text-[#e15b2d]' : 'border-[#e7ece8] text-slate-300'}`}
                      >
                         <MiniQRISIcon />
                         <span className="text-[9px] font-black uppercase tracking-wider">QRIS</span>
                      </button>
                      <button 
                         onClick={() => setSelectedMethod(PaymentMethod.CASH)} 
-                        className={`p-2 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-1.5 ${selectedMethod === PaymentMethod.CASH ? 'border-orange-500 bg-orange-50/20 text-orange-600' : 'border-slate-50 text-slate-300'}`}
+                        className={`p-2 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-1.5 ${selectedMethod === PaymentMethod.CASH ? 'border-[#e15b2d] bg-[#fff2e9] text-[#e15b2d]' : 'border-[#e7ece8] text-slate-300'}`}
                      >
                         <MiniCashIcon />
                         <span className="text-[9px] font-black uppercase tracking-wider">KASIR</span>
@@ -153,24 +153,24 @@ const CartScreen: React.FC<Props> = ({
           </div>
         </div>
 
-        <aside className="w-[300px] md:w-[340px] bg-white border-l border-slate-100 p-8 flex flex-col shrink-0">
+      <aside className="w-75 md:w-85 bg-white/85 backdrop-blur-sm border-l border-[#d9e2dc] p-8 flex flex-col shrink-0">
           <div className="flex-1 space-y-8">
             <div>
               <h4 className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4">Promosi</h4>
               {member ? (
-                 <button 
+                         <button 
                    onClick={onSelectCashback} 
-                   className={`w-full p-4 rounded-2xl border transition-all flex items-center justify-between ${appliedVoucher ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-100'}`}
+                            className={`w-full p-4 rounded-2xl border transition-all flex items-center justify-between ${appliedVoucher ? 'bg-[#fff2e9] border-[#ffd9c2]' : 'bg-white border-[#d9e2dc]'}`}
                  >
                     <div className="text-left overflow-hidden min-w-0 pr-3">
-                       <p className={`text-[11px] font-black uppercase leading-none mb-1 truncate ${appliedVoucher ? 'text-orange-600' : 'text-slate-900'}`}>
+                       <p className={`text-[11px] font-black uppercase leading-none mb-1 truncate ${appliedVoucher ? 'text-[#e15b2d]' : 'text-[#12201b]'}`}>
                          {appliedVoucher ? appliedVoucher.title : 'Pilih Voucher'}
                        </p>
                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wide">
                          {appliedVoucher ? 'Promo Terpasang' : 'Klik untuk promo'}
                        </p>
                     </div>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${appliedVoucher ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-300'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${appliedVoucher ? 'bg-[#e15b2d] text-white' : 'bg-[#edf4ed] text-slate-300'}`}>
                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
                  </button>
@@ -205,10 +205,10 @@ const CartScreen: React.FC<Props> = ({
                </div>
             </div>
 
-            <button 
+                  <button 
               onClick={() => onCheckout(selectedMethod)}
               disabled={cart.length === 0}
-              className="w-full bg-slate-950 text-white py-5 rounded-2xl text-sm font-black shadow-xl active:scale-[0.98] transition-all hover:bg-black uppercase tracking-widest flex items-center justify-between px-8"
+                     className="w-full bg-[#12201b] text-white py-5 rounded-2xl text-sm font-black shadow-xl active:scale-[0.98] transition-all hover:bg-[#0d1814] uppercase tracking-widest flex items-center justify-between px-8"
             >
                <span>Konfirmasi</span>
                <div className="w-5 h-5 flex items-center justify-center">
