@@ -10,6 +10,7 @@ async function getTableColumns(tableName) {
   const rows = await query(`SHOW COLUMNS FROM ${tableName}`);
   const cols = new Set(rows.map((row) => String(row.Field)));
   tableColumnsCache.set(tableName, cols);
+
   return cols;
 }
 
@@ -21,19 +22,24 @@ async function hasColumn(tableName, columnName) {
 function toNumber(value) {
   if (value === undefined || value === null || value === '') return 0;
   if (typeof value === 'number') return value;
+
   const cleaned = String(value).replace(/[^0-9.-]/g, '');
   return Number(cleaned) || 0;
 }
 
 function normalizeProductType(rawType) {
   const value = String(rawType || '').toLowerCase().trim();
+
   if (value === 'computervision' || value === 'cv') return 'cv';
   if (value === 'kiosk') return 'kiosk';
+  if (value === 'all') return 'all';
+
   return 'cv';
 }
 
 function parseItems(rawItems) {
   if (Array.isArray(rawItems)) return rawItems;
+
   if (typeof rawItems === 'string') {
     try {
       const parsed = JSON.parse(rawItems);
@@ -42,20 +48,25 @@ function parseItems(rawItems) {
       return [];
     }
   }
+
   return [];
 }
 
 function buildOrderCode(rawOrderCode) {
   const input = String(rawOrderCode || '').trim();
+
   if (!input) return `ORD-${Date.now()}`;
+
   return input.startsWith('ORD-') ? input : `ORD-${input}`;
 }
 
 async function resolveCvCategoryCode(rawCategory) {
   const categoryValue = String(rawCategory || '').trim();
+
   if (!categoryValue) return null;
 
   const hasCategoryType = await hasColumn('categories', 'product_type');
+
   if (hasCategoryType) {
     const rows = await query(
       `SELECT
@@ -68,9 +79,11 @@ async function resolveCvCategoryCode(rawCategory) {
     );
 
     const category = rows[0];
+
     if (!category) return null;
 
     const categoryType = String(category.productType || '').toLowerCase();
+
     if (categoryType !== 'cv') {
       return null;
     }
@@ -92,8 +105,12 @@ async function resolveCvCategoryCode(rawCategory) {
 export async function getCvProducts(req, res) {
   try {
     const hasProductType = await hasColumn('products', 'product_type');
+
     if (!hasProductType) {
-      return res.status(500).json({ success: false, error: 'Kolom product_type belum tersedia.' });
+      return res.status(500).json({
+        success: false,
+        error: 'Kolom product_type belum tersedia.',
+      });
     }
 
     const hasBarcode = await hasColumn('products', 'barcode');
@@ -106,13 +123,14 @@ export async function getCvProducts(req, res) {
         `SELECT
           p.code AS id,
           p.code,
-          ${hasBarcode ? 'COALESCE(p.barcode, \'\') AS barcode,' : 'NULL AS barcode,'}
+          ${hasBarcode ? "COALESCE(p.barcode, '') AS barcode," : 'NULL AS barcode,'}
           p.name,
           p.price,
           COALESCE(p.category_code, '') AS category_code,
           COALESCE(p.image_url, '') AS image_url,
           COALESCE(p.description, '') AS description,
           p.product_type,
+          COALESCE(p.product_type, 'cv') AS productType,
           p.is_recommended AS isRecommended,
           p.cashback_reward AS cashbackReward,
           p.is_active AS isActive
@@ -123,20 +141,24 @@ export async function getCvProducts(req, res) {
         [requestedType]
       );
 
-      return res.json({ success: true, products: rows });
+      return res.json({
+        success: true,
+        products: rows,
+      });
     }
 
     const rows = await query(
       `SELECT
         p.code AS id,
         p.code,
-        ${hasBarcode ? 'COALESCE(p.barcode, \'\') AS barcode,' : 'NULL AS barcode,'}
+        ${hasBarcode ? "COALESCE(p.barcode, '') AS barcode," : 'NULL AS barcode,'}
         p.name,
         p.price,
         COALESCE(c.code, '') AS category_code,
         COALESCE(p.image_url, '') AS image_url,
         COALESCE(p.description, '') AS description,
         p.product_type,
+        COALESCE(p.product_type, 'cv') AS productType,
         p.is_recommended AS isRecommended,
         p.cashback_reward AS cashbackReward,
         p.is_active AS isActive
@@ -148,9 +170,15 @@ export async function getCvProducts(req, res) {
       [requestedType]
     );
 
-    return res.json({ success: true, products: rows });
+    return res.json({
+      success: true,
+      products: rows,
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 }
 
@@ -180,42 +208,65 @@ export async function getCvCategories(_req, res) {
           ORDER BY created_at ASC`
         );
 
-    return res.json({ success: true, categories: rows });
+    return res.json({
+      success: true,
+      categories: rows,
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 }
 
 export async function saveCvProduct(req, res) {
   try {
     const hasProductType = await hasColumn('products', 'product_type');
+
     if (!hasProductType) {
-      return res.status(500).json({ success: false, error: 'Kolom product_type belum tersedia. Jalankan migrasi database.' });
+      return res.status(500).json({
+        success: false,
+        error: 'Kolom product_type belum tersedia. Jalankan migrasi database.',
+      });
     }
 
     const product = req.body?.product || req.body || {};
-    const code = String(req.params.id || product.id || product.code || `PROD-${Date.now()}`).trim();
+    const code = String(
+      req.params.id || product.id || product.code || `PROD-${Date.now()}`
+    ).trim();
+
     if (!code) {
-      return res.status(400).json({ success: false, error: 'Kode produk wajib diisi.' });
+      return res.status(400).json({
+        success: false,
+        error: 'Kode produk wajib diisi.',
+      });
     }
 
     const name = String(product.name || '').trim();
+
     if (!name) {
-      return res.status(400).json({ success: false, error: 'Nama produk tidak boleh kosong.' });
+      return res.status(400).json({
+        success: false,
+        error: 'Nama produk tidak boleh kosong.',
+      });
     }
 
     const categoryInput = product.category_code || product.category || 'retail';
     const categoryCode = await resolveCvCategoryCode(categoryInput);
+
     if (!categoryCode) {
       return res.status(400).json({
         success: false,
-        error: 'Kategori tidak valid atau bukan scope CV. Gunakan kategori Retail atau kategori CV lain yang diizinkan.',
+        error:
+          'Kategori tidak valid atau bukan scope CV. Gunakan kategori Retail atau kategori CV lain yang diizinkan.',
       });
     }
 
     const usesCategoryCode = await hasColumn('products', 'category_code');
     const hasBarcode = await hasColumn('products', 'barcode');
-    const isActiveValue = product.isActive === false || product.is_active === false ? 0 : 1;
+    const isActiveValue =
+      product.isActive === false || product.is_active === false ? 0 : 1;
     const barcodeValue = String(product.barcode || '').trim();
 
     const columns = ['code', 'name'];
@@ -231,9 +282,14 @@ export async function saveCvProduct(req, res) {
         `SELECT id FROM categories WHERE code = ? LIMIT 1`,
         [categoryCode]
       );
+
       const categoryId = categoryIdRows[0]?.id ?? null;
+
       if (!categoryId) {
-        return res.status(400).json({ success: false, error: 'Kategori CV tidak ditemukan di database.' });
+        return res.status(400).json({
+          success: false,
+          error: 'Kategori CV tidak ditemukan di database.',
+        });
       }
 
       columns.push('category_id');
@@ -241,7 +297,16 @@ export async function saveCvProduct(req, res) {
       updates.push('category_id = VALUES(category_id)');
     }
 
-    columns.push('price', 'image_url', 'description', 'product_type', 'is_recommended', 'cashback_reward', 'is_active');
+    columns.push(
+      'price',
+      'image_url',
+      'description',
+      'product_type',
+      'is_recommended',
+      'cashback_reward',
+      'is_active'
+    );
+
     values.push(
       Number(product.price || 0),
       String(product.image || product.image_url || ''),
@@ -251,6 +316,7 @@ export async function saveCvProduct(req, res) {
       Number(product.cashbackReward || 0),
       isActiveValue
     );
+
     updates.push(
       'price = VALUES(price)',
       'image_url = VALUES(image_url)',
@@ -268,6 +334,7 @@ export async function saveCvProduct(req, res) {
     }
 
     const placeholders = columns.map(() => '?').join(', ');
+
     const result = await query(
       `INSERT INTO products (${columns.join(', ')})
       VALUES (${placeholders})
@@ -275,56 +342,93 @@ export async function saveCvProduct(req, res) {
       values
     );
 
-    return res.json({ success: true, id: code, affectedRows: result.affectedRows ?? 1 });
+    return res.json({
+      success: true,
+      id: code,
+      affectedRows: result.affectedRows ?? 1,
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 }
 
 export async function deleteCvProduct(req, res) {
   try {
     const hasProductType = await hasColumn('products', 'product_type');
+
     if (!hasProductType) {
-      return res.status(500).json({ success: false, error: 'Kolom product_type belum tersedia. Jalankan migrasi database.' });
+      return res.status(500).json({
+        success: false,
+        error:
+          'Kolom product_type belum tersedia. Jalankan migrasi database.',
+      });
     }
 
     const code = String(req.params.id || '').trim();
+
     if (!code) {
-      return res.status(400).json({ success: false, error: 'Kode produk wajib diisi.' });
+      return res.status(400).json({
+        success: false,
+        error: 'Kode produk wajib diisi.',
+      });
     }
 
-    const result = await query('DELETE FROM products WHERE code = ? AND product_type = ?', [code, 'cv']);
+    const result = await query(
+      'DELETE FROM products WHERE code = ? AND product_type = ?',
+      [code, 'cv']
+    );
+
     if (!result.affectedRows) {
-      return res.status(404).json({ success: false, error: 'Produk CV tidak ditemukan.' });
+      return res.status(404).json({
+        success: false,
+        error: 'Produk CV tidak ditemukan.',
+      });
     }
 
-    return res.json({ success: true });
+    return res.json({
+      success: true,
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 }
 
 export async function getCvProductByBarcode(req, res) {
   try {
     const hasBarcode = await hasColumn('products', 'barcode');
+
     if (!hasBarcode) {
-      return res.status(500).json({ success: false, error: 'Kolom barcode belum tersedia. Jalankan migrasi database.' });
+      return res.status(500).json({
+        success: false,
+        error: 'Kolom barcode belum tersedia. Jalankan migrasi database.',
+      });
     }
 
     const barcode = String(req.params.barcode || '').trim();
+
     if (!barcode) {
-      return res.status(400).json({ success: false, error: 'Barcode wajib diisi.' });
+      return res.status(400).json({
+        success: false,
+        error: 'Barcode wajib diisi.',
+      });
     }
 
     const rows = await query(
       `SELECT
         code AS id,
         code,
-            COALESCE(product_type, 'cv') AS productType,
+        COALESCE(barcode, '') AS barcode,
         name,
         price,
         COALESCE(image_url, '') AS image_url,
-            AND product_type = 'cv'
+        COALESCE(description, '') AS description,
+        COALESCE(product_type, 'cv') AS productType,
         product_type,
         is_recommended AS isRecommended,
         cashback_reward AS cashbackReward,
@@ -338,12 +442,21 @@ export async function getCvProductByBarcode(req, res) {
     );
 
     if (!rows.length) {
-      return res.status(404).json({ success: false, error: 'Produk CV dengan barcode tersebut tidak ditemukan.' });
+      return res.status(404).json({
+        success: false,
+        error: 'Produk CV dengan barcode tersebut tidak ditemukan.',
+      });
     }
 
-    return res.json({ success: true, product: rows[0] });
+    return res.json({
+      success: true,
+      product: rows[0],
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 }
 
@@ -351,8 +464,13 @@ export async function getCvOrders(req, res) {
   try {
     const requestedType = normalizeProductType(req.query.order_type);
     const hasOrderType = await hasColumn('orders', 'order_type');
+
     if (!hasOrderType) {
-      return res.status(500).json({ success: false, error: 'Kolom order_type belum tersedia. Jalankan migrasi database terlebih dahulu.' });
+      return res.status(500).json({
+        success: false,
+        error:
+          'Kolom order_type belum tersedia. Jalankan migrasi database terlebih dahulu.',
+      });
     }
 
     const orders = await query(
@@ -390,20 +508,50 @@ export async function getCvOrders(req, res) {
     );
 
     const orderItemsUsesOrderId = await hasColumn('order_items', 'order_id');
-    const orderItemsHasProductNameSnapshot = await hasColumn('order_items', 'product_name_snapshot');
-    const orderItemsHasPriceSnapshot = await hasColumn('order_items', 'price_snapshot');
+    const orderItemsHasProductNameSnapshot = await hasColumn(
+      'order_items',
+      'product_name_snapshot'
+    );
+    const orderItemsHasProductName = await hasColumn(
+      'order_items',
+      'product_name'
+    );
+    const orderItemsHasPriceSnapshot = await hasColumn(
+      'order_items',
+      'price_snapshot'
+    );
 
     for (const o of orders) {
-      const productNameCol = orderItemsHasProductNameSnapshot ? 'product_name_snapshot' : (orderItemsHasProductName ? 'product_name' : "''");
+      const productNameCol = orderItemsHasProductNameSnapshot
+        ? 'product_name_snapshot'
+        : orderItemsHasProductName
+          ? 'product_name'
+          : "''";
+
       const priceCol = orderItemsHasPriceSnapshot ? 'price_snapshot' : 'price';
 
       const items = await query(
         orderItemsUsesOrderId
-          ? `SELECT id, order_id, product_id, ${productNameCol} AS product_name_snapshot, ${priceCol} AS price, qty, subtotal
+          ? `SELECT
+              id,
+              order_id,
+              product_id,
+              ${productNameCol} AS product_name_snapshot,
+              ${priceCol} AS price,
+              qty,
+              subtotal
             FROM order_items
-            WHERE order_id = ? AND COALESCE(order_item_type, 'computervision') IN ('cv', 'computervision')
+            WHERE order_id = ?
+              AND COALESCE(order_item_type, 'computervision') IN ('cv', 'computervision')
             ORDER BY id ASC`
-          : `SELECT id, order_code, product_code, ${productNameCol} AS product_name_snapshot, ${priceCol} AS price, qty, subtotal
+          : `SELECT
+              id,
+              order_code,
+              product_code,
+              ${productNameCol} AS product_name_snapshot,
+              ${priceCol} AS price,
+              qty,
+              subtotal
             FROM order_items
             WHERE order_code = ?
             ORDER BY id ASC`,
@@ -421,9 +569,15 @@ export async function getCvOrders(req, res) {
       }));
     }
 
-    return res.json({ success: true, orders });
+    return res.json({
+      success: true,
+      orders,
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 }
 
@@ -431,10 +585,19 @@ export async function saveCvOrder(req, res) {
   try {
     const payload = req.body || {};
     const order = payload.order || payload;
-    const items = parseItems(payload.items ?? payload.order_items ?? payload.cart ?? payload.rawCartData ?? []);
+    const items = parseItems(
+      payload.items ??
+        payload.order_items ??
+        payload.cart ??
+        payload.rawCartData ??
+        []
+    );
 
     if (!items.length) {
-      return res.status(400).json({ success: false, error: 'Order item kosong.' });
+      return res.status(400).json({
+        success: false,
+        error: 'Order item kosong.',
+      });
     }
 
     const hasOrderCode = await hasColumn('orders', 'order_code');
@@ -443,25 +606,48 @@ export async function saveCvOrder(req, res) {
     const hasNamaPelanggan = await hasColumn('orders', 'nama_pelanggan');
 
     const orderItemsUsesOrderId = await hasColumn('order_items', 'order_id');
-    const orderItemsUsesProductId = await hasColumn('order_items', 'product_id');
+    const orderItemsUsesProductId = await hasColumn(
+      'order_items',
+      'product_id'
+    );
     const hasOrderItemType = await hasColumn('order_items', 'order_item_type');
 
     if (!hasOrderCode || !orderItemsUsesOrderId || !orderItemsUsesProductId) {
-      return res.status(500).json({ success: false, error: 'Skema order_items tidak sesuai backend pusat (wajib relasi order dan product).' });
+      return res.status(500).json({
+        success: false,
+        error:
+          'Skema order_items tidak sesuai backend pusat (wajib relasi order dan product).',
+      });
     }
 
-    const orderCode = buildOrderCode(order.order_code || order.orderCode || order.orderId);
-    const serviceType = String(order.service_type || order.serviceType || 'Computer Vision');
-    const paymentMethod = String(order.payment_method || order.paymentMethod || 'QRIS');
+    const orderCode = buildOrderCode(
+      order.order_code || order.orderCode || order.orderId
+    );
+    const serviceType = String(
+      order.service_type || order.serviceType || 'Computer Vision'
+    );
+    const paymentMethod = String(
+      order.payment_method || order.paymentMethod || 'QRIS'
+    );
     const subtotal = toNumber(order.subtotal);
     const discount = toNumber(order.discount);
     const total = toNumber(order.total);
     const pointsEarned = toNumber(order.points_earned ?? order.pointsEarned);
-    const pointsUsed = toNumber(order.points_used ?? order.pointsUsed ?? order.point_used);
+    const pointsUsed = toNumber(
+      order.points_used ?? order.pointsUsed ?? order.point_used
+    );
 
-    const orderTypeValue = String(order.order_type || order.orderType || 'computervision').toLowerCase();
-    const tipePelanggan = String(order.tipe_pelanggan || order.tipePelanggan || 'GUEST').toUpperCase();
-    const namaPelanggan = String(order.nama_pelanggan || order.namaPelanggan || 'Guest');
+    const orderTypeValue = String(
+      order.order_type || order.orderType || 'computervision'
+    ).toLowerCase();
+
+    const tipePelanggan = String(
+      order.tipe_pelanggan || order.tipePelanggan || 'GUEST'
+    ).toUpperCase();
+
+    const namaPelanggan = String(
+      order.nama_pelanggan || order.namaPelanggan || 'Guest'
+    );
 
     const result = await withTransaction(async (connection) => {
       const orderColumns = [
@@ -474,6 +660,7 @@ export async function saveCvOrder(req, res) {
         'points_earned',
         'points_used',
       ];
+
       const orderValues = [
         orderCode,
         serviceType,
@@ -501,60 +688,77 @@ export async function saveCvOrder(req, res) {
       }
 
       const placeholders = orderColumns.map(() => '?').join(', ');
+
       const [insertResult] = await connection.query(
-        `INSERT INTO orders (${orderColumns.join(', ')}) VALUES (${placeholders})`,
+        `INSERT INTO orders (${orderColumns.join(', ')})
+        VALUES (${placeholders})`,
         orderValues
       );
 
       const insertedOrderId = insertResult.insertId ?? null;
+
       if (!insertedOrderId) {
         throw new Error('Gagal mendapatkan order_id hasil insert orders.');
       }
 
       for (const item of items) {
-        // Pisahkan numeric ID dari string code
         const numericProductId = Number(item.product_id || item.productId || 0);
-        const productCodeInput = String(item.product_code || item.productCode || item.code || item.id || '').trim();
+        const productCodeInput = String(
+          item.product_code || item.productCode || item.code || item.id || ''
+        ).trim();
 
         const qty = toNumber(item.qty || item.quantity || 1) || 1;
         let price = toNumber(item.price_snapshot ?? item.price);
-        let productName = String(item.product_name_snapshot || item.product_name || item.name || '').trim();
+        let productName = String(
+          item.product_name_snapshot || item.product_name || item.name || ''
+        ).trim();
         let productId = null;
 
-        // Coba numeric ID dulu, baru code
         if (numericProductId > 0) {
-          // Query by numeric ID
           const [productRows] = await connection.query(
-            `SELECT id, code, name, price, product_type FROM products WHERE id = ? LIMIT 1`,
+            `SELECT id, code, name, price, product_type
+            FROM products
+            WHERE id = ?
+            LIMIT 1`,
             [numericProductId]
           );
 
           const product = productRows[0];
+
           if (!product) {
             throw new Error(`Produk dengan ID ${numericProductId} tidak ditemukan.`);
           }
 
           if (String(product.product_type || '').toLowerCase() !== 'cv') {
-            throw new Error(`Produk ${product.code || product.id} bukan produk computer vision.`);
+            throw new Error(
+              `Produk ${product.code || product.id} bukan produk computer vision.`
+            );
           }
 
           productId = Number(product.id || 0);
           if (!productName) productName = String(product.name || 'Unknown Product');
           if (price <= 0) price = toNumber(product.price);
         } else if (productCodeInput) {
-          // Query by product code
           const [productRows] = await connection.query(
-            `SELECT id, code, name, price, product_type FROM products WHERE code = ? LIMIT 1`,
+            `SELECT id, code, name, price, product_type
+            FROM products
+            WHERE code = ?
+            LIMIT 1`,
             [productCodeInput]
           );
 
           const product = productRows[0];
+
           if (!product) {
-            throw new Error(`Produk dengan code "${productCodeInput}" tidak ditemukan.`);
+            throw new Error(
+              `Produk dengan code "${productCodeInput}" tidak ditemukan.`
+            );
           }
 
           if (String(product.product_type || '').toLowerCase() !== 'cv') {
-            throw new Error(`Produk ${product.code || product.id} bukan produk computer vision.`);
+            throw new Error(
+              `Produk ${product.code || product.id} bukan produk computer vision.`
+            );
           }
 
           productId = Number(product.id || 0);
@@ -564,9 +768,25 @@ export async function saveCvOrder(req, res) {
           throw new Error('Setiap item wajib mengirim product_id atau product_code.');
         }
 
-        const subtotalItem = toNumber(item.subtotal) || (price * qty);
-        const itemColumns = ['order_id', 'product_id', 'product_name_snapshot', 'price_snapshot', 'qty', 'subtotal'];
-        const itemValues = [insertedOrderId, productId, productName || 'Unknown Product', price, qty, subtotalItem];
+        const subtotalItem = toNumber(item.subtotal) || price * qty;
+
+        const itemColumns = [
+          'order_id',
+          'product_id',
+          'product_name_snapshot',
+          'price_snapshot',
+          'qty',
+          'subtotal',
+        ];
+
+        const itemValues = [
+          insertedOrderId,
+          productId,
+          productName || 'Unknown Product',
+          price,
+          qty,
+          subtotalItem,
+        ];
 
         if (hasOrderItemType) {
           itemColumns.push('order_item_type');
@@ -574,17 +794,27 @@ export async function saveCvOrder(req, res) {
         }
 
         const itemPlaceholders = itemColumns.map(() => '?').join(', ');
+
         await connection.query(
-          `INSERT INTO order_items (${itemColumns.join(', ')}) VALUES (${itemPlaceholders})`,
+          `INSERT INTO order_items (${itemColumns.join(', ')})
+          VALUES (${itemPlaceholders})`,
           itemValues
         );
       }
 
-      return { orderCode };
+      return {
+        orderCode,
+      };
     });
 
-    return res.json({ success: true, orderCode: result.orderCode });
+    return res.json({
+      success: true,
+      orderCode: result.orderCode,
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 }

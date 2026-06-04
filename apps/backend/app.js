@@ -5,7 +5,7 @@ import { registerRoutes } from './routes/index.js';
 
 function isAllowedLanFrontendOrigin(origin) {
   // Mirror the local dev frontend ports for LAN access (same host, different device).
-  return /^http:\/\/(\d{1,3}\.){3}\d{1,3}:(3000|3001|3002|3004|3005|5173)$/.test(origin);
+  return /^http:\/\/(\d{1,3}\.){3}\d{1,3}:(3000|3001|3002|3004|3005|4000|5173)$/.test(origin);
 }
 
 export function createApp({ frontendOrigins }) {

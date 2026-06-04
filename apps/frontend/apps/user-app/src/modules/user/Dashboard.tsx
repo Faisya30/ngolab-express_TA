@@ -1,7 +1,11 @@
 import UserKiosk from './UserKiosk';
 
 const Dashboard = () => {
-  return <UserKiosk />;
+  return (
+    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <UserKiosk />
+    </div>
+  );
 };
 
-export default Dashboard;
+export default Dashboard; 

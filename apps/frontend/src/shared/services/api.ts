@@ -60,7 +60,7 @@ function mapActionToBackendRequest(action: string, data?: any): BackendRequest |
   }
 }
 
-export async function fetchFromSheet(action: string, data?: any, retryCount = 0): Promise<any> {
+export async function fetchFromSheet(action: string, data?: any, retryCount = 0, token?: string): Promise<any> {
   if (!BACKEND_URL) {
     return {
       success: false,
@@ -82,15 +82,20 @@ export async function fetchFromSheet(action: string, data?: any, retryCount = 0)
     const url = `${BACKEND_URL}${backendRequest.path}`;
     const adminRole = getCurrentAdminRole();
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-admin-role': adminRole,
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const options: any = {
       method: backendRequest.method,
       mode: 'cors',
       redirect: 'follow',
       signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-admin-role': adminRole,
-      },
+      headers,
     };
 
     const body = backendRequest.body !== undefined ? backendRequest.body : data;

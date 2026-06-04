@@ -1,6 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Product, CartItem, Member } from '../../types.ts';
 import logoNgolab from '../../../../shared/assets/images/logo_ngolab.png';
+import BowlNoodlesAltIcon from '@iconify-react/boxicons/bowl-noodles-alt';
+import DrinkIcon from '@iconify-react/pixelarticons/drop';
+import CircleIcon from '@iconify-react/pixelarticons/circle';
 
 interface Props {
   cart: CartItem[];
@@ -28,6 +31,20 @@ const isRecommendedCategory = (categoryId: string) => {
   return normalized === 'recommended' || normalized === 'andalan' || normalized === 'best';
 };
 
+const getCategoryIcon = (categoryName: string) => {
+  const normalized = normalizeCategoryId(categoryName);
+
+  if (normalized.includes('mie') || normalized.includes('yamin')) {
+    return <BowlNoodlesAltIcon height="22" />;
+  }
+
+  if (normalized.includes('minuman')) {
+    return <DrinkIcon height="22" />;
+  }
+
+  return <CircleIcon height="18" />;
+};
+
 const MenuScreen: React.FC<Props> = ({
   cart,
   member,
@@ -42,8 +59,8 @@ const MenuScreen: React.FC<Props> = ({
 }) => {
   const [activeCategory, setActiveCategory] = useState(
     categories.find((c) => normalizeCategoryId(c?.id) === 'all')?.id ||
-      categories[0]?.id ||
-      'all'
+    categories[0]?.id ||
+    'all'
   );
 
   useEffect(() => {
@@ -108,18 +125,17 @@ const MenuScreen: React.FC<Props> = ({
                 <button
                   key={cat.id}
                   onClick={() => setActiveCategory(cat.id)}
-                  className={`w-full min-h-[82px] flex flex-col items-center justify-center gap-2 transition-all relative ${
-                    isActive
-                      ? 'bg-orange-500 text-white'
-                      : 'text-white/60 hover:text-white hover:bg-white/5'
-                  }`}
+                  className={`w-full min-h-[82px] flex flex-col items-center justify-center gap-2 transition-all relative ${isActive
+                    ? 'bg-orange-500 text-white'
+                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                    }`}
                 >
                   {isActive && (
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-white rounded-r-full" />
                   )}
 
                   <div className="w-7 h-7 flex items-center justify-center">
-                    {cat.icon}
+                    {getCategoryIcon(cat.name)}
                   </div>
 
                   <span className="text-[9px] font-black uppercase leading-none text-center px-1">
@@ -157,15 +173,6 @@ const MenuScreen: React.FC<Props> = ({
                 Kembali
               </span>
             </button>
-
-            <div className="bg-[#07111f] text-white rounded-2xl px-5 py-3 flex items-center gap-3 shadow-xl">
-              <span className="text-xl">☝</span>
-              <div>
-                <p className="text-[10px] font-black uppercase">Aktifkan Gesture</p>
-                <p className="text-[8px] text-white/60">Gerakkan tangan untuk navigasi</p>
-              </div>
-              <span className="w-2 h-2 bg-emerald-400 rounded-full" />
-            </div>
           </div>
 
           <div>
@@ -189,13 +196,14 @@ const MenuScreen: React.FC<Props> = ({
                 <button
                   key={cat.id}
                   onClick={() => setActiveCategory(cat.id)}
-                  className={`shrink-0 rounded-full px-5 py-3 flex items-center gap-2 border transition-all ${
-                    isActive
-                      ? 'bg-white border-orange-500 text-orange-500 shadow-md'
-                      : 'bg-white border-orange-50 text-slate-500 hover:border-orange-200'
-                  }`}
+                  className={`shrink-0 rounded-full px-5 py-3 flex items-center gap-2 border transition-all ${isActive
+                    ? 'bg-white border-orange-500 text-orange-500 shadow-md'
+                    : 'bg-white border-orange-50 text-slate-500 hover:border-orange-200'
+                    }`}
                 >
-                  <span className="w-4 h-4 flex items-center justify-center">{cat.icon}</span>
+                  <span className="w-4 h-4 flex items-center justify-center">
+                    {getCategoryIcon(cat.name)}
+                  </span>
                   <span className="text-[10px] font-black uppercase tracking-wide">
                     {cat.name}
                   </span>
@@ -215,11 +223,10 @@ const MenuScreen: React.FC<Props> = ({
                 <div
                   key={product.id}
                   onClick={() => onAddToCart(product)}
-                  className={`group relative bg-white rounded-[1.6rem] p-3 shadow-[0_10px_28px_rgba(15,23,42,0.08)] border cursor-pointer active:scale-[0.98] transition-all ${
-                    isSelected
-                      ? 'border-orange-500 ring-4 ring-orange-500/10'
-                      : 'border-white hover:border-orange-200'
-                  }`}
+                  className={`group relative bg-white rounded-[1.6rem] p-3 shadow-[0_10px_28px_rgba(15,23,42,0.08)] border cursor-pointer active:scale-[0.98] transition-all ${isSelected
+                    ? 'border-orange-500 ring-4 ring-orange-500/10'
+                    : 'border-white hover:border-orange-200'
+                    }`}
                 >
                   <div className="relative aspect-square rounded-[1.2rem] overflow-hidden bg-orange-50 mb-4">
                     <img
@@ -414,11 +421,10 @@ const MenuScreen: React.FC<Props> = ({
           <button
             onClick={onOpenCart}
             disabled={cart.length === 0}
-            className={`mt-6 w-full rounded-2xl py-5 px-6 flex items-center justify-between uppercase font-black tracking-widest transition-all ${
-              cart.length > 0
-                ? 'bg-orange-500 text-white shadow-xl shadow-orange-500/25 active:scale-95'
-                : 'bg-slate-100 text-slate-300 cursor-not-allowed'
-            }`}
+            className={`mt-6 w-full rounded-2xl py-5 px-6 flex items-center justify-between uppercase font-black tracking-widest transition-all ${cart.length > 0
+              ? 'bg-orange-500 text-white shadow-xl shadow-orange-500/25 active:scale-95'
+              : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+              }`}
           >
             <span>Bayar</span>
             <span>›</span>

@@ -112,7 +112,7 @@ function buildAffiliateNetworkSummary(row) {
     totalDownlines: Number(network.totalDownlines || 0),
     totalCommission: Number(network.commissionPoints || 0),
     totalPoints: Number(network.totalPoints || 0),
-    affiliateTier: network.affiliateTier,
+    affiliateLevel: network.affiliateTier,
     referralCode: network.referralCode,
     affiliateId: network.affiliateId,
     totalReferrals: Number(network.totalReferrals || 0),
@@ -142,6 +142,7 @@ async function fetchAffiliateNetworkRow(userId) {
 
   const fallbackSelect = `SELECT
         an.user_id,
+        an.affiliate_id,
         an.referral_code,
         an.affiliate_tier
       FROM affiliate_networks an
@@ -157,10 +158,23 @@ async function fetchAffiliateNetworkRow(userId) {
 
   try {
     const rows = await query(fallbackSelect, [userId]);
+    if (rows.length) return rows[0];
+  } catch (error) {
+    if (isUnknownColumnError(error)) {}
+    else throw error;
+  }
+
+  try {
+    const insertResult = await query(
+      `INSERT INTO affiliate_networks (user_id, total_referrals, total_downlines, commission_rate, commission_points, total_points)
+       VALUES (?, 0, 0, 0.02, 0, 0)
+       ON DUPLICATE KEY UPDATE user_id = user_id`,
+      [userId]
+    );
+    const rows = await query(fullSelect, [userId]);
     return rows[0] || null;
   } catch (error) {
-    if (isUnknownColumnError(error)) return null;
-    throw error;
+    return null;
   }
 }
 
@@ -1009,7 +1023,6 @@ export async function getAffiliateNetwork(_req, res) {
     return res.json({
       success: true,
       data: summary,
-      ...summary,
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });

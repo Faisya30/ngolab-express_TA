@@ -1,5 +1,6 @@
 import React from 'react';
 import { ServiceType } from '../../types.ts';
+import FireIcon from '@iconify-react/mdi/fire';
 
 interface Props {
   onSelect: (type: ServiceType) => void;
@@ -66,7 +67,7 @@ const ServiceTypeScreen: React.FC<Props> = ({ onSelect, onBack }) => {
               <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/15" />
 
               <div className="absolute top-4 left-4 bg-orange-600 text-white rounded-full px-4 py-2 flex items-center gap-2 shadow-lg">
-                <span className="text-xs">🔥</span>
+                <FireIcon height="16" />
                 <span className="text-[9px] font-black uppercase tracking-wide">
                   Paling Populer
                 </span>
@@ -90,11 +91,11 @@ const ServiceTypeScreen: React.FC<Props> = ({ onSelect, onBack }) => {
                 Nikmati hidangan favorit Anda langsung di area Ngolab Express
               </p>
 
-              <div className="mt-6 bg-gradient-to-r from-orange-600 to-orange-500 rounded-full py-4 px-6 flex items-center justify-center gap-4 shadow-[0_14px_32px_rgba(249,115,22,0.35)]">
+              <div className="relative mt-6 bg-gradient-to-r from-orange-600 to-orange-500 rounded-full py-4 pl-6 pr-14 flex items-center justify-center shadow-[0_14px_32px_rgba(249,115,22,0.35)] overflow-hidden">
                 <span className="text-white text-sm font-black uppercase tracking-[0.3em]">
                   Pilih
                 </span>
-                <span className="absolute right-7 w-8 h-8 bg-white rounded-full flex items-center justify-center text-orange-600 group-hover:translate-x-1 transition-transform">
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-white rounded-full flex items-center justify-center text-orange-600 group-hover:translate-x-0.5 transition-transform">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="9 18 15 12 9 6" />
                   </svg>
@@ -131,11 +132,11 @@ const ServiceTypeScreen: React.FC<Props> = ({ onSelect, onBack }) => {
                 Pesanan dikemas praktis untuk dibawa pulang
               </p>
 
-              <div className="mt-6 bg-gradient-to-r from-orange-600 to-orange-500 rounded-full py-4 px-6 flex items-center justify-center gap-4 shadow-[0_14px_32px_rgba(249,115,22,0.35)]">
+              <div className="relative mt-6 bg-gradient-to-r from-orange-600 to-orange-500 rounded-full py-4 pl-6 pr-14 flex items-center justify-center shadow-[0_14px_32px_rgba(249,115,22,0.35)] overflow-hidden">
                 <span className="text-white text-sm font-black uppercase tracking-[0.3em]">
                   Pilih
                 </span>
-                <span className="absolute right-7 w-8 h-8 bg-white rounded-full flex items-center justify-center text-orange-600 group-hover:translate-x-1 transition-transform">
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-white rounded-full flex items-center justify-center text-orange-600 group-hover:translate-x-0.5 transition-transform">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="9 18 15 12 9 6" />
                   </svg>
@@ -143,17 +144,6 @@ const ServiceTypeScreen: React.FC<Props> = ({ onSelect, onBack }) => {
               </div>
             </div>
           </button>
-        </div>
-
-        <div className="mt-8 flex flex-col items-center gap-2">
-          <div className="w-9 h-9 bg-white/80 border border-orange-100 rounded-full flex items-center justify-center shadow-sm">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </div>
-          <p className="text-slate-400 text-[8px] font-black uppercase tracking-[0.25em]">
-            Geser ke bawah untuk informasi
-          </p>
         </div>
       </main>
     </div>

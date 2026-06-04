@@ -25,6 +25,11 @@
     "concurrently": "^9.1.2"
   },
   "dependencies": {
+    "@fontsource/plus-jakarta-sans": "^5.2.8",
+    "@iconify-react/boxicons": "^1.0.2",
+    "@iconify-react/mdi": "^1.0.2",
+    "@iconify-react/pixelarticons": "^1.0.3",
+    "@iconify/react": "^6.0.2",
     "multer": "^2.1.1",
     "tesseract.js": "^7.0.0"
   }
