@@ -1,5 +1,10 @@
 import React, { useEffect } from 'react';
 import { CartItem, Member } from '../../types.ts';
+import HandIcon from '@iconify-react/pixelarticons/hand';
+import ReceiptIcon from '@iconify-react/pixelarticons/receipt';
+import ShieldIcon from '@iconify-react/pixelarticons/shield';
+import PrinterIcon from '@iconify-react/pixelarticons/print';
+import CheckIcon from '@iconify-react/pixelarticons/check';
 
 interface Props {
   orderId: string;
@@ -31,7 +36,7 @@ const SuccessScreen: React.FC<Props> = ({
     <div className="relative w-full h-screen overflow-hidden bg-[#fffaf7] text-[#07111f]">
       <div className="absolute right-7 top-7 z-30 flex items-center gap-3 rounded-2xl bg-[#07111f] px-5 py-3 text-white shadow-xl">
         <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center">
-          ✋
+          <HandIcon width="18" height="18" />
         </div>
         <div>
           <p className="text-[10px] font-black uppercase">Aktifkan Gesture</p>
@@ -48,23 +53,12 @@ const SuccessScreen: React.FC<Props> = ({
             <div className="relative mb-5">
               <div className="w-24 h-24 rounded-full bg-emerald-50 flex items-center justify-center shadow-[0_14px_35px_rgba(16,185,129,0.22)]">
                 <div className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-lg">
-                  <svg
-                    width="34"
-                    height="34"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
+                  <CheckIcon width="34" height="34" />
                 </div>
               </div>
 
-              <span className="absolute -left-5 top-5 text-orange-300">✦</span>
-              <span className="absolute -right-5 top-8 text-orange-300">✦</span>
+              <span className="absolute -left-5 top-5 text-orange-300 text-xl">✦</span>
+              <span className="absolute -right-5 top-8 text-orange-300 text-xl">✦</span>
             </div>
 
             <h1 className="text-[2.7rem] leading-none font-black uppercase tracking-tight">
@@ -88,7 +82,7 @@ const SuccessScreen: React.FC<Props> = ({
           <div className="mt-5 grid grid-cols-3 rounded-3xl bg-white border border-orange-50 shadow-sm overflow-hidden">
             <div className="p-5 flex items-center gap-4 border-r border-orange-50">
               <div className="w-12 h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center">
-                🧾
+                <ReceiptIcon width="24" height="24" />
               </div>
               <div>
                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
@@ -113,7 +107,7 @@ const SuccessScreen: React.FC<Props> = ({
 
             <div className="p-5 flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                🛡
+                <ShieldIcon width="24" height="24" />
               </div>
               <div>
                 <p className="text-[12px] font-black text-slate-900">
@@ -130,7 +124,7 @@ const SuccessScreen: React.FC<Props> = ({
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center">
-                  🍜
+                  <ReceiptIcon width="22" height="22" />
                 </div>
                 <div>
                   <h3 className="text-[13px] font-black uppercase text-slate-900">
@@ -185,7 +179,7 @@ const SuccessScreen: React.FC<Props> = ({
           >
             <div className="flex items-center gap-4">
               <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center">
-                🖨️
+                <PrinterIcon width="24" height="24" />
               </div>
               <p className="text-[16px] font-black uppercase tracking-widest">
                 Selesai

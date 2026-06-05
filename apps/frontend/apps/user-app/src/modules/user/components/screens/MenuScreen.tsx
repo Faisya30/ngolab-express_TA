@@ -307,13 +307,6 @@ const MenuScreen: React.FC<Props> = ({
           </div>
         </section>
 
-        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 bg-white rounded-full px-7 py-3 shadow-xl border border-orange-50 flex items-center gap-3">
-          <span className="text-slate-400">☝</span>
-          <span className="text-[10px] font-bold text-slate-400">
-            Geser ke bawah untuk melihat lebih banyak menu
-          </span>
-          <span className="text-orange-500">⌄</span>
-        </div>
       </main>
 
       <aside className="w-[320px] bg-white border-l border-orange-50 flex flex-col shrink-0 z-40 shadow-2xl">

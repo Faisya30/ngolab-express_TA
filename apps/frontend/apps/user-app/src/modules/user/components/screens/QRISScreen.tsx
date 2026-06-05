@@ -253,44 +253,6 @@ const QRISScreen: React.FC<Props> = ({ total, onComplete, onBack }) => {
 
         </div>
 
-
-
-        <div className="mt-4 w-[420px] bg-white rounded-2xl shadow-sm border border-orange-100 px-5 py-3 flex items-center justify-between">
-
-          <div className="flex items-center gap-3">
-
-            <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-500">
-
-              🎧
-
-            </div>
-
-
-
-            <div>
-
-              <p className="text-[10px] font-black text-slate-900">
-
-                Butuh bantuan?
-
-              </p>
-
-              <p className="text-[8px] text-slate-400">
-
-                Hubungi staf kami jika mengalami kendala pembayaran
-
-              </p>
-
-            </div>
-
-          </div>
-
-
-
-          <span className="text-slate-900 text-xl">›</span>
-
-        </div>
-
       </main>
 
     </div>

@@ -1,4 +1,10 @@
 import React from 'react';
+import HandIcon from '@iconify-react/pixelarticons/hand';
+import BriefcaseIcon from '@iconify-react/pixelarticons/briefcase';
+import ReceiptIcon from '@iconify-react/pixelarticons/receipt';
+import BellIcon from '@iconify-react/pixelarticons/bell';
+import PrinterIcon from '@iconify-react/pixelarticons/print';
+import SwitchIcon from '@iconify-react/pixelarticons/switch';
 
 interface Props {
   onComplete: () => void;
@@ -18,7 +24,7 @@ const CashScreen: React.FC<Props> = ({ onComplete, onBack }) => {
 
       <div className="absolute right-7 top-7 z-30 flex items-center gap-3 rounded-2xl bg-[#07111f] px-5 py-3 text-white shadow-xl">
         <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center">
-          ✋
+          <HandIcon width="18" height="18" />
         </div>
         <div>
           <p className="text-[10px] font-black uppercase">Aktifkan Gesture</p>
@@ -28,7 +34,9 @@ const CashScreen: React.FC<Props> = ({ onComplete, onBack }) => {
       </div>
 
       <main className="relative z-10 h-full flex flex-col items-center justify-center px-6">
-        <div className="mb-4 text-6xl">💼</div>
+        <div className="mb-4 w-20 h-20 rounded-3xl bg-orange-50 text-orange-500 flex items-center justify-center">
+          <BriefcaseIcon width="48" height="48" />
+        </div>
 
         <h1 className="text-[2.7rem] leading-none font-black uppercase tracking-tight">
           Lanjut ke <span className="text-orange-500">Kasir</span>
@@ -54,7 +62,9 @@ const CashScreen: React.FC<Props> = ({ onComplete, onBack }) => {
               </p>
             </div>
 
-            <div className="text-5xl">🧾</div>
+            <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center">
+              <ReceiptIcon width="34" height="34" />
+            </div>
           </div>
 
           <div className="relative flex items-center gap-5 rounded-3xl bg-white px-6 py-5 border border-emerald-100 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
@@ -71,8 +81,8 @@ const CashScreen: React.FC<Props> = ({ onComplete, onBack }) => {
               </p>
             </div>
 
-            <div className="relative text-5xl">
-              🔔
+            <div className="relative w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+              <BellIcon width="34" height="34" />
               <span className="absolute -right-1 top-0 w-5 h-5 rounded-full bg-emerald-700 text-white text-[10px] flex items-center justify-center font-black">
                 1
               </span>
@@ -85,7 +95,7 @@ const CashScreen: React.FC<Props> = ({ onComplete, onBack }) => {
           >
             <div className="flex items-center gap-4">
               <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center">
-                🖨️
+                <PrinterIcon width="24" height="24" />
               </div>
               <div className="text-left">
                 <p className="text-[15px] font-black uppercase tracking-wide">
@@ -107,7 +117,7 @@ const CashScreen: React.FC<Props> = ({ onComplete, onBack }) => {
               onClick={onBack}
               className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-emerald-800 active:scale-95 transition"
             >
-              <span>↔</span>
+              <SwitchIcon width="16" height="16" />
               Ganti Metode Pembayaran
             </button>
 
