@@ -8,11 +8,13 @@ import { createMembershipToken } from '../config/jwt.js';
 
 const AFFILIATE_OCR_CONFIDENCE_THRESHOLD = Number(process.env.AFFILIATE_OCR_CONFIDENCE_THRESHOLD || 0.5);
 const AFFILIATE_REFERRAL_BONUS_BASIC = Number(process.env.AFFILIATE_REFERRAL_BONUS_BASIC || 5000);
+const AFFILIATE_REFERRAL_BONUS_STARTER = Number(process.env.AFFILIATE_REFERRAL_BONUS_STARTER || 5000);
 const AFFILIATE_REFERRAL_BONUS_PRO = Number(process.env.AFFILIATE_REFERRAL_BONUS_PRO || 10000);
 const AFFILIATE_REFERRAL_BONUS_ELITE = Number(process.env.AFFILIATE_REFERRAL_BONUS_ELITE || 15000);
-const AFFILIATE_COMMISSION_RATE_BASIC = Number(process.env.AFFILIATE_COMMISSION_RATE_BASIC || 0.02);
+const AFFILIATE_COMMISSION_RATE_BASIC = Number(process.env.AFFILIATE_COMMISSION_RATE_BASIC || 0);
+const AFFILIATE_COMMISSION_RATE_STARTER = Number(process.env.AFFILIATE_COMMISSION_RATE_STARTER || 0.02);
 const AFFILIATE_COMMISSION_RATE_PRO = Number(process.env.AFFILIATE_COMMISSION_RATE_PRO || 0.05);
-const AFFILIATE_COMMISSION_RATE_ELITE = Number(process.env.AFFILIATE_COMMISSION_RATE_ELITE || 0.1);
+const AFFILIATE_COMMISSION_RATE_ELITE = Number(process.env.AFFILIATE_COMMISSION_RATE_ELITE || 0.08);
 
 const BCRYPT_HASH_REGEX = /^\$2[aby]\$\d{2}\$/;
 
@@ -43,6 +45,7 @@ function normalizeAffiliateTier(value) {
   const normalized = normalizeText(value).toLowerCase();
   if (normalized === 'elite') return 'Elite';
   if (normalized === 'pro') return 'Pro';
+  if (normalized === 'starter') return 'Starter';
   return 'Basic';
 }
 
@@ -58,12 +61,21 @@ function resolveAffiliateTierByReferrals(totalReferrals) {
     };
   }
 
-  if (referrals >= 10) {
+  if (referrals >= 20) {
     return {
       affiliate_tier: 'Pro',
       level: 'Pro',
       commission_rate: AFFILIATE_COMMISSION_RATE_PRO,
       referral_bonus: AFFILIATE_REFERRAL_BONUS_PRO,
+    };
+  }
+
+  if (referrals >= 10) {
+    return {
+      affiliate_tier: 'Starter',
+      level: 'Starter',
+      commission_rate: AFFILIATE_COMMISSION_RATE_STARTER,
+      referral_bonus: AFFILIATE_REFERRAL_BONUS_STARTER,
     };
   }
 
@@ -166,10 +178,10 @@ async function fetchAffiliateNetworkRow(userId) {
 
   try {
     const insertResult = await query(
-      `INSERT INTO affiliate_networks (user_id, total_referrals, total_downlines, commission_rate, commission_points, total_points)
-       VALUES (?, 0, 0, 0.02, 0, 0)
+`INSERT INTO affiliate_networks (user_id, total_referrals, total_downlines, commission_rate, commission_points, total_points)
+       VALUES (?, 0, 0, ?, 0, 0)
        ON DUPLICATE KEY UPDATE user_id = user_id`,
-      [userId]
+       [userId, AFFILIATE_COMMISSION_RATE_BASIC],
     );
     const rows = await query(fullSelect, [userId]);
     return rows[0] || null;
@@ -1303,7 +1315,7 @@ export async function getAllAffiliates(_req, res) {
         total_referrals: Number(row.total_referrals || 0),
         total_downlines: Number(row.total_downlines || 0),
         level: row.level || 'Starter',
-        commission_rate: Number(row.commission_rate || 0.02),
+        commission_rate: Number(row.commission_rate ?? AFFILIATE_COMMISSION_RATE_BASIC),
         commission_points: Number(row.commission_points || 0),
         total_points: Number(row.total_points || 0),
         created_at: row.created_at,

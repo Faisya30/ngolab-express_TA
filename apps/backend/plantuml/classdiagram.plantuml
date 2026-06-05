@@ -1,113 +1,106 @@
 @startuml
-skinparam classAttributeIconSize 0
+hide circle
+skinparam linetype ortho
 
-class Customer {
-  - id_customer : int
-  - nama : string
-  - is_member : boolean
+entity "COMPANY" as COMPANY {
+  * company_id : int <<PK>>
+  --
+  company_name : string
+  address : string
+  phone : string
+  email : string
+  status : string
+  created_at : datetime
+  updated_at : datetime
 }
 
-class Member {
-  - id_member : int
-  - nama_member : string
-  - qr_code : string
-  - saldo_poin : int
-  + scanMembership()
-  + gunakanPoin()
+entity "USER" as USER {
+  * user_id : int <<PK>>
+  --
+  company_id : int <<FK>>
+  full_name : string
+  email : string
+  password : string
+  status : string
+  created_at : datetime
+  updated_at : datetime
 }
 
-class Voucher {
-  - id_voucher : int
-  - kode_voucher : string
-  - nama_voucher : string
-  - jenis_diskon : string
-  - nilai_diskon : double
-  - status : string
-  + validasiVoucher()
+entity "ROLE" as ROLE {
+  * role_id : int <<PK>>
+  --
+  role_name : string
+  description : string
+  status : string
+  created_at : datetime
+  updated_at : datetime
 }
 
-class Menu {
-  - id_menu : int
-  - nama_menu : string
-  - kategori : string
-  - harga : double
-  - gambar : string
-  - status : string
+entity "PERMISSION" as PERMISSION {
+  * permission_id : int <<PK>>
+  --
+  permission_name : string
+  module_name : string
+  action : string
+  created_at : datetime
+  updated_at : datetime
 }
 
-class Order {
-  - id_order : int
-  - order_code : string
-  - nomor_antrian : int
-  - tipe_pesanan : string
-  - tanggal_order : datetime
-  - subtotal : double
-  - total_akhir : double
-  - status_order : string
-  + buatOrder()
-  + hitungTotal()
-  + finalisasiOrder()
+entity "USER_ROLE" as USER_ROLE {
+  * user_role_id : int <<PK>>
+  --
+  user_id : int <<FK>>
+  role_id : int <<FK>>
+  assigned_at : datetime
 }
 
-class OrderDetail {
-  - id_detail : int
-  - qty : int
-  - harga_satuan : double
-  - subtotal : double
+entity "ROLE_PERMISSION" as ROLE_PERMISSION {
+  * role_permission_id : int <<PK>>
+  --
+  role_id : int <<FK>>
+  permission_id : int <<FK>>
+  created_at : datetime
 }
 
-class Payment {
-  - id_payment : int
-  - metode_pembayaran : string
-  - status_payment : string
-  - total_bayar : double
-  - waktu_bayar : datetime
-  + prosesPembayaran()
+entity "PRODUCT" as PRODUCT {
+  * product_id : int <<PK>>
+  --
+  product_name : string
+  description : string
+  status : string
+  created_at : datetime
+  updated_at : datetime
 }
 
-class QRISPayment {
-  - qr_code : string
-  - expired_time : datetime
-  + generateQRIS()
-  + cekStatusQRIS()
+entity "COMPANY_PRODUCT" as COMPANY_PRODUCT {
+  * company_product_id : int <<PK>>
+  --
+  company_id : int <<FK>>
+  product_id : int <<FK>>
+  assigned_at : datetime
 }
 
-class CashPayment {
-  - status_kasir : string
-  + cetakStruk()
-  + konfirmasiKasir()
+entity "ACTIVATION_TOKEN" as ACTIVATION_TOKEN {
+  * token_id : int <<PK>>
+  --
+  user_id : int <<FK>>
+  token : string
+  token_type : string
+  expired_at : datetime
+  status : string
+  created_at : datetime
 }
 
-class GestureController {
-  - gesture_type : string
-  + detectGesture()
-  + navigatePage()
-  + selectButton()
-}
+COMPANY ||--o{ USER : memiliki
+USER ||--o{ USER_ROLE : memiliki
+ROLE ||--o{ USER_ROLE : diberikan
 
-class KioskScreen {
-  - screen_name : string
-  + showScreen()
-  + nextScreen()
-}
+ROLE ||--o{ ROLE_PERMISSION : memiliki
+PERMISSION ||--o{ ROLE_PERMISSION : digunakan
 
-class Kasir {
-  - id_kasir : int
-  - nama_kasir : string
-  + konfirmasiPembayaran()
-}
+COMPANY ||--o{ COMPANY_PRODUCT : memiliki_akses
+PRODUCT ||--o{ COMPANY_PRODUCT : diberikan
 
-Customer "0..1" -- "0..1" Member
-Member "1" -- "0..*" Voucher
-Order "1" -- "1..*" OrderDetail
-Menu "1" -- "0..*" OrderDetail
-Order "0..1" -- "1" Member
-Order "0..1" -- "1" Voucher
-Order "1" -- "1" Payment
-Payment <|-- QRISPayment
-Payment <|-- CashPayment
-CashPayment -- Kasir
-GestureController -- KioskScreen
-KioskScreen -- Order
+USER ||--o{ ACTIVATION_TOKEN : memiliki
 
 @enduml

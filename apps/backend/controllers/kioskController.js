@@ -214,10 +214,21 @@ export async function saveOrder(req, res) {
 		const namaPelanggan = String(order.nama_pelanggan || order.namaPelanggan || order.member || (tipePelanggan === 'MEMBER' ? 'Member' : 'Guest'));
 		const orderType = String(order.order_type || order.orderType || 'kiosk').toLowerCase();
 
+		const memberCode = String(order.memberCode || order.member_code || '').trim();
+const isMember = memberCode && memberCode !== '-';
+
+const finalTipePelanggan = isMember ? 'MEMBER' : tipePelanggan;
+const finalNamaPelanggan = isMember
+	? String(order.memberName || order.member_name || order.namaPelanggan || order.nama_pelanggan || 'Member')
+	: namaPelanggan;
+
 		const hasTipePelanggan = await hasColumn('orders', 'tipe_pelanggan');
 		const hasNamaPelanggan = await hasColumn('orders', 'nama_pelanggan');
 		const hasOrderType = await hasColumn('orders', 'order_type');
 		const hasQueueNumber = await hasColumn('orders', 'queue_number');
+		const hasMemberCode = await hasColumn('orders', 'member_code');
+		const orderItemsUsesOrderCode = await hasColumn('order_items', 'order_code');
+		const orderItemsUsesProductCode = await hasColumn('order_items', 'product_code');
 		const orderItemsUsesOrderId = await hasColumn('order_items', 'order_id');
 		const orderItemsUsesProductId = await hasColumn('order_items', 'product_id');
 
@@ -225,6 +236,11 @@ export async function saveOrder(req, res) {
 			const queueNumber = await allocateKioskQueueNumber(connection);
 			const orderColumns = ['order_code', 'service_type', 'subtotal', 'discount', 'total', 'payment_method', 'points_earned', 'points_used'];
 			const orderValues = [orderCode, serviceType, subtotal, discount, total, paymentMethod, pointsEarned, pointsUsed];
+			
+			if (hasMemberCode && isMember) {
+	orderColumns.push('member_code');
+	orderValues.push(memberCode);
+}
 
 			if (hasQueueNumber) {
 				orderColumns.push('queue_number');
@@ -232,14 +248,14 @@ export async function saveOrder(req, res) {
 			}
 
 			if (hasTipePelanggan) {
-				orderColumns.push('tipe_pelanggan');
-				orderValues.push(tipePelanggan);
-			}
+	orderColumns.push('tipe_pelanggan');
+	orderValues.push(finalTipePelanggan);
+}
 
-			if (hasNamaPelanggan) {
-				orderColumns.push('nama_pelanggan');
-				orderValues.push(namaPelanggan);
-			}
+if (hasNamaPelanggan) {
+	orderColumns.push('nama_pelanggan');
+	orderValues.push(finalNamaPelanggan);
+}
 
 			if (hasOrderType) {
 				orderColumns.push('order_type');
@@ -267,19 +283,34 @@ export async function saveOrder(req, res) {
 					throw new Error(`Produk dengan kode ${productCode} tidak ditemukan.`);
 				}
 
+				const itemColumns = ['product_name_snapshot', 'price_snapshot', 'qty', 'subtotal', 'order_item_type'];
+				const itemValues = [
+					String(item.name || item.productName || 'Unknown Product'),
+					price,
+					qty,
+					itemSubtotal,
+					'kiosk',
+				];
+
+				if (orderItemsUsesOrderCode) {
+					itemColumns.push('order_code');
+					itemValues.push(orderCode);
+				} else if (orderItemsUsesOrderId) {
+					itemColumns.push('order_id');
+					itemValues.push(orderId);
+				}
+
+				if (orderItemsUsesProductCode) {
+					itemColumns.push('product_code');
+					itemValues.push(productCode);
+				} else if (orderItemsUsesProductId) {
+					itemColumns.push('product_id');
+					itemValues.push(productId);
+				}
+
 				await connection.query(
-					`INSERT INTO order_items (
-						order_id, product_id, product_name_snapshot, price_snapshot, qty, subtotal, order_item_type
-					) VALUES (?, ?, ?, ?, ?, ?, ?)` ,
-					[
-						orderId,
-						productId,
-						String(item.name || item.productName || 'Unknown Product'),
-						price,
-						qty,
-						itemSubtotal,
-						'kiosk',
-					]
+					`INSERT INTO order_items (${itemColumns.join(', ')}) VALUES (${itemColumns.map(() => '?').join(', ')})`,
+					itemValues
 				);
 			}
 

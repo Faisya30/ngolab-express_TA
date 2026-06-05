@@ -1,122 +1,304 @@
 
 import React, { useEffect, useState } from 'react';
+
 import qrisImage from '../../../../shared/assets/images/qris.jpg';
 
+import logoNgolab from '../../../../shared/assets/images/logo_ngolab.png';
+
+import HandIcon from '@iconify-react/pixelarticons/hand';
+
+  
+
 interface Props {
-  total: number;
-  onComplete: () => void;
-  onBack: () => void;
+
+  total: number;
+
+  onComplete: () => void;
+
+  onBack: () => void;
+
 }
 
+  
+
 const QRISScreen: React.FC<Props> = ({ total, onComplete, onBack }) => {
-  const [status, setStatus] = useState('Menunggu pembayaran...');
-  const [dots, setDots] = useState('');
 
-  useEffect(() => {
-    // Animasi titik-titik sederhana
-    const dotsInterval = setInterval(() => {
-      setDots(prev => (prev.length < 3 ? prev + '.' : ''));
-    }, 500);
+  const [status, setStatus] = useState('Menunggu Pembayaran');
 
-    // Simulasi pembayaran sukses setelah 5 detik
-    const timer = setTimeout(() => {
-      setStatus('Pembayaran Berhasil!');
-      setTimeout(onComplete, 1500);
-    }, 6000);
+  const [dots, setDots] = useState('');
 
-    return () => {
-      clearTimeout(timer);
-      clearInterval(dotsInterval);
-    };
-  }, [onComplete]);
+  
 
-  return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-transparent font-sans p-3 sm:p-4 md:p-6 overflow-y-auto relative text-[#12201b]">
-      
-      {/* Dekorasi Latar Belakang */}
-      <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-[#e15b2d]/10 blur-[120px] rounded-full" />
-      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#ffd173]/5 blur-[100px] rounded-full" />
+  useEffect(() => {
 
-      <div
-        className="w-full max-w-110 md:max-w-125 bg-white rounded-[2.5rem] p-5 md:p-7 flex flex-col items-center shadow-[0_30px_80px_rgba(0,0,0,0.22)] relative animate-in fade-in zoom-in duration-500"
-        style={{ transform: 'scale(var(--kiosk-scale))', transformOrigin: 'center center' }}
-      >
-        
-        {/* Header Pembayaran */}
-          <div className="flex flex-col items-center mb-5 md:mb-6">
-            <div className="bg-white/90 px-4 py-1.5 rounded-full border border-[#d9e2dc] mb-3">
-              <p className="text-[10px] font-black text-[#5f716a] uppercase tracking-[0.32em]">Metode Pembayaran</p>
-           </div>
-           <div className="flex items-center gap-3">
-              <div className="w-10 h-10 md:w-11 md:h-11 bg-white shadow-md rounded-xl flex items-center justify-center p-2 border border-slate-100">
-                 <img src="https://upload.wikimedia.org/wikipedia/commons/a/a2/Logo_QRIS.svg" alt="QRIS" className="w-full" />
-              </div>
-              <h2 className="text-2xl md:text-[2rem] font-black text-[#12201b] tracking-tighter uppercase">SCAN <span className="text-[#e15b2d]">QRIS</span></h2>
-           </div>
-        </div>
+    const dotsInterval = setInterval(() => {
 
-        {/* BOX GAMBAR QRIS (Tempat Menempelkan Foto QRIS) */}
-          <div className="w-full aspect-square bg-white rounded-4xl p-3 shadow-inner border-2 border-[#e7ece8] relative group mb-5 md:mb-6">
-            <div className="w-full h-full rounded-[1.4rem] overflow-hidden border-2 border-[#e15b2d]/20 p-3 flex items-center justify-center bg-white relative">
-              <img 
-                src={qrisImage} 
-                alt="QRIS Merchant" 
-                className="w-full h-full object-contain"
-              />
-              
-              {/* Animasi Scan Line */}
-              <div className="absolute inset-x-0 top-0 h-1 bg-[#ffd173]/40 shadow-[0_0_15px_rgba(225,91,45,0.5)] animate-[scan_3s_infinite_ease-in-out]" />
-           </div>
+      setDots((prev) => (prev.length < 3 ? prev + '.' : ''));
 
-           {/* Corner Accents */}
-            <div className="absolute -top-1 -left-1 w-7 h-7 border-t-4 border-l-4 border-slate-900 rounded-tl-xl" />
-            <div className="absolute -top-1 -right-1 w-7 h-7 border-t-4 border-r-4 border-slate-900 rounded-tr-xl" />
-            <div className="absolute -bottom-1 -left-1 w-7 h-7 border-b-4 border-l-4 border-slate-900 rounded-bl-xl" />
-            <div className="absolute -bottom-1 -right-1 w-7 h-7 border-b-4 border-r-4 border-slate-900 rounded-br-xl" />
-        </div>
+    }, 500);
 
-        {/* Info Total Tagihan */}
-          <div className="w-full bg-slate-50 rounded-3xl p-4 md:p-5 mb-5 md:mb-6 border border-slate-100 flex items-center justify-between">
-           <div className="text-left">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Tagihan</p>
-              <p className="text-2xl md:text-3xl font-black text-slate-900 tracking-tighter">Rp {total.toLocaleString('id-ID')}</p>
-           </div>
-            <div className="w-11 h-11 bg-orange-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-           </div>
-        </div>
+  
 
-        {/* Status Pembayaran */}
-        <div className="flex flex-col items-center gap-3">
-           <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-              <p className="text-sm font-black text-slate-600 uppercase tracking-widest">
-                 {status}{status === 'Menunggu pembayaran...' ? dots : ''}
-              </p>
-           </div>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight text-center px-4 md:px-8">
-              Halaman akan otomatis berpindah setelah pembayaran terdeteksi oleh sistem kami.
-           </p>
-        </div>
+    return () => clearInterval(dotsInterval);
 
-        {/* Tombol Batal */}
-        <button 
-          onClick={onBack}
-          className="mt-6 px-6 py-2.5 rounded-full border border-slate-100 text-slate-300 font-black text-[10px] uppercase tracking-[0.25em] hover:bg-slate-50 hover:text-slate-900 transition-all active:scale-95"
-        >
-          Batal & Kembali
-        </button>
-      </div>
+  }, []);
 
-      <style>{`
-        @keyframes scan {
-          0% { top: 5%; }
-          50% { top: 95%; }
-          100% { top: 5%; }
-        }
-      `}</style>
-    </div>
-  );
+  
+
+  const handlePaid = () => {
+
+    setStatus('Pembayaran Berhasil');
+
+    setTimeout(() => {
+
+      onComplete();
+
+    }, 800);
+
+  };
+
+  
+
+  return (
+
+    <div className="relative w-full h-screen overflow-hidden bg-white text-[#07111f]">
+
+      <div className="absolute inset-0 pointer-events-none bg-white">
+
+        <div className="absolute inset-0 bg-gradient-to-b from-white via-[#fffaf5] to-white" />
+
+        <div className="absolute left-[-120px] top-[-120px] h-[320px] w-[320px] rounded-full border border-orange-100/70" />
+
+        <div className="absolute right-[-130px] bottom-[-130px] h-[360px] w-[360px] rounded-full border border-orange-100/80" />
+
+        <div className="absolute left-[18%] top-[22%] h-[220px] w-[220px] rounded-full bg-orange-50/50 blur-[90px]" />
+
+        <div className="absolute right-[22%] bottom-[18%] h-[260px] w-[260px] rounded-full bg-orange-50/60 blur-[100px]" />
+
+      </div>
+
+  
+
+      <button
+
+        onClick={onBack}
+
+        className="absolute left-8 top-8 z-30 h-11 px-5 rounded-full bg-white shadow-sm text-[#07111f] font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all flex items-center gap-2"
+
+      >
+
+        <span className="text-lg leading-none">←</span>
+
+        Kembali
+
+      </button>
+
+  
+
+      <main className="relative z-20 h-screen flex flex-col items-center justify-center px-8">
+
+        <div className="mb-4 flex items-center gap-3">
+
+          <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm p-2">
+
+            <img src={logoNgolab} alt="Ngolab" className="w-full h-full object-contain" />
+
+          </div>
+
+          <div className="leading-none">
+
+            <p className="text-[#07111f] font-black text-base">NGOLAB</p>
+
+            <p className="text-orange-500 font-black text-base">EXPRESS</p>
+
+          </div>
+
+        </div>
+
+  
+
+        <div className="text-center mb-5">
+
+  
+
+          <h1 className="text-[4rem] leading-none font-black uppercase tracking-tight">
+
+            Scan <span className="text-orange-500">QRIS</span>
+
+          </h1>
+
+  
+
+          <p className="mt-2 text-[12px] font-semibold text-slate-400">
+
+            Arahkan kamera HP ke QRIS untuk melakukan pembayaran
+
+          </p>
+
+        </div>
+
+  
+
+        <div className="w-[420px] rounded-[30px] bg-white p-5 border border-orange-100 shadow-[0_24px_70px_rgba(249,115,22,0.16)]">
+
+          <div className="flex justify-center mb-3">
+
+            <div className="text-center">
+
+              <p className="text-[18px] leading-none font-black text-slate-800">
+
+                QRIS
+
+              </p>
+
+              <p className="text-[8px] font-black text-slate-500">
+
+                QR Code Standard
+
+              </p>
+
+              <p className="text-[8px] font-bold text-slate-400">
+
+                Pembayaran Nasional
+
+              </p>
+
+            </div>
+
+          </div>
+
+  
+
+          <div className="relative rounded-[24px] bg-white p-4">
+
+            <img
+
+              src={qrisImage}
+
+              alt="QRIS Merchant"
+
+              className="mx-auto w-[270px] h-[270px] object-contain"
+
+            />
+
+  
+
+            <div className="absolute top-4 left-12 w-8 h-8 border-t-4 border-l-4 border-orange-500 rounded-tl-lg" />
+
+            <div className="absolute top-4 right-12 w-8 h-8 border-t-4 border-r-4 border-orange-500 rounded-tr-lg" />
+
+            <div className="absolute bottom-4 left-12 w-8 h-8 border-b-4 border-l-4 border-orange-500 rounded-bl-lg" />
+
+            <div className="absolute bottom-4 right-12 w-8 h-8 border-b-4 border-r-4 border-orange-500 rounded-br-lg" />
+
+          </div>
+
+  
+
+          <div className="mt-3 rounded-2xl bg-orange-50 px-4 py-3 flex items-center justify-between">
+
+            <div className="flex items-center gap-3">
+
+              <div className="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center text-white">
+
+                ⏱
+
+              </div>
+
+  
+
+              <div>
+
+                <p className="text-[10px] font-black text-orange-500 uppercase">
+
+                  {status === 'Menunggu Pembayaran' ? `${status}${dots}` : status}
+
+                </p>
+
+                <p className="text-[9px] text-slate-400">
+
+                  Pembayaran akan terverifikasi otomatis
+
+                </p>
+
+              </div>
+
+            </div>
+
+  
+
+            <p className="text-orange-500 font-black tracking-widest">•••</p>
+
+          </div>
+
+  
+
+          <button
+
+            onClick={handlePaid}
+
+            className="mt-3 w-full h-14 rounded-2xl bg-orange-500 text-white font-black uppercase tracking-widest shadow-xl hover:bg-orange-600 transition-all active:scale-95 flex items-center justify-center gap-2"
+
+          >
+
+            <span className="w-5 h-5 rounded-full bg-white text-orange-500 flex items-center justify-center text-xs">
+
+              ✓
+
+            </span>
+
+            Saya Sudah Bayar
+
+          </button>
+
+        </div>
+
+  
+
+        <div className="mt-4 w-[420px] bg-white rounded-2xl shadow-sm border border-orange-100 px-5 py-3 flex items-center justify-between">
+
+          <div className="flex items-center gap-3">
+
+            <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-500">
+
+              🎧
+
+            </div>
+
+  
+
+            <div>
+
+              <p className="text-[10px] font-black text-slate-900">
+
+                Butuh bantuan?
+
+              </p>
+
+              <p className="text-[8px] text-slate-400">
+
+                Hubungi staf kami jika mengalami kendala pembayaran
+
+              </p>
+
+            </div>
+
+          </div>
+
+  
+
+          <span className="text-slate-900 text-xl">›</span>
+
+        </div>
+
+      </main>
+
+    </div>
+
+  );
+
 };
+
+  
 
 export default QRISScreen;
