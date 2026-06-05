@@ -7,298 +7,298 @@ import logoNgolab from '../../../../shared/assets/images/logo_ngolab.png';
 
 import HandIcon from '@iconify-react/pixelarticons/hand';
 
-  
+
 
 interface Props {
 
-  total: number;
+  total: number;
 
-  onComplete: () => void;
+  onComplete: () => void;
 
-  onBack: () => void;
+  onBack: () => void;
 
 }
 
-  
+
 
 const QRISScreen: React.FC<Props> = ({ total, onComplete, onBack }) => {
 
-  const [status, setStatus] = useState('Menunggu Pembayaran');
+  const [status, setStatus] = useState('Menunggu Pembayaran');
 
-  const [dots, setDots] = useState('');
+  const [dots, setDots] = useState('');
 
-  
 
-  useEffect(() => {
 
-    const dotsInterval = setInterval(() => {
+  useEffect(() => {
 
-      setDots((prev) => (prev.length < 3 ? prev + '.' : ''));
+    const dotsInterval = setInterval(() => {
 
-    }, 500);
+      setDots((prev) => (prev.length < 3 ? prev + '.' : ''));
 
-  
+    }, 500);
 
-    return () => clearInterval(dotsInterval);
 
-  }, []);
 
-  
+    return () => clearInterval(dotsInterval);
 
-  const handlePaid = () => {
+  }, []);
 
-    setStatus('Pembayaran Berhasil');
 
-    setTimeout(() => {
 
-      onComplete();
+  const handlePaid = () => {
 
-    }, 800);
+    setStatus('Pembayaran Berhasil');
 
-  };
+    setTimeout(() => {
 
-  
+      onComplete();
 
-  return (
+    }, 800);
 
-    <div className="relative w-full h-screen overflow-hidden bg-white text-[#07111f]">
+  };
 
-      <div className="absolute inset-0 pointer-events-none bg-white">
 
-        <div className="absolute inset-0 bg-gradient-to-b from-white via-[#fffaf5] to-white" />
 
-        <div className="absolute left-[-120px] top-[-120px] h-[320px] w-[320px] rounded-full border border-orange-100/70" />
+  return (
 
-        <div className="absolute right-[-130px] bottom-[-130px] h-[360px] w-[360px] rounded-full border border-orange-100/80" />
+    <div className="relative w-full h-screen overflow-hidden bg-white text-[#07111f]">
 
-        <div className="absolute left-[18%] top-[22%] h-[220px] w-[220px] rounded-full bg-orange-50/50 blur-[90px]" />
+      <div className="absolute inset-0 pointer-events-none bg-white">
 
-        <div className="absolute right-[22%] bottom-[18%] h-[260px] w-[260px] rounded-full bg-orange-50/60 blur-[100px]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-white via-[#fffaf5] to-white" />
 
-      </div>
+        <div className="absolute left-[-120px] top-[-120px] h-[320px] w-[320px] rounded-full border border-orange-100/70" />
 
-  
+        <div className="absolute right-[-130px] bottom-[-130px] h-[360px] w-[360px] rounded-full border border-orange-100/80" />
 
-      <button
+        <div className="absolute left-[18%] top-[22%] h-[220px] w-[220px] rounded-full bg-orange-50/50 blur-[90px]" />
 
-        onClick={onBack}
+        <div className="absolute right-[22%] bottom-[18%] h-[260px] w-[260px] rounded-full bg-orange-50/60 blur-[100px]" />
 
-        className="absolute left-8 top-8 z-30 h-11 px-5 rounded-full bg-white shadow-sm text-[#07111f] font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all flex items-center gap-2"
+      </div>
 
-      >
 
-        <span className="text-lg leading-none">←</span>
 
-        Kembali
+      <button
 
-      </button>
+        onClick={onBack}
 
-  
+        className="absolute left-8 top-8 z-30 h-11 px-5 rounded-full bg-white shadow-sm text-[#07111f] font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all flex items-center gap-2"
 
-      <main className="relative z-20 h-screen flex flex-col items-center justify-center px-8">
+      >
 
-        <div className="mb-4 flex items-center gap-3">
+        <span className="text-lg leading-none">←</span>
 
-          <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm p-2">
+        Kembali
 
-            <img src={logoNgolab} alt="Ngolab" className="w-full h-full object-contain" />
+      </button>
 
-          </div>
 
-          <div className="leading-none">
 
-            <p className="text-[#07111f] font-black text-base">NGOLAB</p>
+      <main className="relative z-20 h-screen flex flex-col items-center justify-center px-8">
 
-            <p className="text-orange-500 font-black text-base">EXPRESS</p>
+        <div className="mb-4 flex items-center gap-3">
 
-          </div>
+          <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm p-2">
 
-        </div>
+            <img src={logoNgolab} alt="Ngolab" className="w-full h-full object-contain" />
 
-  
+          </div>
 
-        <div className="text-center mb-5">
+          <div className="leading-none">
 
-  
+            <p className="text-[#07111f] font-black text-base">NGOLAB</p>
 
-          <h1 className="text-[4rem] leading-none font-black uppercase tracking-tight">
+            <p className="text-orange-500 font-black text-base">EXPRESS</p>
 
-            Scan <span className="text-orange-500">QRIS</span>
+          </div>
 
-          </h1>
+        </div>
 
-  
 
-          <p className="mt-2 text-[12px] font-semibold text-slate-400">
 
-            Arahkan kamera HP ke QRIS untuk melakukan pembayaran
+        <div className="text-center mb-5">
 
-          </p>
 
-        </div>
 
-  
+          <h1 className="text-[4rem] leading-none font-black uppercase tracking-tight">
 
-        <div className="w-[420px] rounded-[30px] bg-white p-5 border border-orange-100 shadow-[0_24px_70px_rgba(249,115,22,0.16)]">
+            Scan <span className="text-orange-500">QRIS</span>
 
-          <div className="flex justify-center mb-3">
+          </h1>
 
-            <div className="text-center">
 
-              <p className="text-[18px] leading-none font-black text-slate-800">
 
-                QRIS
+          <p className="mt-2 text-[12px] font-semibold text-slate-400">
 
-              </p>
+            Arahkan kamera HP ke QRIS untuk melakukan pembayaran
 
-              <p className="text-[8px] font-black text-slate-500">
+          </p>
 
-                QR Code Standard
+        </div>
 
-              </p>
 
-              <p className="text-[8px] font-bold text-slate-400">
 
-                Pembayaran Nasional
+        <div className="w-[420px] rounded-[30px] bg-white p-5 border border-orange-100 shadow-[0_24px_70px_rgba(249,115,22,0.16)]">
 
-              </p>
+          <div className="flex justify-center mb-3">
 
-            </div>
+            <div className="text-center">
 
-          </div>
+              <p className="text-[18px] leading-none font-black text-slate-800">
 
-  
+                QRIS
 
-          <div className="relative rounded-[24px] bg-white p-4">
+              </p>
 
-            <img
+              <p className="text-[8px] font-black text-slate-500">
 
-              src={qrisImage}
+                QR Code Standard
 
-              alt="QRIS Merchant"
+              </p>
 
-              className="mx-auto w-[270px] h-[270px] object-contain"
+              <p className="text-[8px] font-bold text-slate-400">
 
-            />
+                Pembayaran Nasional
 
-  
+              </p>
 
-            <div className="absolute top-4 left-12 w-8 h-8 border-t-4 border-l-4 border-orange-500 rounded-tl-lg" />
+            </div>
 
-            <div className="absolute top-4 right-12 w-8 h-8 border-t-4 border-r-4 border-orange-500 rounded-tr-lg" />
+          </div>
 
-            <div className="absolute bottom-4 left-12 w-8 h-8 border-b-4 border-l-4 border-orange-500 rounded-bl-lg" />
 
-            <div className="absolute bottom-4 right-12 w-8 h-8 border-b-4 border-r-4 border-orange-500 rounded-br-lg" />
 
-          </div>
+          <div className="relative rounded-[24px] bg-white p-4">
 
-  
+            <img
 
-          <div className="mt-3 rounded-2xl bg-orange-50 px-4 py-3 flex items-center justify-between">
+              src={qrisImage}
 
-            <div className="flex items-center gap-3">
+              alt="QRIS Merchant"
 
-              <div className="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center text-white">
+              className="mx-auto w-[270px] h-[270px] object-contain"
 
-                ⏱
+            />
 
-              </div>
 
-  
 
-              <div>
+            <div className="absolute top-4 left-12 w-8 h-8 border-t-4 border-l-4 border-orange-500 rounded-tl-lg" />
 
-                <p className="text-[10px] font-black text-orange-500 uppercase">
+            <div className="absolute top-4 right-12 w-8 h-8 border-t-4 border-r-4 border-orange-500 rounded-tr-lg" />
 
-                  {status === 'Menunggu Pembayaran' ? `${status}${dots}` : status}
+            <div className="absolute bottom-4 left-12 w-8 h-8 border-b-4 border-l-4 border-orange-500 rounded-bl-lg" />
 
-                </p>
+            <div className="absolute bottom-4 right-12 w-8 h-8 border-b-4 border-r-4 border-orange-500 rounded-br-lg" />
 
-                <p className="text-[9px] text-slate-400">
+          </div>
 
-                  Pembayaran akan terverifikasi otomatis
 
-                </p>
 
-              </div>
+          <div className="mt-3 rounded-2xl bg-orange-50 px-4 py-3 flex items-center justify-between">
 
-            </div>
+            <div className="flex items-center gap-3">
 
-  
+              <div className="w-9 h-9 rounded-full bg-orange-500 flex items-center justify-center text-white">
 
-            <p className="text-orange-500 font-black tracking-widest">•••</p>
+                ⏱
 
-          </div>
+              </div>
 
-  
 
-          <button
 
-            onClick={handlePaid}
+              <div>
 
-            className="mt-3 w-full h-14 rounded-2xl bg-orange-500 text-white font-black uppercase tracking-widest shadow-xl hover:bg-orange-600 transition-all active:scale-95 flex items-center justify-center gap-2"
+                <p className="text-[10px] font-black text-orange-500 uppercase">
 
-          >
+                  {status === 'Menunggu Pembayaran' ? `${status}${dots}` : status}
 
-            <span className="w-5 h-5 rounded-full bg-white text-orange-500 flex items-center justify-center text-xs">
+                </p>
 
-              ✓
+                <p className="text-[9px] text-slate-400">
 
-            </span>
+                  Pembayaran akan terverifikasi otomatis
 
-            Saya Sudah Bayar
+                </p>
 
-          </button>
+              </div>
 
-        </div>
+            </div>
 
-  
 
-        <div className="mt-4 w-[420px] bg-white rounded-2xl shadow-sm border border-orange-100 px-5 py-3 flex items-center justify-between">
 
-          <div className="flex items-center gap-3">
+            <p className="text-orange-500 font-black tracking-widest">•••</p>
 
-            <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-500">
+          </div>
 
-              🎧
 
-            </div>
 
-  
+          <button
 
-            <div>
+            onClick={handlePaid}
 
-              <p className="text-[10px] font-black text-slate-900">
+            className="mt-3 w-full h-14 rounded-2xl bg-orange-500 text-white font-black uppercase tracking-widest shadow-xl hover:bg-orange-600 transition-all active:scale-95 flex items-center justify-center gap-2"
 
-                Butuh bantuan?
+          >
 
-              </p>
+            <span className="w-5 h-5 rounded-full bg-white text-orange-500 flex items-center justify-center text-xs">
 
-              <p className="text-[8px] text-slate-400">
+              ✓
 
-                Hubungi staf kami jika mengalami kendala pembayaran
+            </span>
 
-              </p>
+            Saya Sudah Bayar
 
-            </div>
+          </button>
 
-          </div>
+        </div>
 
-  
 
-          <span className="text-slate-900 text-xl">›</span>
 
-        </div>
+        <div className="mt-4 w-[420px] bg-white rounded-2xl shadow-sm border border-orange-100 px-5 py-3 flex items-center justify-between">
 
-      </main>
+          <div className="flex items-center gap-3">
 
-    </div>
+            <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-500">
 
-  );
+              🎧
+
+            </div>
+
+
+
+            <div>
+
+              <p className="text-[10px] font-black text-slate-900">
+
+                Butuh bantuan?
+
+              </p>
+
+              <p className="text-[8px] text-slate-400">
+
+                Hubungi staf kami jika mengalami kendala pembayaran
+
+              </p>
+
+            </div>
+
+          </div>
+
+
+
+          <span className="text-slate-900 text-xl">›</span>
+
+        </div>
+
+      </main>
+
+    </div>
+
+  );
 
 };
 
-  
+
 
 export default QRISScreen;

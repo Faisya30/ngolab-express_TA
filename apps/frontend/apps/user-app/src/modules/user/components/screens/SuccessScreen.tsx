@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { CartItem, Member } from '../../types.ts';
 
@@ -11,8 +10,17 @@ interface Props {
   onClose: () => void;
 }
 
-const SuccessScreen: React.FC<Props> = ({ orderId, queueNumber, total, items, onClose }) => {
-  const displayQueueNumber = typeof queueNumber === 'number' ? queueNumber : orderId;
+const SuccessScreen: React.FC<Props> = ({
+  orderId,
+  queueNumber,
+  total,
+  items,
+  onClose,
+}) => {
+  const displayQueueNumber =
+    typeof queueNumber === 'number' ? queueNumber : orderId;
+
+  const totalItems = items.reduce((acc, item) => acc + item.quantity, 0);
 
   useEffect(() => {
     const timer = setTimeout(onClose, 45000);
@@ -20,89 +28,189 @@ const SuccessScreen: React.FC<Props> = ({ orderId, queueNumber, total, items, on
   }, [onClose]);
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-transparent font-sans p-3 sm:p-4 md:p-6 overflow-y-auto relative text-[#12201b]">
-      <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#e15b2d]/10 blur-[100px] rounded-full" />
-      
-      <div
-        className="w-full max-w-105 bg-white rounded-[2.25rem] p-5 md:p-6 flex flex-col items-center shadow-2xl border border-[#e9efea] relative animate-in zoom-in duration-500"
-        style={{ transform: 'scale(var(--kiosk-scale))', transformOrigin: 'center center' }}
-      >
-        
-        <div className="mb-5 relative">
-          <div className="w-14 h-14 bg-[#fff4ee] rounded-full flex items-center justify-center relative border-2 border-white shadow-sm">
-            <div className="w-9 h-9 bg-[#e15b2d] rounded-full flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            </div>
-          </div>
+    <div className="relative w-full h-screen overflow-hidden bg-[#fffaf7] text-[#07111f]">
+      <div className="absolute right-7 top-7 z-30 flex items-center gap-3 rounded-2xl bg-[#07111f] px-5 py-3 text-white shadow-xl">
+        <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center">
+          ✋
         </div>
-
-        <h2 className="text-xl md:text-2xl font-black text-[#12201b] tracking-tighter uppercase mb-2">
-          PESANAN <span className="text-[#e15b2d]">SUKSES!</span>
-        </h2>
-        <p className="text-center text-[#5f716a] text-[10px] font-black uppercase tracking-widest mb-5">
-          Ambil struk Anda di bawah layar.
-        </p>
-
-        <div className="w-full bg-[#fff7e6] rounded-3xl py-4 md:py-5 flex flex-col items-center justify-center mb-5 shadow-lg border-b-4 border-[#ffd173] relative">
-          <span className="text-[9px] font-black text-slate-900/60 uppercase tracking-[0.4em] mb-1">Nomor Antrian</span>
-          <h1 className="text-5xl md:text-6xl font-black text-slate-950 tracking-tighter leading-none">
-            {displayQueueNumber}
-          </h1>
+        <div>
+          <p className="text-[10px] font-black uppercase">Aktifkan Gesture</p>
+          <p className="text-[8px] text-white/60">
+            Gerakkan tangan untuk navigasi
+          </p>
         </div>
-
-        <div className="w-full bg-white rounded-2xl border-2 border-dashed border-[#e9efea] p-4 mb-5">
-          <div className="space-y-2">
-            <div className="flex justify-between items-center text-[9px] font-black text-slate-400 uppercase">
-              <span>Order ID</span>
-              <span className="text-slate-900">#NGL-{orderId}</span>
-            </div>
-            <div className="flex justify-between items-center text-[9px] font-black text-slate-400 uppercase">
-              <span>Total Bayar</span>
-              <span className="text-orange-600 text-base">Rp {total.toLocaleString('id-ID')}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="w-full bg-white rounded-2xl border border-[#e9efea] p-4 mb-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider">Menu Dibeli</h3>
-            <span className="text-[10px] text-slate-500">{items.reduce((acc, item) => acc + item.quantity, 0)} item</span>
-          </div>
-
-          {items.length === 0 ? (
-            <p className="text-[10px] text-slate-400">Tidak ada item pada pesanan ini.</p>
-          ) : (
-            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-              {items.map((item) => (
-                <div key={item.id} className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[11px] text-slate-900 leading-tight truncate">{item.name}</p>
-                    <p className="text-[10px] text-slate-500">Qty {item.quantity}</p>
-                  </div>
-                  <span className="text-[11px] font-semibold text-slate-800 whitespace-nowrap">
-                    Rp {(item.price * item.quantity).toLocaleString('id-ID')}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <button 
-          onClick={onClose}
-          className="w-full bg-[#12201b] text-white py-3.5 rounded-2xl text-xs font-black shadow-lg active:scale-95 transition-all hover:bg-[#0d1814] flex items-center justify-between px-7"
-        aria-label="Selesai"
-        >
-          <span className="uppercase tracking-[0.2em]">Selesai</span>
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-        </button>
-        
-        <p className="mt-5 text-[8px] font-black text-slate-300 uppercase tracking-[0.3em]">
-          Reset otomatis dalam 45s
-        </p>
+        <span className="w-2 h-2 rounded-full bg-emerald-400" />
       </div>
+
+      <main className="relative z-10 h-full flex items-center justify-center px-6">
+        <div className="w-full max-w-[1180px] rounded-[34px] bg-white border border-orange-100 shadow-[0_22px_70px_rgba(15,23,42,0.12)] p-8">
+          <div className="flex flex-col items-center">
+            <div className="relative mb-5">
+              <div className="w-24 h-24 rounded-full bg-emerald-50 flex items-center justify-center shadow-[0_14px_35px_rgba(16,185,129,0.22)]">
+                <div className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-lg">
+                  <svg
+                    width="34"
+                    height="34"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+              </div>
+
+              <span className="absolute -left-5 top-5 text-orange-300">✦</span>
+              <span className="absolute -right-5 top-8 text-orange-300">✦</span>
+            </div>
+
+            <h1 className="text-[2.7rem] leading-none font-black uppercase tracking-tight">
+              Pesanan <span className="text-orange-500">Sukses!</span>
+            </h1>
+
+            <p className="mt-3 text-[11px] font-black uppercase tracking-[0.32em] text-slate-400">
+              Ambil struk Anda di bawah layar
+            </p>
+          </div>
+
+          <div className="mt-7 rounded-3xl bg-orange-50 border border-orange-100 py-7 text-center shadow-sm">
+            <p className="text-[10px] font-black uppercase tracking-[0.45em] text-slate-400">
+              Nomor Antrian
+            </p>
+            <h2 className="mt-2 text-[5.2rem] leading-none font-black tracking-tight text-[#07111f]">
+              {displayQueueNumber}
+            </h2>
+          </div>
+
+          <div className="mt-5 grid grid-cols-3 rounded-3xl bg-white border border-orange-50 shadow-sm overflow-hidden">
+            <div className="p-5 flex items-center gap-4 border-r border-orange-50">
+              <div className="w-12 h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center">
+                🧾
+              </div>
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  Order ID
+                </p>
+                <p className="text-[14px] font-black text-slate-900">
+                  #NGL-{orderId}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-5 flex items-center gap-4 border-r border-orange-50">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  Total Bayar
+                </p>
+                <p className="text-[20px] font-black text-orange-500">
+                  Rp {total.toLocaleString('id-ID')}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                🛡
+              </div>
+              <div>
+                <p className="text-[12px] font-black text-slate-900">
+                  Pembayaran
+                </p>
+                <p className="text-[10px] text-slate-400 font-semibold">
+                  Berhasil
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-3xl bg-white border border-orange-50 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center">
+                  🍜
+                </div>
+                <div>
+                  <h3 className="text-[13px] font-black uppercase text-slate-900">
+                    Menu Dibeli
+                  </h3>
+                  {items[0] && (
+                    <p className="text-[11px] text-slate-500 font-semibold">
+                      {items[0].name}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <span className="text-[11px] text-slate-400 font-semibold">
+                {totalItems} item
+              </span>
+            </div>
+
+            {items.length === 0 ? (
+              <p className="text-[11px] text-slate-400">
+                Tidak ada item pada pesanan ini.
+              </p>
+            ) : (
+              <div className="space-y-3 max-h-[120px] overflow-y-auto no-scrollbar">
+                {items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-4"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-semibold text-slate-900 truncate">
+                        {item.name}
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        Qty {item.quantity}
+                      </p>
+                    </div>
+
+                    <span className="text-[12px] font-black text-slate-900 whitespace-nowrap">
+                      Rp {(item.price * item.quantity).toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={onClose}
+            className="mt-5 w-full h-[72px] rounded-3xl bg-[#082118] text-white shadow-[0_20px_45px_rgba(8,33,24,0.28)] flex items-center justify-between px-7 active:scale-[0.98] transition"
+            aria-label="Selesai"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center">
+                🖨️
+              </div>
+              <p className="text-[16px] font-black uppercase tracking-widest">
+                Selesai
+              </p>
+            </div>
+
+            <span className="text-3xl leading-none">›</span>
+          </button>
+
+          <p className="mt-4 text-center text-[9px] font-black text-slate-300 uppercase tracking-[0.35em]">
+            Reset otomatis dalam 45s
+          </p>
+        </div>
+      </main>
+
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 };
