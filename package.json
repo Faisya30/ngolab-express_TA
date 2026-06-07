@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@fontsource/plus-jakarta-sans": "^5.2.8",
+    "@google/generative-ai": "^0.24.1",
     "@iconify-react/boxicons": "^1.0.2",
     "@iconify-react/mdi": "^1.0.2",
     "@iconify-react/pixelarticons": "^1.0.3",

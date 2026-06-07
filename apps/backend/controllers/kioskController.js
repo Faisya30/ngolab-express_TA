@@ -1,4 +1,5 @@
 import { query, withTransaction } from '../config/db.js';
+import { generateAiRecommendation } from '../services/geminiService.js';
 
 const tableColumnsCache = new Map();
 
@@ -127,13 +128,13 @@ export async function init(req, res) {
 				is_active AS isActive
 			FROM categories
 			WHERE is_active = 1`;
-		
+
 		if (hasProductType) {
 			categoriesQuery += ` AND product_type = 'kiosk'`;
 		}
-		
+
 		categoriesQuery += ` ORDER BY created_at ASC`;
-		
+
 		const categories = await query(categoriesQuery);
 
 		return res.json({ success: true, products, categories, vouchers: [] });
@@ -267,7 +268,7 @@ export async function lookupMemberByQr(req, res) {
 			return res.status(400).json({ success: false, error: 'QR code tidak valid.' });
 		}
 
-		let userId = null; 
+		let userId = null;
 		try {
 			const trimmed = rawCode.trim();
 			const firstBrace = trimmed.indexOf('{');
@@ -485,6 +486,12 @@ export async function saveOrder(req, res) {
 
 			return { orderCode, queueNumber };
 		});
+		// ==========================================
+		// TAMBAHKAN KODE PEMANGGIL AI DI SINI:
+		if (userId) {
+			generateAiRecommendation(userId);
+		}
+		// ==========================================
 
 		return res.json({ success: true, orderCode: result.orderCode, queueNumber: result.queueNumber });
 	} catch (error) {
