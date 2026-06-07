@@ -1,54 +1,80 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Member } from '../../types.ts';
-import { DUMMY_MEMBER } from '../../constants.ts';
+import { Html5Qrcode } from 'html5-qrcode';
 
 interface Props {
-  onScanSuccess: (member: Member) => void;
+  onScanSuccess: (code: string) => void;
   onBack: () => void;
+  validateUrl?: string;
 }
 
-const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack }) => {
-  const [isSimulating, setIsSimulating] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
+const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack, validateUrl }) => {
+  const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const containerId = useRef(`qr-reader-${Math.random().toString(36).slice(2, 9)}`);
 
   useEffect(() => {
-    async function setupCamera() {
+    let isMounted = true;
+
+    async function startScanner() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
+        const html5QrCode = new Html5Qrcode(containerId.current);
+        scannerRef.current = html5QrCode;
+
+        const config = {
+          fps: 10,
+          qrbox: { width: 260, height: 260 },
+          aspectRatio: 1,
+        };
+
+        await html5QrCode.start(
+          { facingMode: 'environment' },
+          config,
+          (decodedText) => {
+            if (!isMounted) return;
+            setScanning(false);
+            onScanSuccess(decodedText);
+          },
+          () => {
+            // ignore scan failures (no QR in frame)
+          }
+        );
+
+        if (isMounted) setScanning(true);
       } catch (err) {
-        console.error("Akses kamera ditolak atau tidak tersedia", err);
+        console.error('Gagal memulai scanner:', err);
+        if (isMounted) setError('Kamera tidak tersedia atau izin ditolak. Pastikan kamera frontal/laptop aktif.');
       }
     }
-    setupCamera();
+
+    startScanner();
 
     return () => {
-      if (videoRef.current && videoRef.current.srcObject) {
-        (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+      isMounted = false;
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+        scannerRef.current = null;
       }
     };
-  }, []);
+  }, [onScanSuccess]);
 
-  const handleSimulate = () => {
-    setIsSimulating(true);
-    setTimeout(() => {
-      // Menggunakan data dummy yang lengkap dari constants
-      onScanSuccess(DUMMY_MEMBER);
-    }, 1500);
+  const handleClose = async () => {
+    if (scannerRef.current) {
+      await scannerRef.current.stop().catch(() => {});
+      scannerRef.current = null;
+    }
+    setScanning(false);
+    onBack();
   };
 
   return (
     <div className="w-full h-full bg-transparent flex flex-col items-center justify-center relative overflow-hidden text-[#12201b]">
-      {/* Background Decor */}
       <div className="absolute inset-0 z-0">
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-orange-600/10 via-transparent to-transparent" />
       </div>
 
-      <button 
-        onClick={onBack} 
+      <button
+        onClick={handleClose}
         aria-label="Batal scan"
         className="absolute top-12 left-12 z-20 text-[#5f716a] hover:text-white transition flex items-center gap-4 font-black text-xl tracking-widest group uppercase"
       >
@@ -58,60 +84,33 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack }) => {
         Batal
       </button>
 
-      <div className="relative z-10 flex flex-col items-center max-w-2xl w-full">
-        <header className="text-center mb-12">
+      <div className="relative z-10 flex flex-col items-center max-w-2xl w-full px-6">
+        <header className="text-center mb-10">
           <h2 className="text-5xl font-black text-[#12201b] mb-4 tracking-tighter uppercase">SCAN <span className="text-[#e15b2d]">MEMBER</span></h2>
-          <p className="text-[#5f716a] text-xl font-medium px-10">Posisikan kode QR Anda tepat di dalam bingkai.</p>
+          <p className="text-[#5f716a] text-xl font-medium px-10">Posisikan QR Member tepat di dalam bingkai kamera.</p>
         </header>
 
-        {/* Scanner Frame */}
-        <div className="relative w-full aspect-square max-w-md bg-[#0f1e18]/20 rounded-[4rem] overflow-hidden border-4 border-[#e7ece8] shadow-2xl">
-          {/* Camera View */}
-          <video 
-            ref={videoRef} 
-            autoPlay 
-            playsInline 
-            className="w-full h-full object-cover grayscale opacity-40"
-          />
-
-          {/* Scanner Overlay UI */}
-          <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-64 h-64 border-2 border-[#e15b2d]/30 rounded-4xl relative">
-              <div className="absolute -top-1 -left-1 w-12 h-12 border-t-8 border-l-8 border-orange-500 rounded-tl-2xl" />
-              <div className="absolute -top-1 -right-1 w-12 h-12 border-t-8 border-r-8 border-orange-500 rounded-tr-2xl" />
-              <div className="absolute -bottom-1 -left-1 w-12 h-12 border-b-8 border-l-8 border-orange-500 rounded-bl-2xl" />
-              <div className="absolute -bottom-1 -right-1 w-12 h-12 border-b-8 border-r-8 border-orange-500 rounded-br-2xl" />
-              
-              {/* Animated Scan Line */}
-              <div className="absolute left-0 w-full h-1 bg-[#ffd173] shadow-[0_0_20px_rgba(225,91,45,0.45)] animate-[scan_3s_infinite_ease-in-out]" />
-            </div>
-          </div>
-
-          {isSimulating && (
-            <div className="absolute inset-0 bg-amber-400/20 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300">
-               <div className="bg-amber-400 p-6 rounded-full animate-bounce shadow-2xl">
-                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-               </div>
-               <p className="text-white font-black text-2xl mt-6 tracking-widest uppercase">Terverifikasi</p>
+        <div className="relative w-full max-w-md rounded-[3rem] overflow-hidden border-4 border-[#e7ece8] shadow-2xl bg-[#0f1e18]/20">
+          <div id={containerId.current} className="w-full" />
+          {!scanning && !error && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+              <p className="text-white font-black text-lg tracking-widest uppercase">Menyiapkan kamera...</p>
             </div>
           )}
         </div>
 
-        <button 
-          onClick={handleSimulate}
-          disabled={isSimulating}
-          className="mt-16 bg-[#12201b] hover:bg-[#0d1814] text-white px-12 py-6 rounded-full border border-[#12201b] font-black text-lg tracking-[0.12em] transition-all active:scale-95 shadow-xl uppercase"
-        >
-          Simulasi Scan
-        </button>
-      </div>
+        {error && (
+          <div className="mt-8 w-full max-w-md rounded-3xl border border-red-200 bg-red-50 px-6 py-5 text-center">
+            <p className="text-sm font-bold text-red-700">{error}</p>
+          </div>
+        )}
 
-      <style>{`
-        @keyframes scan {
-          0%, 100% { top: 0%; }
-          50% { top: 100%; }
-        }
-      `}</style>
+        {validateUrl && (
+          <p className="mt-6 text-[11px] tracking-widest uppercase font-black text-slate-500">
+            Validasi: {validateUrl}
+          </p>
+        )}
+      </div>
     </div>
   );
 };

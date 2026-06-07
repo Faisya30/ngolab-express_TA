@@ -479,27 +479,47 @@ const UserKiosk: React.FC = () => {
         )}
         {currentScreen === Screen.SCANNER && (
           <ScannerScreen
-            onScanSuccess={async (scanned) => {
+            validateUrl="/api/membership/lookup"
+            onScanSuccess={async (code) => {
               try {
-                const data = await fetchFromSheet('getMember', { code: scanned.code });
-                if (data && !data.error) {
-                  const nMember: any = {};
-                  Object.keys(data).forEach((k) => {
-                    nMember[k.toLowerCase().trim()] = data[k];
-                  });
+                const base = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000').replace(/\/$/, '');
+                const response = await fetch(`${base}/api/membership/lookup`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ code }),
+                });
+                const data = await response.json().catch(() => ({}));
+
+                if (data?.success && data?.user) {
+                  const u = data.user;
+                  const pts = data.points || {};
                   setMember({
-                    code: String(nMember.code || nMember.Code),
-                    name: String(nMember.name || nMember.Name),
-                    points: cleanNumber(nMember.points),
-                    cashbackPoints: cleanNumber(nMember.cashbackpoints || nMember.poin),
+                    code: String(u.user_id || code),
+                    name: String(u.username || 'Member'),
+                    points: Number(pts.total_points || 0),
+                    cashbackPoints: Number(pts.cashback_points || 0),
                     vouchers,
-                    isAffiliate: nMember.affiliate === 'Yes' || nMember.isaffiliate === 'TRUE' || !!nMember.isaffiliate,
+                    isAffiliate: String(u.role || '').toUpperCase() === 'MEMBER_AFFILIATE',
                   });
                 } else {
-                  setMember(scanned);
+                  setMember({
+                    code,
+                    name: String(data?.user?.username || 'Member'),
+                    points: 0,
+                    cashbackPoints: 0,
+                    vouchers,
+                    isAffiliate: false,
+                  });
                 }
               } catch {
-                setMember(scanned);
+                setMember({
+                  code,
+                  name: 'Member',
+                  points: 0,
+                  cashbackPoints: 0,
+                  vouchers,
+                  isAffiliate: false,
+                });
               }
               setCurrentScreen(Screen.CART);
             }}

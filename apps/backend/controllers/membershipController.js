@@ -620,7 +620,7 @@ export async function updateProfile(_req, res) {
     const nextUsername = normalizeText(body.username);
     const nextEmail = normalizeEmail(body.email);
     const nextPhoneNumber = normalizeText(body.phone_number ?? body.phoneNumber);
-    const nextProfilePicture = normalizeText(body.profile_picture ?? body.photo_url ?? body.profilePicture);
+    let nextProfilePicture = normalizeText(body.profile_picture ?? body.photo_url ?? body.profilePicture);
     const nextKtmPicture = normalizeText(body.ktm_picture ?? body.ktm_url ?? body.ktmPicture);
     const nextNim = normalizeText(body.nim ?? body.nim_number ?? body.nimNumber ?? body.student_id ?? body.studentId);
     const nextAiReasoning = body.ai_reasoning ?? body.aiReasoning;
@@ -647,6 +647,19 @@ export async function updateProfile(_req, res) {
       }
     }
 
+    if (_req.file && _req.file.buffer) {
+      const uploadsDir = path.join(process.cwd(), 'apps', 'backend', 'uploads');
+      try {
+        await fs.promises.mkdir(uploadsDir, { recursive: true });
+      } catch (e) {
+        // ignore
+      }
+      const filename = `profile-${Date.now()}-${crypto.randomBytes(3).toString('hex')}${path.extname(_req.file.originalname) || '.jpg'}`;
+      const filePath = path.join(uploadsDir, filename);
+      await fs.promises.writeFile(filePath, _req.file.buffer);
+      nextProfilePicture = `/uploads/${filename}`;
+    }
+
     const updateFields = [];
     const updateValues = [];
 
@@ -665,7 +678,7 @@ export async function updateProfile(_req, res) {
       updateValues.push(nextPhoneNumber);
     }
 
-    if (body.profile_picture !== undefined || body.photo_url !== undefined || body.profilePicture !== undefined) {
+    if (body.profile_picture !== undefined || body.photo_url !== undefined || body.profilePicture !== undefined || _req.file) {
       updateFields.push('profile_picture = ?');
       updateValues.push(nextProfilePicture || null);
     }
@@ -685,18 +698,16 @@ export async function updateProfile(_req, res) {
       updateValues.push(nextAiReasoning ?? null);
     }
 
-    if (!updateFields.length) {
-      return res.status(400).json({ success: false, error: 'Tidak ada field yang diupdate.' });
-    }
-
     updateValues.push(userId);
 
-    await query(
-      `UPDATE users
-      SET ${updateFields.join(', ')}
-      WHERE user_id = ?`,
-      updateValues
-    );
+    if (updateFields.length) {
+      await query(
+        `UPDATE users
+        SET ${updateFields.join(', ')}
+        WHERE user_id = ?`,
+        updateValues
+      );
+    }
 
     const updatedRows = await query(
       `SELECT user_id, username, email, nim, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm, ai_reasoning

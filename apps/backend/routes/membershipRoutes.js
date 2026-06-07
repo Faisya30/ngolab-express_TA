@@ -26,6 +26,7 @@ import {
   verifyAffiliate,
 } from '../controllers/membershipController.js';
 import { requireMembershipJwt, requireSelfMembershipAccess } from '../middlewares/membershipAuth.js';
+import { requireConnectionKey } from '../middlewares/connectionKey.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -34,7 +35,7 @@ router.post('/register', register);
 router.post('/login', login);
 router.post('/lookup', lookupMember);
 router.get('/profile/:user_id', getUserProfile);
-router.put('/profile/:user_id', updateProfile);
+router.put('/profile/:user_id', upload.single('profile_picture'), updateProfile);
 // Accept multipart uploads (ktm_image) but also accept JSON fallback.
 router.post('/affiliate/verify', upload.single('ktm_image'), requireMembershipJwt, requireSelfMembershipAccess, verifyAffiliate);
 router.get('/affiliate/network/:user_id', requireMembershipJwt, requireSelfMembershipAccess, getAffiliateNetwork);
