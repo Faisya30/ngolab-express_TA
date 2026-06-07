@@ -71,7 +71,7 @@ const CartScreen: React.FC<Props> = ({
   const koinDiscountAmount = useMemo(() => {
     if (!useKoin || !member) return 0;
     const maxRedeemable = subtotal - voucherDiscountAmount;
-    return Math.min(member.cashbackPoints, maxRedeemable);
+    return Math.min(member.points, maxRedeemable);
   }, [useKoin, member, subtotal, voucherDiscountAmount]);
 
   const finalTotal = Math.max(0, subtotal - voucherDiscountAmount - koinDiscountAmount);
@@ -199,7 +199,7 @@ const CartScreen: React.FC<Props> = ({
                 </div>
 
                 <h2 className="text-3xl font-black text-orange-500">
-                  {member ? member.cashbackPoints.toLocaleString() : '0'}
+                  {member ? member.points.toLocaleString() : '0'}
                 </h2>
 
                 <div className="mt-5 flex items-center justify-between">
@@ -209,7 +209,7 @@ const CartScreen: React.FC<Props> = ({
 
                   <button
                     onClick={() => member && onToggleKoin()}
-                    disabled={!member || member.cashbackPoints === 0}
+                    disabled={!member || member.points === 0}
                     className={`w-12 h-7 rounded-full relative transition ${
                       useKoin ? 'bg-orange-500' : 'bg-slate-200'
                     }`}
@@ -322,7 +322,7 @@ const CartScreen: React.FC<Props> = ({
                   onClick={onScanMember}
                   className="mt-4 w-full rounded-full border border-orange-400 text-orange-500 py-3 font-black text-[10px] uppercase tracking-widest active:scale-95 transition"
                 >
-                  Login Member
+                  Punya Member? Scan QR
                 </button>
               </div>
             )}

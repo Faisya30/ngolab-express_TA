@@ -19,7 +19,6 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack, validateUrl }) 
     async function startScanner() {
       try {
         const html5QrCode = new Html5Qrcode(containerId.current);
-        scannerRef.current = html5QrCode;
 
         const config = {
           fps: 10,
@@ -33,6 +32,10 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack, validateUrl }) 
           (decodedText) => {
             if (!isMounted) return;
             setScanning(false);
+            if (scannerRef.current) {
+              scannerRef.current.stop().catch(() => {});
+              scannerRef.current = null;
+            }
             onScanSuccess(decodedText);
           },
           () => {
@@ -40,10 +43,25 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack, validateUrl }) 
           }
         );
 
-        if (isMounted) setScanning(true);
+        if (isMounted) {
+          scannerRef.current = html5QrCode;
+          setScanning(true);
+        }
       } catch (err) {
         console.error('Gagal memulai scanner:', err);
-        if (isMounted) setError('Kamera tidak tersedia atau izin ditolak. Pastikan kamera frontal/laptop aktif.');
+        if (isMounted) {
+          scannerRef.current = null;
+          setScanning(false);
+          if (err?.name === 'NotAllowedError') {
+            setError('Izin kamera ditolak. Berikan izin kamera dan coba lagi.');
+          } else if (err?.name === 'NotFoundError') {
+            setError('Kamera tidak ditemukan di perangkat ini.');
+          } else if (err?.name === 'NotReadableError') {
+            setError('Kamera sedang digunakan aplikasi lain.');
+          } else {
+            setError('Kamera tidak tersedia atau izin ditolak. Pastikan kamera frontal/laptop aktif.');
+          }
+        }
       }
     }
 
@@ -52,7 +70,11 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack, validateUrl }) 
     return () => {
       isMounted = false;
       if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {});
+        try {
+          scannerRef.current.stop();
+        } catch {
+          // scanner was never started, ignore
+        }
         scannerRef.current = null;
       }
     };

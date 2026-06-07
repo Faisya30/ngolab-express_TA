@@ -52,6 +52,10 @@ function mapActionToBackendRequest(action: string, data?: any): BackendRequest |
       return { method: 'GET', path: '/api/kiosk/init' };
     case 'getMember':
       return { method: 'GET', path: `/api/kiosk/member/${encodeURIComponent(String(data?.code || ''))}` };
+    case 'getMemberByUserId':
+      return { method: 'GET', path: `/api/kiosk/members/${encodeURIComponent(String(data?.user_id || ''))}` };
+    case 'lookupMemberByQr':
+      return { method: 'POST', path: '/api/kiosk/members/qr-lookup', body: { code: data?.code || data?.user_id } };
     case 'submitOrder':
       return { method: 'POST', path: '/api/kiosk/orders', body: data };
     default:

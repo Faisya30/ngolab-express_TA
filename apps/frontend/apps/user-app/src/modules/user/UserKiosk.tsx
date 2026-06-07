@@ -329,7 +329,7 @@ const UserKiosk: React.FC = () => {
 
   const koinDiscount = useMemo(() => {
     if (!useKoin || !member) return 0;
-    return Math.min(member.cashbackPoints || 0, subtotal - voucherDiscount);
+    return Math.min(member.points || 0, subtotal - voucherDiscount);
   }, [useKoin, member, subtotal, voucherDiscount]);
 
   const total = Math.max(0, subtotal - (voucherDiscount + koinDiscount));
@@ -340,7 +340,7 @@ const UserKiosk: React.FC = () => {
     const payload = {
       action: 'submitOrder',
       order: {
-        orderId,
+        orderId: orderId,
         service: serviceType,
         subtotal,
         discount: voucherDiscount + koinDiscount,
@@ -352,6 +352,9 @@ const UserKiosk: React.FC = () => {
         voucher: appliedVoucher ? appliedVoucher.title : '-',
         pointsEarned,
         pointsUsed: koinDiscount,
+        user_id: member ? member.code : null,
+        tipe_pelanggan: member ? 'member' : 'guest',
+        nama_pelanggan: member ? member.name : null,
       },
       rawCartData: JSON.stringify(cart),
     };
@@ -479,47 +482,74 @@ const UserKiosk: React.FC = () => {
         )}
         {currentScreen === Screen.SCANNER && (
           <ScannerScreen
-            validateUrl="/api/membership/lookup"
+            validateUrl="/api/kiosk/members/qr-lookup"
             onScanSuccess={async (code) => {
+              let userId: string | undefined;
               try {
-                const base = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000').replace(/\/$/, '');
-                const response = await fetch(`${base}/api/membership/lookup`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ code }),
-                });
-                const data = await response.json().catch(() => ({}));
-
-                if (data?.success && data?.user) {
-                  const u = data.user;
-                  const pts = data.points || {};
-                  setMember({
-                    code: String(u.user_id || code),
-                    name: String(u.username || 'Member'),
-                    points: Number(pts.total_points || 0),
-                    cashbackPoints: Number(pts.cashback_points || 0),
-                    vouchers,
-                    isAffiliate: String(u.role || '').toUpperCase() === 'MEMBER_AFFILIATE',
-                  });
-                } else {
-                  setMember({
-                    code,
-                    name: String(data?.user?.username || 'Member'),
-                    points: 0,
-                    cashbackPoints: 0,
-                    vouchers,
-                    isAffiliate: false,
-                  });
+                const trimmed = String(code).trim();
+                const firstBrace = trimmed.indexOf('{');
+                const lastBrace = trimmed.lastIndexOf('}');
+                if (firstBrace >= 0 && lastBrace > firstBrace) {
+                  const jsonStr = trimmed.slice(firstBrace, lastBrace + 1);
+                  const parsed = JSON.parse(jsonStr);
+                  userId = parsed.user_id || parsed.userId || undefined;
+                  if (!userId && parsed.user && parsed.user.id) {
+                    userId = String(parsed.user.id);
+                  }
                 }
               } catch {
-                setMember({
-                  code,
-                  name: 'Member',
-                  points: 0,
-                  cashbackPoints: 0,
-                  vouchers,
-                  isAffiliate: false,
-                });
+                userId = undefined;
+              }
+
+              try {
+                let data: any;
+                if (userId && userId.length >= 3) {
+                  const response = await fetchFromSheet('getMemberByUserId', { user_id: userId });
+                  data = response;
+                } else {
+                  const response = await fetchFromSheet('lookupMemberByQr', { code: String(code) });
+                  data = response;
+                }
+
+                if (data?.success && data?.user_id && data?.username) {
+                  const u = data;
+                  setMember({
+                    code: String(u.user_id),
+                    name: String(u.username || 'Member'),
+                    points: Number(u.total_points || 0),
+                    cashbackPoints: Number(u.cashback_points || 0),
+                    vouchers,
+                    isAffiliate: String(u.affiliate || '').toUpperCase() === 'YES',
+                  });
+                } else {
+                  setMember(null);
+                }
+              } catch {
+                try {
+                  const base = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000').replace(/\/$/, '');
+                  const fallbackCode = userId || String(code);
+                  const fallback = await fetch(`${base}/api/kiosk/members/qr-lookup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: fallbackCode }),
+                  });
+                  const fallbackData = await fallback.json().catch(() => ({}));
+                  if (fallbackData?.success && fallbackData?.user_id) {
+                    const u = fallbackData;
+                    setMember({
+                      code: String(u.user_id),
+                      name: String(u.username || 'Member'),
+                      points: Number(u.total_points || 0),
+                      cashbackPoints: Number(u.cashback_points || 0),
+                      vouchers,
+                      isAffiliate: String(u.affiliate || '').toUpperCase() === 'YES',
+                    });
+                  } else {
+                    setMember(null);
+                  }
+                } catch {
+                  setMember(null);
+                }
               }
               setCurrentScreen(Screen.CART);
             }}
