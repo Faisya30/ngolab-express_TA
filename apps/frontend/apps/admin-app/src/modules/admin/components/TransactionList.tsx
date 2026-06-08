@@ -2,14 +2,15 @@
 import React, { useState, useMemo } from 'react';
 
 interface Props {
-  initialTransactions: any[];
+  orders: any[];
+  orderDetails?: any[];
   allOrderDetails?: any[];
   onRefresh?: () => Promise<void>;
 }
 
 type FilterType = 'ALL' | 'DINE_IN' | 'TAKE_AWAY';
 
-const TransactionList: React.FC<Props> = ({ initialTransactions, allOrderDetails = [], onRefresh }) => {
+const TransactionList: React.FC<Props> = ({ orders, orderDetails, allOrderDetails = [], onRefresh }) => {
   const [selectedTrx, setSelectedTrx] = useState<any | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
@@ -74,9 +75,9 @@ const TransactionList: React.FC<Props> = ({ initialTransactions, allOrderDetails
 
   // Seluruh transaksi yang sudah diproses & diurutkan
   const processedTransactions = useMemo(() => {
-    if (!initialTransactions) return [];
+    if (!orders) return [];
     
-    return initialTransactions
+    return orders
       .map(trx => {
         const rawId = getValue(trx, ['orderid', 'id'], 'a');
         const id = normalizeId(rawId);
@@ -104,7 +105,7 @@ const TransactionList: React.FC<Props> = ({ initialTransactions, allOrderDetails
       })
       .filter(t => t.id !== "" && t.id !== "orderid")
       .sort((a, b) => b.timestamp - a.timestamp);
-  }, [initialTransactions]);
+  }, [orders]);
 
   // Transaksi yang difilter untuk ditampilkan di tabel
   const filteredTransactions = useMemo(() => {
@@ -127,13 +128,13 @@ const TransactionList: React.FC<Props> = ({ initialTransactions, allOrderDetails
   }, [processedTransactions]);
 
   const currentDetails = useMemo(() => {
-    if (!selectedTrx || !allOrderDetails || allOrderDetails.length === 0) return [];
+    if (!selectedTrx || !orderDetails || orderDetails.length === 0) return [];
     const targetId = normalizeId(selectedTrx.id);
-    return allOrderDetails.filter(detail => {
+    return orderDetails.filter(detail => {
       const detailIdRaw = getValue(detail, ['orderid', 'id'], 'a');
       return normalizeId(detailIdRaw) === targetId;
     });
-  }, [selectedTrx, allOrderDetails]);
+  }, [selectedTrx, orderDetails]);
 
   const handleRefresh = async () => {
     if (onRefresh) {

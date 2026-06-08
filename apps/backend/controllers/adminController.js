@@ -1,4 +1,7 @@
 import { query } from '../config/db.js';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
 
 const tableColumnsCache = new Map();
 
@@ -170,7 +173,7 @@ export async function getProducts(req, res) {
                 name,
                 category_code AS category,
                 price,
-                COALESCE(image_url, '') AS image,
+                COALESCE(CAST(image_url AS CHAR(255)), '') AS image,
                 COALESCE(description, '') AS description,
                 product_type,
                 is_recommended AS isRecommended,
@@ -183,7 +186,7 @@ export async function getProducts(req, res) {
                 name,
                 category_code AS category,
                 price,
-                COALESCE(image_url, '') AS image,
+                COALESCE(CAST(image_url AS CHAR(255)), '') AS image,
                 COALESCE(description, '') AS description,
                 product_type,
                 is_recommended AS isRecommended,
@@ -201,7 +204,7 @@ export async function getProducts(req, res) {
                 p.name,
                 COALESCE(c.code, '') AS category,
                 p.price,
-                COALESCE(p.image_url, '') AS image,
+                COALESCE(CAST(p.image_url AS CHAR(255)), '') AS image,
                 COALESCE(p.description, '') AS description,
                 p.product_type,
                 p.is_recommended AS isRecommended,
@@ -215,7 +218,7 @@ export async function getProducts(req, res) {
                 p.name,
                 COALESCE(c.code, '') AS category,
                 p.price,
-                COALESCE(p.image_url, '') AS image,
+                COALESCE(CAST(p.image_url AS CHAR(255)), '') AS image,
                 COALESCE(p.description, '') AS description,
                 p.product_type,
                 p.is_recommended AS isRecommended,
@@ -386,10 +389,10 @@ export async function saveProduct(req, res) {
 
     res.json({ success: true, id: code });
   } catch (error) {
-    if (error?.code === 'ER_DATA_TOO_LONG') {
+    if (error?.code === 'ER_DATA_TOO_LONG' || error?.message?.includes('max_allowed_packet') || error?.message?.includes('packet')) {
       return res.status(413).json({
         success: false,
-        error: 'Data gambar terlalu besar untuk kolom database (image_url). Perbesar tipe kolom atau kompres gambar.',
+        error: 'Data gambar terlalu besar. Kompresi gambar gagal mengurangi ukuran. Gunakan gambar yang lebih kecil atau sederhana.',
       });
     }
     res.status(500).json({ success: false, error: error.message });
@@ -476,6 +479,27 @@ export async function deleteCategory(req, res) {
   try {
     await query('DELETE FROM categories WHERE code = ?', [req.params.id]);
     res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+export async function uploadProductImage(req, res) {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ success: false, error: 'File gambar tidak ditemukan.' });
+    }
+
+    const uploadsDir = path.join(process.cwd(), 'apps', 'backend', 'uploads', 'products');
+    await fs.promises.mkdir(uploadsDir, { recursive: true });
+
+    const ext = path.extname(req.file.originalname) || '.jpg';
+    const filename = `prod-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`;
+    const filePath = path.join(uploadsDir, filename);
+
+    await fs.promises.writeFile(filePath, req.file.buffer);
+
+    res.json({ success: true, imageUrl: `/uploads/products/${filename}` });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

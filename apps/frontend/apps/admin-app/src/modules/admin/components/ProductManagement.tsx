@@ -4,6 +4,16 @@ import { Product, Category } from '../../../types';
 import { fetchFromSheet } from '@ngolab/shared-lib';
 import { ProductType } from '../utils/productScope';
 
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
+
+function getImageUrl(imagePath: string | null | undefined): string {
+  if (!imagePath) return '/images/no-image.svg';
+  if (imagePath.startsWith('/uploads/')) {
+    return `${BACKEND_URL}${imagePath}`;
+  }
+  return imagePath || '/images/no-image.svg';
+}
+
 interface Props {
   initialProducts: Product[];
   categories: Category[];
@@ -28,7 +38,7 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const compressImage = (file: File, maxWidth = 1280, quality = 0.75): Promise<string> => {
+const compressImage = (file: File, maxWidth = 1280, quality = 0.8): Promise<File> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onerror = () => reject(new Error('Gagal membaca file gambar.'));
@@ -50,13 +60,58 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
           const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-          const outputQuality = mimeType === 'image/png' ? 0.92 : quality;
-          resolve(canvas.toDataURL(mimeType, outputQuality));
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error('Gagal mengompres gambar.'));
+                return;
+              }
+              const compressedFile = new File([blob], file.name, { type: mimeType });
+              resolve(compressedFile);
+            },
+            mimeType,
+            quality
+          );
         };
         img.src = reader.result as string;
       };
       reader.readAsDataURL(file);
     });
+  };
+
+  const prepareImageForUpload = async (file: File): Promise<File> => {
+    const imageFiles = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!imageFiles.includes(file.type)) {
+      return file;
+    }
+    
+    const targetSize = 1024 * 1024;
+    if (file.size <= targetSize) {
+      return file;
+    }
+    
+    return compressImage(file, 1280, 0.85);
+  };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const uploadImageToServer = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || ''}/api/admin/products/upload-image`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || 'Upload gambar gagal');
+    }
+    return result.imageUrl;
   };
 
   useEffect(() => {
@@ -125,24 +180,30 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const maxUploadSize = 12 * 1024 * 1024;
+      const maxUploadSize = 5 * 1024 * 1024;
       if (file.size > maxUploadSize) {
-        setSaveError('Ukuran foto terlalu besar. Gunakan foto di bawah 12MB.');
+        setSaveError('Ukuran foto terlalu besar. Gunakan foto di bawah 5MB.');
         return;
       }
 
       setSaveError(null);
-      compressImage(file)
-        .then((compressed) => {
-          setImagePreview(compressed);
-        })
-        .catch((error) => {
-          console.error('[❌ IMAGE COMPRESS ERROR]', error);
-          setSaveError('Gagal memproses foto. Coba file yang lebih kecil.');
-        });
+      
+      const objectUrl = URL.createObjectURL(file);
+      setImagePreview(objectUrl);
+
+      try {
+        const preparedFile = await prepareImageForUpload(file);
+        const imageUrl = await uploadImageToServer(preparedFile);
+        setImagePreview(imageUrl);
+      } catch (error: any) {
+        URL.revokeObjectURL(objectUrl);
+        setImagePreview(editingProduct?.image || null);
+        console.error('[❌ IMAGE UPLOAD ERROR]', error);
+        setSaveError(error.message || 'Gagal mengupload foto. Coba file yang lain.');
+      }
     }
   };
 
@@ -172,8 +233,6 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
       setIsSaving(false);
       return;
     }
-
-    console.log(`[💾 SAVING PRODUCT] ID: ${productId} | Payload Size: ${JSON.stringify(productData).length} chars`);
 
     try {
       const result = await fetchFromSheet('saveProduct', { product: productData });
@@ -255,12 +314,12 @@ const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpd
             <div key={p.id} className="group bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-blue-600/5 transition-all duration-500 overflow-hidden flex flex-col relative">
               {/* Product Image Area */}
               <div className="h-56 overflow-hidden relative bg-slate-50">
-                <img 
-                  src={p.image || 'https://via.placeholder.com/400?text=No+Image'} 
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
-                  alt={p.name} 
-                  onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400?text=IMG+Error'; }}
-                />
+<img 
+                    src={getImageUrl(p.image)} 
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                    alt={p.name} 
+                    onError={(e) => { (e.target as HTMLImageElement).src = '/images/no-image.svg'; }}
+                  />
                 
                 {/* Overlay Badges */}
                 <div className="absolute top-5 left-5 flex flex-col gap-2">

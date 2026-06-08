@@ -1,0 +1,26 @@
+{
+  "id": "gamification-env",
+  "name": "Gamification Environment",
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "user-001",
+      "type": "string"
+    },
+    {
+      "key": "missionId",
+      "value": "mission-001",
+      "type": "string"
+    },
+    {
+      "key": "gameId",
+      "value": "game-001",
+      "type": "string"
+    }
+  ]
+}

@@ -5,23 +5,39 @@ import BowlNoodlesAltIcon from '@iconify-react/boxicons/bowl-noodles-alt';
 import DrinkIcon from '@iconify-react/pixelarticons/drop';
 import CircleIcon from '@iconify-react/pixelarticons/circle';
 
-interface Props {
-  cart: CartItem[];
-  member: Member | null;
-  potentialPoints: number;
-  products: Product[];
-  categories: any[];
-  onAddToCart: (p: Product | CartItem) => void;
-  onUpdateQty: (id: string, delta: number) => void;
-  onRemove: (id: string) => void;
-  onClearCart: () => void;
-  onOpenCart: () => void;
-  onBack: () => void;
-  total: number;
+const PLACEHOLDER_IMAGE = '/images/no-image.svg';
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
+
+function resolveImageSource(raw: unknown): string {
+  if (!raw) return PLACEHOLDER_IMAGE;
+
+  if (typeof raw === 'string') {
+    const value = raw.trim();
+    if (!value) return PLACEHOLDER_IMAGE;
+    if (value.startsWith('/uploads/')) return `${BACKEND_URL}${value}`;
+    return value;
+  }
+
+  if (Array.isArray(raw)) {
+    const first = raw[0];
+    if (!first) return PLACEHOLDER_IMAGE;
+    return resolveImageSource(first);
+  }
+
+  if (typeof raw === 'object') {
+    const keys = ['url', 'href', 'src', 'link', 'path', 'name', 'value', 'id'] as const;
+    for (const key of keys) {
+      const candidate = (raw as Record<string, unknown>)[key];
+      const resolved = resolveImageSource(candidate);
+      if (resolved !== PLACEHOLDER_IMAGE) return resolved;
+    }
+  }
+
+  console.warn('[ImageResolver] Gambar produk tidak valid:', raw);
+  return PLACEHOLDER_IMAGE;
 }
 
-const PLACEHOLDER_IMAGE =
-  'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?q=80&w=600&auto=format&fit=crop';
+console.log('[ImageResolver] MenuScreen image resolver ready');
 
 const normalizeCategoryId = (value: string | undefined | null) =>
   String(value || '').toLowerCase().trim();
@@ -92,6 +108,13 @@ const MenuScreen: React.FC<Props> = ({
 
     return byCategory.length > 0 ? byCategory : products;
   }, [activeCategory, products]);
+
+  console.log('[ImageResolver] Filtered products sample:', filteredProducts.slice(0, 3).map((p) => ({
+    id: p.id,
+    imageRaw: p.image,
+    imageType: typeof p.image,
+    imageResolved: resolveImageSource(p.image),
+  })));
 
   const itemCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
@@ -230,7 +253,7 @@ const MenuScreen: React.FC<Props> = ({
                 >
                   <div className="relative aspect-square rounded-[1.2rem] overflow-hidden bg-orange-50 mb-4">
                     <img
-                      src={product.image || PLACEHOLDER_IMAGE}
+                      src={resolveImageSource(product.image)}
                       alt={product.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                     />
@@ -355,7 +378,7 @@ const MenuScreen: React.FC<Props> = ({
               {cart.map((item) => (
                 <div key={item.id} className="flex gap-3">
                   <img
-                    src={item.image || PLACEHOLDER_IMAGE}
+                     src={resolveImageSource(item.image)}
                     alt={item.name}
                     className="w-14 h-14 rounded-xl object-cover bg-orange-50"
                   />

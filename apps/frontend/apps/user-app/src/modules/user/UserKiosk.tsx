@@ -511,20 +511,25 @@ const UserKiosk: React.FC = () => {
                   data = response;
                 }
 
+                console.log('[QR-LOOKUP] fetchFromSheet response:', data);
+
                 if (data?.success && data?.user_id && data?.username) {
                   const u = data;
-                  setMember({
+                  const memberData = {
                     code: String(u.user_id),
                     name: String(u.username || 'Member'),
                     points: Number(u.total_points || 0),
                     cashbackPoints: Number(u.cashback_points || 0),
                     vouchers,
                     isAffiliate: String(u.affiliate || '').toUpperCase() === 'YES',
-                  });
+                  };
+                  console.log('[QR-LOOKUP] Member data set:', memberData);
+                  setMember(memberData);
                 } else {
                   setMember(null);
                 }
-              } catch {
+              } catch (fetchError) {
+                console.error('[QR-LOOKUP] fetchFromSheet error:', fetchError);
                 try {
                   const base = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000').replace(/\/$/, '');
                   const fallbackCode = userId || String(code);
@@ -534,20 +539,24 @@ const UserKiosk: React.FC = () => {
                     body: JSON.stringify({ code: fallbackCode }),
                   });
                   const fallbackData = await fallback.json().catch(() => ({}));
+                  console.log('[QR-LOOKUP] fallback API response:', fallbackData);
                   if (fallbackData?.success && fallbackData?.user_id) {
                     const u = fallbackData;
-                    setMember({
+                    const memberData = {
                       code: String(u.user_id),
                       name: String(u.username || 'Member'),
                       points: Number(u.total_points || 0),
                       cashbackPoints: Number(u.cashback_points || 0),
                       vouchers,
                       isAffiliate: String(u.affiliate || '').toUpperCase() === 'YES',
-                    });
+                    };
+                    console.log('[QR-LOOKUP] Member data set (fallback):', memberData);
+                    setMember(memberData);
                   } else {
                     setMember(null);
                   }
-                } catch {
+                } catch (fallbackError) {
+                  console.error('[QR-LOOKUP] fallback error:', fallbackError);
                   setMember(null);
                 }
               }

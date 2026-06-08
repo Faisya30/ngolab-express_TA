@@ -50,8 +50,8 @@ const CVDashboard: React.FC = () => {
   const loadDashboardData = useCallback(async () => {
     try {
       const [ordersRes, orderDetailsRes, productsRes, categoriesRes] = await Promise.all([
-        fetchFromSheet(API_ACTIONS.GET_ORDERS),
-        fetchFromSheet(API_ACTIONS.GET_ORDER_DETAILS),
+        fetchFromSheet(API_ACTIONS.GET_CV_ORDERS),
+        fetchFromSheet(API_ACTIONS.GET_CV_ORDER_DETAILS),
         fetchFromSheet(API_ACTIONS.GET_PRODUCTS),
         fetchFromSheet(API_ACTIONS.GET_CATEGORIES),
       ]);

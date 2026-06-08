@@ -3,6 +3,8 @@ import cors from 'cors';
 import path from 'path';
 import { pingDatabase } from './config/db.js';
 import { registerRoutes } from './routes/index.js';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './swagger.js';
 
 function isAllowedLanFrontendOrigin(origin) {
   return /^http:\/\/(\d{1,3}\.){3}\d{1,3}:(3000|3001|3002|3004|3005|4000|5173|5175)$/.test(origin);
@@ -37,6 +39,8 @@ export function createApp({ frontendOrigins }) {
       res.status(500).json({ ok: false, service: 'ngolab-express-backend', db: false });
     }
   });
+
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
   registerRoutes(app);
 

@@ -94,7 +94,7 @@ export async function init(req, res) {
 						p.name,
 						p.price,
 						COALESCE(p.category_code, '') AS category,
-						COALESCE(p.image_url, '') AS image,
+						COALESCE(CAST(p.image_url AS CHAR(255)), '') AS image,
 						COALESCE(p.description, '') AS description,
 						p.is_recommended AS isRecommended,
 						p.cashback_reward AS cashbackReward,
@@ -109,7 +109,7 @@ export async function init(req, res) {
 						p.name,
 						p.price,
 						COALESCE(c.code, '') AS category,
-						COALESCE(p.image_url, '') AS image,
+						COALESCE(CAST(p.image_url AS CHAR(255)), '') AS image,
 						COALESCE(p.description, '') AS description,
 						p.is_recommended AS isRecommended,
 						p.cashback_reward AS cashbackReward,
@@ -486,12 +486,16 @@ export async function saveOrder(req, res) {
 
 			return { orderCode, queueNumber };
 		});
-		// ==========================================
-		// TAMBAHKAN KODE PEMANGGIL AI DI SINI:
 		if (userId) {
-			generateAiRecommendation(userId);
+			try {
+				const { generateAiRecommendation } = await import('../services/geminiService.js');
+				generateAiRecommendation(userId).catch((err) => {
+					console.error('Fire-and-forget AI recommendation failed:', err.message);
+				});
+			} catch (importError) {
+				console.error('Gagal memuat modul AI recommendation:', importError.message);
+			}
 		}
-		// ==========================================
 
 		return res.json({ success: true, orderCode: result.orderCode, queueNumber: result.queueNumber });
 	} catch (error) {

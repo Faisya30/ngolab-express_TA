@@ -1,0 +1,239 @@
+{
+  "info": {
+    "name": "Gamification API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "API Collection untuk sistem gamifikasi"
+  },
+  "item": [
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "GET All Users",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/gamification/users"
+          }
+        },
+        {
+          "name": "GET User by ID",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/gamification/users/{{userId}}"
+          }
+        },
+        {
+          "name": "UPDATE User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/gamification/users/{{userId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"points\": 100,\n  \"memberLevel\": \"Silver\",\n  \"streakCount\": 5\n}"
+            }
+          }
+        },
+        {
+          "name": "Add Points",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/gamification/users/{{userId}}/add-points",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"points\": 50,\n  \"description\": \"Bonus points\"
+}"
+            }
+          }
+        },
+        {
+          "name": "Check-in",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/gamification/users/{{userId}}/checkin"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Missions",
+      "item": [
+        {
+          "name": "GET All Missions",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/gamification/missions"
+          }
+        },
+        {
+          "name": "CREATE Mission",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/gamification/missions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Daily Login\",\n  \"description\": \"Login hari ini untuk mendapatkan poin\",\n  \"rewardPoints\": 10,\n  \"target\": 1,\n  \"type\": \"daily\",\n  \"icon\": \"fas fa-calendar-check\",\n  \"status\": \"active\"\n}"
+            }
+          }
+        },
+        {
+          "name": "UPDATE Mission",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/gamification/missions/{{missionId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Daily Login Updated\",\n  \"rewardPoints\": 15\n}"
+            }
+          }
+        },
+        {
+          "name": "DELETE Mission",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/gamification/missions/{{missionId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "User Missions",
+      "item": [
+        {
+          "name": "GET User Missions",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/gamification/user-missions?userId={{userId}}"
+          }
+        },
+        {
+          "name": "Complete Mission",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/gamification/user-missions/complete",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"missionId\": \"{{missionId}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Games",
+      "item": [
+        {
+          "name": "GET All Games",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/gamification/games"
+          }
+        },
+        {
+          "name": "CREATE Game",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/gamification/games",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"wheel\",\n  \"name\": \"Wheel of Fortune\",\n  \"cost_points\": 50,\n  \"reward_points\": 100,\n  \"is_active\": true,\n  \"config_data\": {\n    \"segments\": [\"10\", \"20\", \"50\", \"100\"]\n  }"
+            }
+          }
+        },
+        {
+          "name": "UPDATE Game",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/gamification/games/{{gameId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reward_points\": 150\n}"
+            }
+          }
+        },
+        {
+          "name": "DELETE Game",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/gamification/games/{{gameId}}"
+          }
+        },
+        {
+          "name": "Play Game",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/gamification/games/play",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"gameId\": \"{{gameId}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Points History",
+      "item": [
+        {
+          "name": "GET Points History",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/gamification/points-history"
+          }
+        },
+        {
+          "name": "GET User Points History",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/gamification/points-history?userId={{userId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Game Plays",
+      "item": [
+        {
+          "name": "GET All Game Plays",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/gamification/game-plays"
+          }
+        },
+        {
+          "name": "GET User Game Plays",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/gamification/game-plays?userId={{userId}}"
+          }
+        }
+      ]
+    }
+  ]
+}

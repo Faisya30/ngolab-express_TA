@@ -37,6 +37,20 @@ function normalizeProductType(rawType) {
   return 'cv';
 }
 
+function convertToBase64IfBlob(imageUrl) {
+  if (!imageUrl) return null;
+  if (typeof imageUrl === 'string') {
+    if (imageUrl.startsWith('data:image/')) return imageUrl;
+    if (imageUrl.startsWith('/uploads/')) return imageUrl;
+    return imageUrl;
+  }
+  if (Buffer.isBuffer(imageUrl)) {
+    const mime = 'image/jpeg';
+    return `data:${mime};base64,${imageUrl.toString('base64')}`;
+  }
+  return String(imageUrl);
+}
+
 function parseItems(rawItems) {
   if (Array.isArray(rawItems)) return rawItems;
 
@@ -127,7 +141,7 @@ export async function getCvProducts(req, res) {
           p.name,
           p.price,
           COALESCE(p.category_code, '') AS category_code,
-          COALESCE(p.image_url, '') AS image_url,
+          p.image_url,
           COALESCE(p.description, '') AS description,
           p.product_type,
           COALESCE(p.product_type, 'cv') AS productType,
@@ -141,9 +155,14 @@ export async function getCvProducts(req, res) {
         [requestedType]
       );
 
+      const products = rows.map(r => ({
+        ...r,
+        image_url: convertToBase64IfBlob(r.image_url)
+      }));
+
       return res.json({
         success: true,
-        products: rows,
+        products,
       });
     }
 
@@ -155,7 +174,7 @@ export async function getCvProducts(req, res) {
         p.name,
         p.price,
         COALESCE(c.code, '') AS category_code,
-        COALESCE(p.image_url, '') AS image_url,
+        p.image_url,
         COALESCE(p.description, '') AS description,
         p.product_type,
         COALESCE(p.product_type, 'cv') AS productType,
@@ -170,9 +189,14 @@ export async function getCvProducts(req, res) {
       [requestedType]
     );
 
+    const products = rows.map(r => ({
+      ...r,
+      image_url: convertToBase64IfBlob(r.image_url)
+    }));
+
     return res.json({
       success: true,
-      products: rows,
+      products,
     });
   } catch (error) {
     return res.status(500).json({
@@ -426,7 +450,7 @@ export async function getCvProductByBarcode(req, res) {
         COALESCE(barcode, '') AS barcode,
         name,
         price,
-        COALESCE(image_url, '') AS image_url,
+        image_url,
         COALESCE(description, '') AS description,
         COALESCE(product_type, 'cv') AS productType,
         product_type,
@@ -448,9 +472,12 @@ export async function getCvProductByBarcode(req, res) {
       });
     }
 
+    const product = rows[0];
+    product.image_url = convertToBase64IfBlob(product.image_url);
+
     return res.json({
       success: true,
-      product: rows[0],
+      product,
     });
   } catch (error) {
     return res.status(500).json({
@@ -474,37 +501,21 @@ export async function getCvOrders(req, res) {
     }
 
     const orders = await query(
-      requestedType === 'all'
-        ? `SELECT
-            id,
-            order_code,
-            created_at,
-            service_type AS service,
-            subtotal,
-            discount,
-            total,
-            payment_method AS payment,
-            COALESCE(tipe_pelanggan, 'GUEST') AS customerType,
-            COALESCE(nama_pelanggan, 'Guest') AS member,
-            order_type AS orderType
-          FROM orders
-          WHERE order_type IN ('cv', 'computervision')
-          ORDER BY created_at DESC`
-        : `SELECT
-            id,
-            order_code,
-            created_at,
-            service_type AS service,
-            subtotal,
-            discount,
-            total,
-            payment_method AS payment,
-            COALESCE(tipe_pelanggan, 'GUEST') AS customerType,
-            COALESCE(nama_pelanggan, 'Guest') AS member,
-            order_type AS orderType
-          FROM orders
-          WHERE order_type IN ('cv', 'computervision')
-          ORDER BY created_at DESC`
+      `SELECT
+        id,
+        order_code,
+        created_at,
+        service_type AS service,
+        subtotal,
+        discount,
+        total,
+        payment_method AS payment,
+        COALESCE(tipe_pelanggan, 'GUEST') AS customerType,
+        COALESCE(nama_pelanggan, 'Guest') AS member,
+        order_type AS orderType
+      FROM orders
+      WHERE order_type IN ('cv', 'computervision')
+      ORDER BY created_at DESC`
     );
 
     const orderItemsUsesOrderId = await hasColumn('order_items', 'order_id');
@@ -573,6 +584,66 @@ export async function getCvOrders(req, res) {
       success: true,
       orders,
     });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+}
+
+export async function getCvOrderDetails(req, res) {
+  try {
+    const orderItemsUsesOrderId = await hasColumn('order_items', 'order_id');
+    const orderItemsHasProductNameSnapshot = await hasColumn(
+      'order_items',
+      'product_name_snapshot'
+    );
+    const orderItemsHasProductName = await hasColumn(
+      'order_items',
+      'product_name'
+    );
+    const orderItemsHasPriceSnapshot = await hasColumn(
+      'order_items',
+      'price_snapshot'
+    );
+
+    const productNameCol = orderItemsHasProductNameSnapshot
+      ? 'product_name_snapshot'
+      : orderItemsHasProductName
+        ? 'product_name'
+        : "''";
+
+    const priceCol = orderItemsHasPriceSnapshot ? 'price_snapshot' : 'price';
+
+    const rows = orderItemsUsesOrderId
+      ? await query(
+          `SELECT
+            oi.id,
+            oi.order_id,
+            o.order_code AS orderId,
+            ${productNameCol} AS productName,
+            oi.qty,
+            ${priceCol} AS price,
+            oi.subtotal
+          FROM order_items oi
+          LEFT JOIN orders o ON oi.order_id = o.id
+          WHERE o.order_type IN ('cv', 'computervision')
+          ORDER BY oi.id DESC`
+        )
+      : await query(
+          `SELECT
+            id,
+            order_code AS orderId,
+            ${productNameCol} AS productName,
+            qty,
+            ${priceCol} AS price,
+            subtotal
+          FROM order_items
+          ORDER BY id DESC`
+        );
+
+    return res.json({ success: true, orderDetails: rows });
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -816,5 +887,20 @@ export async function saveCvOrder(req, res) {
       success: false,
       error: error.message,
     });
+  }
+}
+
+export async function uploadCvProductImage(req, res) {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ success: false, error: 'File gambar tidak ditemukan.' });
+    }
+
+    const mimeType = req.file.mimetype || 'image/jpeg';
+    const base64 = `data:${mimeType};base64,${req.file.buffer.toString('base64')}`;
+
+    res.json({ success: true, imageUrl: base64 });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 }

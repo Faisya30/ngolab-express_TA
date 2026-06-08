@@ -16,21 +16,21 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 
 CREATE TABLE IF NOT EXISTS products (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  code VARCHAR(50) NOT NULL UNIQUE,
-  name VARCHAR(150) NOT NULL,
-  category_code VARCHAR(50) NOT NULL,
-  price DECIMAL(12,2) NOT NULL DEFAULT 0,
-  image_url LONGTEXT NULL,
-  description TEXT NULL,
-  product_type ENUM('kiosk','cv') NOT NULL DEFAULT 'kiosk',
-  is_recommended TINYINT(1) NOT NULL DEFAULT 0,
-  cashback_reward INT NOT NULL DEFAULT 0,
-  is_active TINYINT(1) NOT NULL DEFAULT 1,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_products_category_code
-    FOREIGN KEY (category_code) REFERENCES categories(code)
-    ON UPDATE CASCADE ON DELETE RESTRICT
+   id INT AUTO_INCREMENT PRIMARY KEY,
+   code VARCHAR(50) NOT NULL UNIQUE,
+   name VARCHAR(150) NOT NULL,
+   category_code VARCHAR(50) NOT NULL,
+   price DECIMAL(12,2) NOT NULL DEFAULT 0,
+   image_url VARCHAR(255) NULL,
+   description TEXT NULL,
+   product_type ENUM('kiosk','cv') NOT NULL DEFAULT 'kiosk',
+   is_recommended TINYINT(1) NOT NULL DEFAULT 0,
+   cashback_reward INT NOT NULL DEFAULT 0,
+   is_active TINYINT(1) NOT NULL DEFAULT 1,
+   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+   CONSTRAINT fk_products_category_code
+     FOREIGN KEY (category_code) REFERENCES categories(code)
+     ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
 

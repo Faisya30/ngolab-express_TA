@@ -19,6 +19,10 @@ function getCurrentAdminRole(): string {
 
 function mapActionToBackendRequest(action: string, data?: any): BackendRequest | null {
   switch (action) {
+    case 'getCvOrders':
+      return { method: 'GET', path: '/api/cv/orders' };
+    case 'getCvOrderDetails':
+      return { method: 'GET', path: '/api/cv/order-details' };
     case 'getOrders':
       return { method: 'GET', path: '/api/admin/orders' };
     case 'getOrderDetails':

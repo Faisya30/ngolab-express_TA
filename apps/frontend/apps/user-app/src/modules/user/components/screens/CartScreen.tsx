@@ -5,6 +5,25 @@ import ShieldIcon from '@iconify-react/pixelarticons/shield';
 import LockIcon from '@iconify-react/pixelarticons/lock';
 import TrashIcon from '@iconify-react/pixelarticons/trash';
 
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000').replace(/\/$/, '');
+
+const QRISIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <path d="M14 14h1M18 14h3M14 18h3M21 18v3M18 21h-4M21 14v1" />
+  </svg>
+);
+
+const CashIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+    <rect x="2" y="6" width="20" height="12" rx="2" />
+    <circle cx="12" cy="12" r="2" />
+    <path d="M6 12h.01M18 12h.01" />
+  </svg>
+);
+
 interface Props {
   cart: CartItem[];
   subtotal: number;
@@ -27,22 +46,36 @@ interface Props {
 const PLACEHOLDER_IMAGE =
   'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?q=80&w=600&auto=format&fit=crop';
 
-const QRISIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-    <rect x="3" y="3" width="7" height="7" rx="1" />
-    <rect x="14" y="3" width="7" height="7" rx="1" />
-    <rect x="3" y="14" width="7" height="7" rx="1" />
-    <path d="M14 14h1M18 14h3M14 18h3M21 18v3M18 21h-4M21 14v1" />
-  </svg>
-);
+const resolveImageSource = (raw: unknown): string => {
+  if (!raw) return PLACEHOLDER_IMAGE;
 
-const CashIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-    <rect x="2" y="6" width="20" height="12" rx="2" />
-    <circle cx="12" cy="12" r="2" />
-    <path d="M6 12h.01M18 12h.01" />
-  </svg>
-);
+  if (typeof raw === 'string') {
+    const value = raw.trim();
+    if (!value) return PLACEHOLDER_IMAGE;
+    if (value.startsWith('/uploads/')) return `${BACKEND_URL}${value}`;
+    return value;
+  }
+
+  if (Array.isArray(raw)) {
+    const first = raw[0];
+    if (!first) return PLACEHOLDER_IMAGE;
+    return resolveImageSource(first);
+  }
+
+  if (typeof raw === 'object') {
+    const keys = ['url', 'href', 'src', 'link', 'path', 'name', 'value', 'id'] as const;
+    for (const key of keys) {
+      const candidate = (raw as Record<string, unknown>)[key];
+      const resolved = resolveImageSource(candidate);
+      if (resolved !== PLACEHOLDER_IMAGE) return resolved;
+    }
+  }
+
+  console.warn('[ImageResolver] Gambar produk tidak valid:', raw);
+  return PLACEHOLDER_IMAGE;
+};
+
+console.log('[ImageResolver] CartScreen image resolver ready');
 
 const CartScreen: React.FC<Props> = ({
   cart,
@@ -71,7 +104,7 @@ const CartScreen: React.FC<Props> = ({
   const koinDiscountAmount = useMemo(() => {
     if (!useKoin || !member) return 0;
     const maxRedeemable = subtotal - voucherDiscountAmount;
-    return Math.min(member.points, maxRedeemable);
+    return Math.min(member.cashbackPoints, maxRedeemable);
   }, [useKoin, member, subtotal, voucherDiscountAmount]);
 
   const finalTotal = Math.max(0, subtotal - voucherDiscountAmount - koinDiscountAmount);
@@ -199,7 +232,7 @@ const CartScreen: React.FC<Props> = ({
                 </div>
 
                 <h2 className="text-3xl font-black text-orange-500">
-                  {member ? member.points.toLocaleString() : '0'}
+                  {member ? member.cashbackPoints.toLocaleString() : '0'}
                 </h2>
 
                 <div className="mt-5 flex items-center justify-between">
@@ -209,7 +242,7 @@ const CartScreen: React.FC<Props> = ({
 
                   <button
                     onClick={() => member && onToggleKoin()}
-                    disabled={!member || member.points === 0}
+                    disabled={!member || member.cashbackPoints === 0}
                     className={`w-12 h-7 rounded-full relative transition ${
                       useKoin ? 'bg-orange-500' : 'bg-slate-200'
                     }`}
