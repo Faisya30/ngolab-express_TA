@@ -2009,19 +2009,75 @@ export async function earnPoints(_req, res) {
   }
 }
 
-export async function lookupMember(req, res) {
+export async function getTransactionHistory(req, res) {
   try {
-    const body = req.body || {};
-    const code = normalizeText(body.code || req.query?.code || req.params?.code);
-
-    if (!code) {
-      return res.status(400).json({ success: false, error: 'code/member identifier wajib diisi.' });
+    const userId = String(req.user?.user_id || req.params?.user_id || req.query?.user_id || '').trim();
+    if (!userId) {
+      return res.status(400).json({ message: 'user_id wajib diisi.' });
     }
 
-    const rows = await query(
-      `SELECT user_id, username, email, nim, role, status, membership_level, referred_by, created_at, phone_number, profile_picture
+    const transactions = await query(
+      `SELECT
+        o.order_code,
+        o.created_at AS transaction_date,
+        o.total,
+        o.payment_method,
+        oi.product_name_snapshot AS item_name,
+        oi.qty,
+        oi.subtotal AS item_total
+      FROM orders o
+      JOIN order_items oi ON oi.order_code = o.order_code
+      WHERE o.user_id = ?
+      ORDER BY o.created_at DESC, oi.id ASC`,
+      [userId]
+    );
+
+    if (!transactions.length) {
+      return res.json({
+        message: 'Tidak ada riwayat transaksi',
+        data: [],
+      });
+    }
+
+    const grouped = new Map();
+    for (const row of transactions) {
+      if (!grouped.has(row.order_code)) {
+        grouped.set(row.order_code, {
+          order_code: row.order_code,
+          transaction_date: row.transaction_date,
+          total: Number(row.total || 0),
+          payment_method: row.payment_method,
+          items: [],
+        });
+      }
+      const tx = grouped.get(row.order_code);
+      tx.items.push({
+        item_name: row.item_name,
+        qty: Number(row.qty || 0),
+        item_total: Number(row.item_total || 0),
+      });
+    }
+
+    return res.json({
+      message: 'Riwayat transaksi berhasil diambil',
+      data: Array.from(grouped.values()),
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+}
+
+export async function lookupMember(req, res) {
+  try {
+    const code = String(req.body?.code || req.body?.user_id || '').trim();
+    if (!code) {
+      return res.status(400).json({ success: false, error: 'code wajib diisi.' });
+    }
+
+    const [rows] = await query(
+      `SELECT user_id, username, phone_number, email, membership_level, status, created_at
       FROM users
-      WHERE user_id = ? OR username = ? OR phone_number = ?
+      WHERE user_id = ? OR phone_number = ? OR username = ?
       LIMIT 1`,
       [code, code, code]
     );

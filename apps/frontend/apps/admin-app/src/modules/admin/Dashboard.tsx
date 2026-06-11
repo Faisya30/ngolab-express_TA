@@ -15,7 +15,7 @@ const AdminDashboard: React.FC = () => {
   const [currentView, setView] = useState<ViewType>('DASHBOARD');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<any>(null);
-  
+
   // Data dummy - nanti ganti dengan API calls
   const [orders, setOrders] = useState<any[]>([]);
   const [orderDetails, setOrderDetails] = useState<any[]>([]);
@@ -61,7 +61,7 @@ const AdminDashboard: React.FC = () => {
       setOrders(normalizeRows(ordersRes));
       setOrderDetails(normalizeRows(orderDetailsRes));
       setProducts(normalizeRows(productsRes));
-      
+
       // Handle categories from backend API wrapper
       const categoryData = categoriesRes?.success ? categoriesRes.categories : categoriesRes;
       setCategories(Array.isArray(categoryData) ? categoryData : []);
@@ -89,6 +89,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleRefresh = async () => {
+    console.log('[SYNC BUTTON DIKLIK]');
     await loadDashboardData();
   };
 
@@ -107,8 +108,8 @@ const AdminDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 overflow-hidden">
       {/* Sidebar */}
-      <Sidebar 
-        currentView={currentView} 
+      <Sidebar
+        currentView={currentView}
         setView={setCurrentView}
         onLogout={handleLogout}
         user={user}
@@ -122,42 +123,43 @@ const AdminDashboard: React.FC = () => {
         {/* Content Area */}
         <div className="flex-1 overflow-auto p-8">
           {currentView === 'DASHBOARD' && (
-            <Dashboard 
-              orders={orders} 
-              orderDetails={orderDetails} 
+            <Dashboard
+              orders={orders}
+              orderDetails={orderDetails}
               products={products}
               onRefresh={handleRefresh}
             />
           )}
-          
+
           {currentView === 'CATEGORIES' && (
-            <CategoryManagement 
+            <CategoryManagement
               initialCategories={categories}
+              products={products}
               onUpdate={handleRefresh}
             />
           )}
-          
+
           {currentView === 'PRODUCTS' && (
-            <ProductManagement 
+            <ProductManagement
               initialProducts={scopedProducts}
               categories={categories}
               onUpdate={handleRefresh}
               adminProductType={adminProductType}
             />
           )}
-          
+
           {currentView === 'TRANSACTIONS' && (
-            <TransactionList 
-              initialTransactions={orders}
-              allOrderDetails={orderDetails}
+            <TransactionList
+              orders={orders}
+              orderDetails={orderDetails}
               onRefresh={handleRefresh}
             />
           )}
-          
+
           {currentView === 'REPORTS' && (
             <Reports />
           )}
-          
+
         </div>
       </div>
     </div>

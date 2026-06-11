@@ -4,3 +4,4 @@ export { MissionRepository } from './MissionRepository.js';
 export { UserMissionRepository } from './UserMissionRepository.js';
 export { PointsHistoryRepository } from './PointsHistoryRepository.js';
 export { GamePlayRepository } from './GamePlayRepository.js';
+export { ReferralEarningsRepository } from './ReferralEarningsRepository.js';

@@ -89,13 +89,30 @@ async function runMigrations() {
       }
     }
 
-    // Run migration_affiliate_referral_commission.sql
+// Run migration_affiliate_referral_commission.sql
     const migrationPath5 = path.join(process.cwd(), 'sql', 'migration_affiliate_referral_commission.sql');
     const migrationSQL5 = fs.readFileSync(migrationPath5, 'utf8');
-
+    
     console.log('\n> Running migration_affiliate_referral_commission.sql');
     const statements5 = migrationSQL5.split(';').filter(s => s.trim());
     for (const statement of statements5) {
+      if (statement.trim()) {
+        try {
+          await conn.query(statement);
+          console.log('  ✓ Executed');
+        } catch (err) {
+          console.log('  ✗ Error:', err.message);
+        }
+      }
+    }
+    
+    // Run gamification_migration.sql
+    const migrationPath6 = path.join(process.cwd(), 'sql', 'gamification_migration.sql');
+    const migrationSQL6 = fs.readFileSync(migrationPath6, 'utf8');
+    
+    console.log('\n> Running gamification_migration.sql');
+    const statements6 = migrationSQL6.split(';').filter(s => s.trim());
+    for (const statement of statements6) {
       if (statement.trim()) {
         try {
           await conn.query(statement);
@@ -121,6 +138,18 @@ async function runMigrations() {
 
     const [commissionLogs] = await conn.query(`SHOW TABLES LIKE 'affiliate_commission_logs'`);
     console.log('Affiliate commission logs table exists:', commissionLogs.length > 0 ? '✓ YES' : '✗ NO');
+    
+    const [gamificationTables] = await conn.query(`SHOW TABLES LIKE 'UserGamification'`);
+    console.log('UserGamification table exists:', gamificationTables.length > 0 ? '✓ YES' : '✗ NO');
+    
+    const [gamesTable] = await conn.query(`SHOW TABLES LIKE 'Games'`);
+    console.log('Games table exists:', gamesTable.length > 0 ? '✓ YES' : '✗ NO');
+    
+    const [missionsTable] = await conn.query(`SHOW TABLES LIKE 'Missions'`);
+    console.log('Missions table exists:', missionsTable.length > 0 ? '✓ YES' : '✗ NO');
+    
+    const [referralEarningsTable] = await conn.query(`SHOW TABLES LIKE 'ReferralEarnings'`);
+    console.log('ReferralEarnings table exists:', referralEarningsTable.length > 0 ? '✓ YES' : '✗ NO');
     
   } catch (error) {
     console.error('Migration failed:', error);

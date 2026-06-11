@@ -52,12 +52,30 @@ const UserKiosk: React.FC = () => {
   const lastClickAtRef = useRef(0);
   const lastCursorPaintAtRef = useRef(0);
 
+  const getMemberPoints = (source: any): number => {
+  return cleanNumber(
+    source?.total_points ??
+    source?.totalPoints ??
+    source?.points ??
+    source?.point ??
+    source?.saldo_point ??
+    source?.saldoPoint ??
+    source?.reward_points ??
+    source?.rewardPoints ??
+    source?.cashbackPoints ??
+    source?.cashback_points ??
+    0
+  );
+};
+
   const findClickableElement = useCallback((startEl: HTMLElement | null) => {
     let el: HTMLElement | null = startEl;
+
     while (el) {
       const role = el.getAttribute('role');
       const tag = el.tagName;
       const cursorStyle = window.getComputedStyle(el).cursor;
+
       if (
         tag === 'BUTTON' ||
         tag === 'A' ||
@@ -70,8 +88,10 @@ const UserKiosk: React.FC = () => {
       ) {
         return el;
       }
+
       el = el.parentElement;
     }
+
     return startEl;
   }, []);
 
@@ -97,7 +117,10 @@ const UserKiosk: React.FC = () => {
       const py = Math.max(0, Math.min(window.innerHeight - 1, y + dy));
       const rawEl = document.elementFromPoint(px, py) as HTMLElement | null;
       const target = findClickableElement(rawEl);
-      if (target) return { target, clickX: px, clickY: py };
+
+      if (target) {
+        return { target, clickX: px, clickY: py };
+      }
     }
 
     return null;
@@ -105,10 +128,13 @@ const UserKiosk: React.FC = () => {
 
   const findScrollableElement = useCallback((x: number, y: number) => {
     let el = document.elementFromPoint(x, y) as HTMLElement | null;
+
     while (el) {
       const style = window.getComputedStyle(el);
       const canScrollY = /(auto|scroll|overlay)/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 2;
+
       if (canScrollY) return el;
+
       el = el.parentElement;
     }
 
@@ -119,6 +145,7 @@ const UserKiosk: React.FC = () => {
   const triggerGestureClick = useCallback((x: number, y: number) => {
     const targetHit = findGestureTarget(x, y);
     if (!targetHit) return;
+
     const { target, clickX, clickY } = targetHit;
 
     const eventInit: MouseEventInit = {
@@ -161,24 +188,31 @@ const UserKiosk: React.FC = () => {
     const pinchDistance = typeof trackingData.pinchDistance === 'number' ? trackingData.pinchDistance : null;
     const pinchStartThreshold = 0.07;
     const pinchReleaseThreshold = 0.09;
+
     const isPinching = pinchDistance === null
       ? Boolean(trackingData.pinch)
       : (pinchActiveRef.current ? pinchDistance < pinchReleaseThreshold : pinchDistance < pinchStartThreshold);
 
     const frameIntervalMs = 1000 / 24;
+
     if (now - lastCursorPaintAtRef.current >= frameIntervalMs) {
       lastCursorPaintAtRef.current = now;
+
       setVirtualCursor((prevCursor) => {
         if (!prevCursor) return { x, y, pinching: isPinching };
+
         const moved = Math.abs(prevCursor.x - x) > 1 || Math.abs(prevCursor.y - y) > 1;
         const pinchChanged = prevCursor.pinching !== isPinching;
+
         if (!moved && !pinchChanged) return prevCursor;
+
         return { x, y, pinching: isPinching };
       });
     }
 
     const cooldownMs = 350;
     const pinchHoldMs = 40;
+
     if (isPinching && !pinchActiveRef.current) {
       pinchStartedAtRef.current = now;
       pinchTriggeredRef.current = false;
@@ -196,6 +230,7 @@ const UserKiosk: React.FC = () => {
       const session = pinchSessionRef.current;
       const deltaY = y - session.lastY;
       const movedDistance = Math.hypot(x - session.startX, y - session.startY);
+
       if (movedDistance > 24) {
         session.moved = true;
       }
@@ -213,7 +248,14 @@ const UserKiosk: React.FC = () => {
     }
 
     const canTriggerClick = !pinchSessionRef.current?.moved;
-    if (isPinching && canTriggerClick && !pinchTriggeredRef.current && now - pinchStartedAtRef.current >= pinchHoldMs && now - lastClickAtRef.current > cooldownMs) {
+
+    if (
+      isPinching &&
+      canTriggerClick &&
+      !pinchTriggeredRef.current &&
+      now - pinchStartedAtRef.current >= pinchHoldMs &&
+      now - lastClickAtRef.current > cooldownMs
+    ) {
       triggerGestureClick(x, y);
       lastClickAtRef.current = now;
       pinchTriggeredRef.current = true;
@@ -227,32 +269,45 @@ const UserKiosk: React.FC = () => {
     pinchActiveRef.current = isPinching;
   }, [findScrollableElement, triggerGestureClick]);
 
-  const cleanNumber = (val: any) => {
+  function cleanNumber(val: any) {
     if (val === undefined || val === null || val === '') return 0;
     if (typeof val === 'number') return val;
+
     const cleaned = String(val).replace(/[^0-9.-]/g, '');
     return parseFloat(cleaned) || 0;
-  };
+  }
 
   const normalizeData = (dataArray: any[]) => {
     if (!dataArray || !Array.isArray(dataArray)) return [];
+
     return dataArray.map((item) => {
       const normalized: any = {};
+
       Object.keys(item).forEach((key) => {
         const cleanKey = key.toLowerCase().trim();
         normalized[cleanKey] = item[key];
       });
+
       return normalized;
     });
   };
 
+  const calculatePotentialPoints = useCallback((items: CartItem[]) => {
+    return items.reduce(
+      (acc: number, item: CartItem) => acc + ((item.cashbackReward || 0) * item.quantity),
+      0
+    );
+  }, []);
+
   const refreshKioskData = async () => {
     setIsLoading(true);
+
     try {
       const rawData = await fetchFromSheet('initKiosk');
 
       if (rawData.products) {
         const normalizedProducts = normalizeData(rawData.products);
+
         const formattedProducts = normalizedProducts.map((p: any) => {
           const name = p.name || p.nama || p['nama produk'] || 'Menu Tanpa Nama';
           const price = p.price || p.harga || p['harga jual'] || 0;
@@ -278,12 +333,15 @@ const UserKiosk: React.FC = () => {
 
         setProducts(formattedProducts);
 
-        let finalCategories = [];
+        let finalCategories: any[] = [];
+
         if (rawData.categories && rawData.categories.length > 0) {
           const normalizedCats = normalizeData(rawData.categories);
+
           finalCategories = normalizedCats.map((c: any) => {
             const catId = String(c.id || c.name || c.kategori || '').toLowerCase().trim();
             const fallback = FALLBACK_CATEGORIES.find((f) => f.id.toLowerCase() === catId);
+
             return {
               id: catId,
               name: String(c.name || c.nama || c.id),
@@ -297,10 +355,12 @@ const UserKiosk: React.FC = () => {
         if (!finalCategories.find((c: any) => c.id === 'all')) {
           finalCategories.splice(1, 0, { id: 'all', name: 'Semua Menu', icon: '◉' });
         }
+
         setCategories(finalCategories);
 
         if (rawData.vouchers) {
           const normalizedVouchers = normalizeData(rawData.vouchers);
+
           setVouchers(normalizedVouchers.map((v: any) => ({
             id: String(v.id || v.kode),
             title: String(v.title || v.nama || v.judul),
@@ -321,26 +381,63 @@ const UserKiosk: React.FC = () => {
     refreshKioskData();
   }, []);
 
-  const subtotal = useMemo(() => cart.reduce((acc, item) => acc + (item.price * item.quantity), 0), [cart]);
+  const subtotal = useMemo(() => {
+    return cart.reduce((acc: number, item: CartItem) => acc + (item.price * item.quantity), 0);
+  }, [cart]);
+
   const voucherDiscount = useMemo(() => {
     if (!appliedVoucher) return 0;
-    return appliedVoucher.type === 'PERCENT' ? subtotal * (appliedVoucher.discount / 100) : appliedVoucher.discount;
+
+    return appliedVoucher.type === 'PERCENT'
+      ? subtotal * (appliedVoucher.discount / 100)
+      : appliedVoucher.discount;
   }, [appliedVoucher, subtotal]);
 
   const koinDiscount = useMemo(() => {
     if (!useKoin || !member) return 0;
-    return Math.min(member.points || 0, subtotal - voucherDiscount);
+
+    return Math.min(getMemberPoints(member), subtotal - voucherDiscount);
   }, [useKoin, member, subtotal, voucherDiscount]);
 
   const total = Math.max(0, subtotal - (voucherDiscount + koinDiscount));
 
+  const handleAddToCart = (p: Product) => {
+    setCart((prev: CartItem[]) => {
+      const ex = prev.find((i: CartItem) => i.id === p.id);
+
+      return ex
+        ? prev.map((i: CartItem) =>
+          i.id === p.id
+            ? { ...i, quantity: i.quantity + 1 }
+            : i
+        )
+        : [...prev, { ...p, quantity: 1 }];
+    });
+  };
+
+  const handleUpdateQty = (id: string, delta: number) => {
+    setCart((prev: CartItem[]) => {
+      const updated = prev.map((i: CartItem) =>
+        i.id === id
+          ? { ...i, quantity: i.quantity + delta }
+          : i
+      );
+
+      return updated.filter((i: CartItem) => i.quantity > 0);
+    });
+  };
+
+  const handleRemoveItem = (id: string) => {
+    setCart((prev: CartItem[]) => prev.filter((i: CartItem) => i.id !== id));
+  };
+
   const handleCompleteOrder = async (method: PaymentMethod) => {
-    const pointsEarned = cart.reduce((acc, item) => acc + ((item.cashbackReward || 0) * item.quantity), 0);
+    const pointsEarned = calculatePotentialPoints(cart);
 
     const payload = {
       action: 'submitOrder',
       order: {
-        orderId: orderId,
+        orderId,
         service: serviceType,
         subtotal,
         discount: voucherDiscount + koinDiscount,
@@ -361,6 +458,7 @@ const UserKiosk: React.FC = () => {
 
     try {
       const response = await fetchFromSheet('submitOrder', payload);
+
       if (!response?.success) {
         console.error('Gagal submit order ke backend:', response?.error || response);
         return;
@@ -385,11 +483,26 @@ const UserKiosk: React.FC = () => {
     refreshKioskData();
   };
 
+  const buildMemberData = (u: any): Member => {
+    const pointValue = getMemberPoints(u);
+
+    return {
+      code: String(u.user_id),
+      name: String(u.username || 'Member'),
+      points: pointValue,
+      cashbackPoints: pointValue,
+      vouchers,
+      isAffiliate: String(u.affiliate || '').toUpperCase() === 'YES',
+    };
+  };
+
   if (isLoading && products.length === 0) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-white">
-        <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">Menyiapkan Menu...</p>
+        <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">
+          Menyiapkan Menu...
+        </p>
       </div>
     );
   }
@@ -415,48 +528,49 @@ const UserKiosk: React.FC = () => {
           }}
         >
           <div
-            className={`w-4 h-4 rounded-full border-2 border-white shadow-[0_0_20px_rgba(249,115,22,0.7)] ${virtualCursor.pinching ? 'bg-emerald-500/90 scale-125' : 'bg-orange-500/80'}`}
+            className={`w-4 h-4 rounded-full border-2 border-white shadow-[0_0_20px_rgba(249,115,22,0.7)] ${
+              virtualCursor.pinching ? 'bg-emerald-500/90 scale-125' : 'bg-orange-500/80'
+            }`}
           />
         </div>
       )}
 
       <div className="flex-1 overflow-auto">
-        {currentScreen === Screen.WELCOME && <WelcomeScreen 
-  onStart={() => setCurrentScreen(Screen.SERVICE_TYPE)}
-  onToggleGesture={() => setHandTrackingEnabled(prev => !prev)}
-  handTrackingEnabled={handTrackingEnabled}
-/>}
+        {currentScreen === Screen.WELCOME && (
+          <WelcomeScreen
+            onStart={() => setCurrentScreen(Screen.SERVICE_TYPE)}
+            onToggleGesture={() => setHandTrackingEnabled((prev) => !prev)}
+            handTrackingEnabled={handTrackingEnabled}
+          />
+        )}
+
         {currentScreen === Screen.SERVICE_TYPE && (
           <ServiceTypeScreen
-            onSelect={(type) => {
+            onSelect={(type: ServiceType) => {
               setServiceType(type);
               setCurrentScreen(Screen.MENU);
             }}
             onBack={() => setCurrentScreen(Screen.WELCOME)}
           />
         )}
+
         {currentScreen === Screen.MENU && (
           <MenuScreen
             products={products}
             categories={categories}
             cart={cart}
             member={member}
-            potentialPoints={cart.reduce((acc, item) => acc + ((item.cashbackReward || 0) * item.quantity), 0)}
-            onAddToCart={(p) => setCart((prev) => {
-              const ex = prev.find((i) => i.id === p.id);
-              return ex ? prev.map((i) => i.id === p.id ? { ...i, quantity: i.quantity + 1 } : i) : [...prev, { ...p, quantity: 1 }];
-            })}
-            onUpdateQty={(id, delta) => setCart((prev) => {
-              const updated = prev.map((i) => i.id === id ? { ...i, quantity: i.quantity + delta } : i);
-              return updated.filter((i) => i.quantity > 0);
-            })}
-            onRemove={(id) => setCart((prev) => prev.filter((i) => i.id !== id))}
+            potentialPoints={calculatePotentialPoints(cart)}
+            onAddToCart={handleAddToCart}
+            onUpdateQty={handleUpdateQty}
+            onRemove={handleRemoveItem}
             onClearCart={() => setCart([])}
             onOpenCart={() => setCurrentScreen(Screen.CART)}
             onBack={() => setCurrentScreen(Screen.SERVICE_TYPE)}
             total={total}
           />
         )}
+
         {currentScreen === Screen.CART && (
           <CartScreen
             cart={cart}
@@ -466,33 +580,39 @@ const UserKiosk: React.FC = () => {
             member={member}
             useKoin={useKoin}
             onToggleKoin={() => setUseKoin(!useKoin)}
-            potentialPoints={cart.reduce((acc, item) => acc + ((item.cashbackReward || 0) * item.quantity), 0)}
+            potentialPoints={calculatePotentialPoints(cart)}
             onRemoveMember={() => setMember(null)}
             appliedVoucher={appliedVoucher}
-            onUpdateQty={(id, delta) => setCart((prev) => {
-              const updated = prev.map((i) => i.id === id ? { ...i, quantity: i.quantity + delta } : i);
-              return updated.filter((i) => i.quantity > 0);
-            })}
-            onRemove={(id) => setCart((prev) => prev.filter((i) => i.id !== id))}
+            onUpdateQty={handleUpdateQty}
+            onRemove={handleRemoveItem}
             onScanMember={() => setCurrentScreen(Screen.SCANNER)}
             onSelectCashback={() => setCurrentScreen(Screen.MEMBER_BENEFITS)}
             onBack={() => setCurrentScreen(Screen.MENU)}
-            onCheckout={(m) => m === PaymentMethod.QRIS ? setCurrentScreen(Screen.QRIS) : setCurrentScreen(Screen.CASH)}
+            onCheckout={(m: PaymentMethod) =>
+              m === PaymentMethod.QRIS
+                ? setCurrentScreen(Screen.QRIS)
+                : setCurrentScreen(Screen.CASH)
+            }
           />
         )}
+
         {currentScreen === Screen.SCANNER && (
           <ScannerScreen
             validateUrl="/api/kiosk/members/qr-lookup"
-            onScanSuccess={async (code) => {
+            onScanSuccess={async (code: string) => {
               let userId: string | undefined;
+
               try {
                 const trimmed = String(code).trim();
                 const firstBrace = trimmed.indexOf('{');
                 const lastBrace = trimmed.lastIndexOf('}');
+
                 if (firstBrace >= 0 && lastBrace > firstBrace) {
                   const jsonStr = trimmed.slice(firstBrace, lastBrace + 1);
                   const parsed = JSON.parse(jsonStr);
+
                   userId = parsed.user_id || parsed.userId || undefined;
+
                   if (!userId && parsed.user && parsed.user.id) {
                     userId = String(parsed.user.id);
                   }
@@ -503,26 +623,18 @@ const UserKiosk: React.FC = () => {
 
               try {
                 let data: any;
+
                 if (userId && userId.length >= 3) {
-                  const response = await fetchFromSheet('getMemberByUserId', { user_id: userId });
-                  data = response;
+                  data = await fetchFromSheet('getMemberByUserId', { user_id: userId });
                 } else {
-                  const response = await fetchFromSheet('lookupMemberByQr', { code: String(code) });
-                  data = response;
+                  data = await fetchFromSheet('lookupMemberByQr', { code: String(code) });
                 }
 
                 console.log('[QR-LOOKUP] fetchFromSheet response:', data);
 
                 if (data?.success && data?.user_id && data?.username) {
-                  const u = data;
-                  const memberData = {
-                    code: String(u.user_id),
-                    name: String(u.username || 'Member'),
-                    points: Number(u.total_points || 0),
-                    cashbackPoints: Number(u.cashback_points || 0),
-                    vouchers,
-                    isAffiliate: String(u.affiliate || '').toUpperCase() === 'YES',
-                  };
+                  const memberData = buildMemberData(data);
+
                   console.log('[QR-LOOKUP] Member data set:', memberData);
                   setMember(memberData);
                 } else {
@@ -530,26 +642,24 @@ const UserKiosk: React.FC = () => {
                 }
               } catch (fetchError) {
                 console.error('[QR-LOOKUP] fetchFromSheet error:', fetchError);
+
                 try {
                   const base = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000').replace(/\/$/, '');
                   const fallbackCode = userId || String(code);
+
                   const fallback = await fetch(`${base}/api/kiosk/members/qr-lookup`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ code: fallbackCode }),
                   });
+
                   const fallbackData = await fallback.json().catch(() => ({}));
+
                   console.log('[QR-LOOKUP] fallback API response:', fallbackData);
+
                   if (fallbackData?.success && fallbackData?.user_id) {
-                    const u = fallbackData;
-                    const memberData = {
-                      code: String(u.user_id),
-                      name: String(u.username || 'Member'),
-                      points: Number(u.total_points || 0),
-                      cashbackPoints: Number(u.cashback_points || 0),
-                      vouchers,
-                      isAffiliate: String(u.affiliate || '').toUpperCase() === 'YES',
-                    };
+                    const memberData = buildMemberData(fallbackData);
+
                     console.log('[QR-LOOKUP] Member data set (fallback):', memberData);
                     setMember(memberData);
                   } else {
@@ -560,17 +670,19 @@ const UserKiosk: React.FC = () => {
                   setMember(null);
                 }
               }
+
               setCurrentScreen(Screen.CART);
             }}
             onBack={() => setCurrentScreen(Screen.CART)}
           />
         )}
+
         {currentScreen === Screen.MEMBER_BENEFITS && (
           <MemberBenefitsScreen
             member={member}
             cart={cart}
             vouchers={vouchers}
-            onSelectVoucher={(v) => {
+            onSelectVoucher={(v: Voucher) => {
               setAppliedVoucher(v);
               setCurrentScreen(Screen.CART);
             }}
@@ -578,6 +690,7 @@ const UserKiosk: React.FC = () => {
             onContinue={() => setCurrentScreen(Screen.CART)}
           />
         )}
+
         {currentScreen === Screen.QRIS && (
           <QRISScreen
             total={total}
@@ -585,12 +698,14 @@ const UserKiosk: React.FC = () => {
             onBack={() => setCurrentScreen(Screen.CART)}
           />
         )}
+
         {currentScreen === Screen.CASH && (
           <CashScreen
             onComplete={() => handleCompleteOrder(PaymentMethod.CASH)}
             onBack={() => setCurrentScreen(Screen.CART)}
           />
         )}
+
         {currentScreen === Screen.SUCCESS && (
           <SuccessScreen
             orderId={orderId}

@@ -13,6 +13,7 @@ import {
   getHubDataAdmin,
   getPointLogs,
   getTransactionDetail,
+  getTransactionHistory,
   getUserProfile,
   lookupMember,
   login,
@@ -54,6 +55,7 @@ router.post('/redeem-points', redeemPoints);
 router.get('/point-logs/:user_id', getPointLogs);
 router.post('/transactions', createTransaction);
 router.get('/transactions/:transaction_code', getTransactionDetail);
+router.get('/transactions/history/:user_id', requireMembershipJwt, requireSelfMembershipAccess, getTransactionHistory);
 router.post('/gamification/earn-points', earnPoints);
 
 export default router;

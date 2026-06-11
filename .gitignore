@@ -24,3 +24,50 @@ npm-debug.log*
 .vscode/
 .idea/
 .DS_Store
+
+# Build output apps
+apps/frontend/apps/admin-app/dist/
+apps/frontend/apps/user-app/dist/
+
+# Nested node_modules
+apps/frontend/apps/admin-app/node_modules/
+apps/frontend/apps/user-app/node_modules/
+
+# Upload files
+apps/backend/uploads/*
+!apps/backend/uploads/.gitkeep
+apps/backend/apps/backend/uploads/
+
+# Backup / old generated folders
+apps/frontend/_src_backup_old/
+
+# dependencies
+node_modules/
+.kilo/node_modules/
+.kilo/
+
+# build
+dist/
+apps/frontend/apps/admin-app/dist/
+apps/frontend/apps/user-app/dist/
+
+# env
+.env
+.env.*
+apps/backend/.env*
+apps/frontend/.env*
+
+# uploads
+apps/backend/uploads/*
+!apps/backend/uploads/.gitkeep
+apps/backend/apps/
+
+# generated/check files
+struktur.txt
+struktur_bersih.txt
+kiosk_init.json
+kiosk_init_response.json
+login-payload.json
+
+# database backup
+*.sql

@@ -93,6 +93,22 @@ const CartScreen: React.FC<Props> = ({
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>(PaymentMethod.QRIS);
 
+  const memberPoints = useMemo(() => {
+    const m = member as any;
+
+    return Number(
+      m?.cashbackPoints ??
+      m?.points ??
+      m?.point ??
+      m?.saldo_point ??
+      m?.saldoPoint ??
+      m?.total_point ??
+      m?.totalPoint ??
+      m?.reward_points ??
+      0
+    );
+  }, [member]);
+
   const voucherDiscountAmount = useMemo(() => {
     if (!appliedVoucher) return 0;
     if (appliedVoucher.type === 'PERCENT') {
@@ -104,14 +120,14 @@ const CartScreen: React.FC<Props> = ({
   const koinDiscountAmount = useMemo(() => {
     if (!useKoin || !member) return 0;
     const maxRedeemable = subtotal - voucherDiscountAmount;
-    return Math.min(member.cashbackPoints, maxRedeemable);
-  }, [useKoin, member, subtotal, voucherDiscountAmount]);
+    return Math.min(memberPoints, maxRedeemable);
+  }, [useKoin, member, memberPoints, subtotal, voucherDiscountAmount]);
 
   const finalTotal = Math.max(0, subtotal - voucherDiscountAmount - koinDiscountAmount);
 
   return (
     <div className="w-full h-full min-h-screen bg-[#fbf7f2] text-slate-950 overflow-hidden">
-      <header className="h-[72px] px-7 flex items-center justify-between bg-[#fbf7f2]">
+      <header className="h-18 px-7 flex items-center justify-between bg-[#fbf7f2]">
         <div className="flex items-center gap-4">
           <button
             onClick={onBack}
@@ -159,7 +175,7 @@ const CartScreen: React.FC<Props> = ({
                       className="flex items-center gap-4 rounded-2xl bg-[#fffaf5] border border-orange-50 p-4"
                     >
                       <img
-                        src={item.image || PLACEHOLDER_IMAGE}
+                        src={resolveImageSource(item.image)}
                         alt={item.name}
                         className="w-20 h-20 rounded-2xl object-cover bg-orange-50"
                         onError={(e) => {
@@ -206,7 +222,7 @@ const CartScreen: React.FC<Props> = ({
 
                       <div className="text-right flex flex-col items-end justify-between self-stretch">
                         <p className="text-orange-500 text-sm font-black">
-                          Rp {(item.price * item.quantity).toLocaleString()}
+                          Rp {(item.price * item.quantity).toLocaleString('id-ID')}
                         </p>
 
                         <button
@@ -232,7 +248,7 @@ const CartScreen: React.FC<Props> = ({
                 </div>
 
                 <h2 className="text-3xl font-black text-orange-500">
-                  {member ? member.cashbackPoints.toLocaleString() : '0'}
+                  {member ? memberPoints.toLocaleString('id-ID') : '0'}
                 </h2>
 
                 <div className="mt-5 flex items-center justify-between">
@@ -241,11 +257,11 @@ const CartScreen: React.FC<Props> = ({
                   </p>
 
                   <button
-                    onClick={() => member && onToggleKoin()}
-                    disabled={!member || member.cashbackPoints === 0}
+                    onClick={() => member && memberPoints > 0 && onToggleKoin()}
+                    disabled={!member || memberPoints <= 0}
                     className={`w-12 h-7 rounded-full relative transition ${
                       useKoin ? 'bg-orange-500' : 'bg-slate-200'
-                    }`}
+                    } ${!member || memberPoints <= 0 ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     <span
                       className={`absolute top-1 w-5 h-5 bg-white rounded-full transition shadow-sm ${
@@ -264,7 +280,7 @@ const CartScreen: React.FC<Props> = ({
                 <div className="grid grid-cols-2 gap-4">
                   <button
                     onClick={() => setSelectedMethod(PaymentMethod.QRIS)}
-                    className={`h-[92px] rounded-2xl border-2 flex flex-col items-center justify-center gap-2 relative transition ${
+                    className={`h-23 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 relative transition ${
                       selectedMethod === PaymentMethod.QRIS
                         ? 'border-orange-500 bg-orange-50 text-orange-500'
                         : 'border-slate-100 bg-white text-slate-300'
@@ -283,7 +299,7 @@ const CartScreen: React.FC<Props> = ({
 
                   <button
                     onClick={() => setSelectedMethod(PaymentMethod.CASH)}
-                    className={`h-[92px] rounded-2xl border-2 flex flex-col items-center justify-center gap-2 relative transition ${
+                    className={`h-23 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 relative transition ${
                       selectedMethod === PaymentMethod.CASH
                         ? 'border-orange-500 bg-orange-50 text-orange-500'
                         : 'border-slate-100 bg-white text-slate-300'
@@ -325,7 +341,7 @@ const CartScreen: React.FC<Props> = ({
           </div>
         </section>
 
-        <aside className="w-[360px] bg-white rounded-[28px] shadow-sm border border-orange-100 flex flex-col overflow-hidden">
+        <aside className="w-90 bg-white rounded-[28px] shadow-sm border border-orange-100 flex flex-col overflow-hidden">
           <div className="p-7 border-b border-orange-50">
             <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-4">
               Promosi
@@ -364,12 +380,12 @@ const CartScreen: React.FC<Props> = ({
           <div className="flex-1 p-7 space-y-4">
             <div className="flex justify-between text-[11px] font-black uppercase">
               <span className="text-slate-400">Subtotal</span>
-              <span>Rp {subtotal.toLocaleString()}</span>
+              <span>Rp {subtotal.toLocaleString('id-ID')}</span>
             </div>
 
             <div className="flex justify-between text-[11px] font-black uppercase">
               <span className="text-slate-400">Diskon</span>
-              <span>Rp {voucherDiscountAmount.toLocaleString()}</span>
+              <span>Rp {voucherDiscountAmount.toLocaleString('id-ID')}</span>
             </div>
 
             <div className="flex justify-between text-[11px] font-black uppercase">
@@ -380,7 +396,7 @@ const CartScreen: React.FC<Props> = ({
             {koinDiscountAmount > 0 && (
               <div className="flex justify-between text-[11px] font-black uppercase text-emerald-500">
                 <span>Koin</span>
-                <span>- Rp {koinDiscountAmount.toLocaleString()}</span>
+                <span>- Rp {koinDiscountAmount.toLocaleString('id-ID')}</span>
               </div>
             )}
 
@@ -389,7 +405,7 @@ const CartScreen: React.FC<Props> = ({
                 Total Akhir
               </p>
               <h2 className="text-[2.35rem] leading-none font-black text-orange-500 mt-3">
-                Rp {finalTotal.toLocaleString()}
+                Rp {finalTotal.toLocaleString('id-ID')}
               </h2>
             </div>
           </div>

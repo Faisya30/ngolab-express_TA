@@ -84,7 +84,10 @@ export async function getOrders(req, res) {
             discount,
             total,
             payment_method AS payment,
-            COALESCE(order_type, 'kiosk') AS orderType
+            COALESCE(order_type, 'kiosk') AS orderType,
+            COALESCE(tipe_pelanggan, 'guest') AS tipePelanggan,
+            COALESCE(nama_pelanggan, '') AS namaPelanggan,
+            COALESCE(user_id, '') AS userId
           FROM orders
           ORDER BY created_at DESC`
         : requestProductType === 'cv'
@@ -96,7 +99,10 @@ export async function getOrders(req, res) {
               discount,
               total,
               payment_method AS payment,
-              COALESCE(order_type, 'computervision') AS orderType
+              COALESCE(order_type, 'computervision') AS orderType,
+              COALESCE(tipe_pelanggan, 'guest') AS tipePelanggan,
+              COALESCE(nama_pelanggan, '') AS namaPelanggan,
+              COALESCE(user_id, '') AS userId
             FROM orders
             WHERE order_type IN ('cv', 'computervision')
             ORDER BY created_at DESC`
@@ -108,7 +114,10 @@ export async function getOrders(req, res) {
               discount,
               total,
               payment_method AS payment,
-              COALESCE(order_type, 'kiosk') AS orderType
+              COALESCE(order_type, 'kiosk') AS orderType,
+              COALESCE(tipe_pelanggan, 'guest') AS tipePelanggan,
+              COALESCE(nama_pelanggan, '') AS namaPelanggan,
+              COALESCE(user_id, '') AS userId
             FROM orders
             WHERE order_type = ?
             ORDER BY created_at DESC`,

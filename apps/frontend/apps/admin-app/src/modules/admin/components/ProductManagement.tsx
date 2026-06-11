@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Product, Category } from '../../../types';
 import { fetchFromSheet } from '@ngolab/shared-lib';
@@ -6,11 +5,22 @@ import { ProductType } from '../utils/productScope';
 
 const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
 
+type ProductWithType = Product & {
+  product_type?: 'kiosk' | 'cv' | string;
+};
+
+type CategoryWithType = Category & {
+  product_type?: 'kiosk' | 'cv' | 'all' | string;
+  productType?: 'kiosk' | 'cv' | 'all' | string;
+};
+
 function getImageUrl(imagePath: string | null | undefined): string {
   if (!imagePath) return '/images/no-image.svg';
+
   if (imagePath.startsWith('/uploads/')) {
     return `${BACKEND_URL}${imagePath}`;
   }
+
   return imagePath || '/images/no-image.svg';
 }
 
@@ -21,37 +31,59 @@ interface Props {
   adminProductType: ProductType | null;
 }
 
-const ProductManagement: React.FC<Props> = ({ initialProducts, categories, onUpdate, adminProductType }) => {
-  const [products, setProducts] = useState<Product[]>(initialProducts);
+const ProductManagement: React.FC<Props> = ({
+  initialProducts,
+  categories,
+  onUpdate,
+  adminProductType,
+}) => {
+  const [products, setProducts] = useState<ProductWithType[]>(initialProducts as ProductWithType[]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingProduct, setEditingProduct] = useState<ProductWithType | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [selectedProductType, setSelectedProductType] = useState<'kiosk' | 'cv'>('kiosk');
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
-  
+
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-const compressImage = (file: File, maxWidth = 1280, quality = 0.8): Promise<File> => {
+  const getCategoryName = (categoryValue: string | number | undefined | null): string => {
+    if (!categoryValue) return '';
+
+    const foundCategory = categories.find((cat) => {
+      const c = cat as CategoryWithType;
+      return String(c.id) === String(categoryValue) || String(c.name) === String(categoryValue);
+    });
+
+    return foundCategory?.name || String(categoryValue);
+  };
+
+  const compressImage = (file: File, maxWidth = 1280, quality = 0.8): Promise<File> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
+
       reader.onerror = () => reject(new Error('Gagal membaca file gambar.'));
+
       reader.onload = () => {
         const img = new Image();
+
         img.onerror = () => reject(new Error('Gagal memproses gambar.'));
+
         img.onload = () => {
           const canvas = document.createElement('canvas');
           const ratio = Math.min(1, maxWidth / img.width);
+
           canvas.width = Math.max(1, Math.round(img.width * ratio));
           canvas.height = Math.max(1, Math.round(img.height * ratio));
 
           const ctx = canvas.getContext('2d');
+
           if (!ctx) {
             reject(new Error('Browser tidak mendukung kompresi gambar.'));
             return;
@@ -60,12 +92,14 @@ const compressImage = (file: File, maxWidth = 1280, quality = 0.8): Promise<File
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
           const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+
           canvas.toBlob(
             (blob) => {
               if (!blob) {
                 reject(new Error('Gagal mengompres gambar.'));
                 return;
               }
+
               const compressedFile = new File([blob], file.name, { type: mimeType });
               resolve(compressedFile);
             },
@@ -73,104 +107,105 @@ const compressImage = (file: File, maxWidth = 1280, quality = 0.8): Promise<File
             quality
           );
         };
+
         img.src = reader.result as string;
       };
+
       reader.readAsDataURL(file);
     });
   };
 
   const prepareImageForUpload = async (file: File): Promise<File> => {
     const imageFiles = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!imageFiles.includes(file.type)) {
-      return file;
-    }
-    
+
+    if (!imageFiles.includes(file.type)) return file;
+
     const targetSize = 1024 * 1024;
-    if (file.size <= targetSize) {
-      return file;
-    }
-    
+
+    if (file.size <= targetSize) return file;
+
     return compressImage(file, 1280, 0.85);
-  };
-        img.src = reader.result as string;
-      };
-      reader.readAsDataURL(file);
-    });
   };
 
   const uploadImageToServer = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append('image', file);
 
-    const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || ''}/api/admin/products/upload-image`, {
-      method: 'POST',
-      body: formData,
-    });
+    const response = await fetch(
+      `${import.meta.env.VITE_BACKEND_URL || ''}/api/admin/products/upload-image`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
 
     const result = await response.json();
+
     if (!response.ok || !result.success) {
       throw new Error(result.error || 'Upload gambar gagal');
     }
+
     return result.imageUrl;
   };
 
   useEffect(() => {
-    setProducts(initialProducts);
+    setProducts(initialProducts as ProductWithType[]);
   }, [initialProducts]);
 
   useEffect(() => {
     if (isModalOpen) {
       setImagePreview(editingProduct?.image || null);
-      setSelectedProductType(
-        (String(editingProduct?.product_type || '').toLowerCase() as 'kiosk' | 'cv') ||
+
+      const productType =
+        String(editingProduct?.product_type || '').toLowerCase() ||
         adminProductType ||
-        'kiosk'
-      );
+        'kiosk';
+
+      setSelectedProductType(productType as 'kiosk' | 'cv');
     } else {
       setImagePreview(null);
     }
   }, [isModalOpen, editingProduct, adminProductType]);
 
-  // Filter categories based on product type
   const filteredCategories = useMemo(() => {
     const currentType = selectedProductType || adminProductType || 'kiosk';
-    return categories.filter(c => {
+
+    return categories.filter((cat) => {
+      const c = cat as CategoryWithType;
       const catType = String(c.product_type || c.productType || 'all').toLowerCase();
-      // Show category if it matches product type or is 'all'
+
       return catType === currentType || catType === 'all';
     });
   }, [categories, selectedProductType, adminProductType]);
 
-  // Helper to get category name
-  const getCategoryName = (catId: string) => {
-    if (!catId) return 'NO CATEGORY';
-    const category = categories.find(c => 
-      c.id === catId || 
-      c.name.toLowerCase() === catId.toLowerCase()
-    );
-    return category ? category.name : catId;
-  };
-
-  // Filter Logic
   const filteredProducts = useMemo(() => {
-    return products.filter(p => {
-      const matchSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          p.id.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      // Support both ID and Name matching for legacy data
-      const matchCategory = selectedCategory === 'ALL' || 
-                            p.category === selectedCategory ||
-                            getCategoryName(p.category) === selectedCategory;
-      
+    return products.filter((p) => {
+      const keyword = searchTerm.toLowerCase();
+
+      const matchSearch =
+        p.name.toLowerCase().includes(keyword) ||
+        p.id.toLowerCase().includes(keyword);
+
+      const matchCategory =
+        selectedCategory === 'ALL' ||
+        String(p.category) === String(selectedCategory) ||
+        getCategoryName(p.category) === selectedCategory;
+
       return matchSearch && matchCategory;
     });
   }, [products, searchTerm, selectedCategory, categories]);
 
   const executeDelete = async (id: string) => {
     if (!id) return;
+
     setIsDeleting(true);
+
     try {
-      const result = await fetchFromSheet('deleteRow', { sheetName: 'Products', id: id });
+      const result = await fetchFromSheet('deleteRow', {
+        sheetName: 'Products',
+        id,
+      });
+
       if (result && result.success) {
         onUpdate();
         setConfirmDeleteId(null);
@@ -182,43 +217,67 @@ const compressImage = (file: File, maxWidth = 1280, quality = 0.8): Promise<File
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const maxUploadSize = 5 * 1024 * 1024;
-      if (file.size > maxUploadSize) {
-        setSaveError('Ukuran foto terlalu besar. Gunakan foto di bawah 5MB.');
-        return;
-      }
 
-      setSaveError(null);
-      
-      const objectUrl = URL.createObjectURL(file);
-      setImagePreview(objectUrl);
+    if (!file) return;
 
-      try {
-        const preparedFile = await prepareImageForUpload(file);
-        const imageUrl = await uploadImageToServer(preparedFile);
-        setImagePreview(imageUrl);
-      } catch (error: any) {
-        URL.revokeObjectURL(objectUrl);
-        setImagePreview(editingProduct?.image || null);
-        console.error('[❌ IMAGE UPLOAD ERROR]', error);
-        setSaveError(error.message || 'Gagal mengupload foto. Coba file yang lain.');
-      }
+    const maxUploadSize = 5 * 1024 * 1024;
+
+    if (file.size > maxUploadSize) {
+      setSaveError('Ukuran foto terlalu besar. Gunakan foto di bawah 5MB.');
+      return;
     }
+
+    setSaveError(null);
+
+    const objectUrl = URL.createObjectURL(file);
+    setImagePreview(objectUrl);
+
+    try {
+      const preparedFile = await prepareImageForUpload(file);
+      const imageUrl = await uploadImageToServer(preparedFile);
+      setImagePreview(imageUrl);
+    } catch (error: any) {
+      URL.revokeObjectURL(objectUrl);
+      setImagePreview(editingProduct?.image || null);
+      console.error('[❌ IMAGE UPLOAD ERROR]', error);
+      setSaveError(error.message || 'Gagal mengupload foto. Coba file yang lain.');
+    }
+  };
+
+  const openAddForm = () => {
+    setEditingProduct(null);
+    setSaveError(null);
+    setImagePreview(null);
+    setIsModalOpen(true);
+  };
+
+  const openEditForm = (product: ProductWithType) => {
+    setEditingProduct(product);
+    setSaveError(null);
+    setImagePreview(product.image || null);
+    setIsModalOpen(true);
+  };
+
+  const closeInlineForm = () => {
+    setIsModalOpen(false);
+    setEditingProduct(null);
+    setSaveError(null);
+    setImagePreview(null);
   };
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
     setIsSaving(true);
     setSaveError(null);
 
     const formData = new FormData(e.currentTarget);
     const productId = editingProduct?.id || `PROD-${Date.now()}`;
     const productTypeToSave = adminProductType || selectedProductType;
-    
+
     const productData = {
       id: productId,
-      name: (formData.get('name') as string || '').trim(),
+      name: ((formData.get('name') as string) || '').trim(),
       category: formData.get('category') as string,
       price: Number(formData.get('price')),
       image: imagePreview || '',
@@ -235,11 +294,13 @@ const compressImage = (file: File, maxWidth = 1280, quality = 0.8): Promise<File
     }
 
     try {
-      const result = await fetchFromSheet('saveProduct', { product: productData });
+      const result = await fetchFromSheet('saveProduct', {
+        product: productData,
+      });
+
       console.log('[✅ SAVE RESULT]', result);
-      
+
       if (result && result.success) {
-        // Beri jeda sedikit agar data di spreadsheet sempat terupdate sebelum refresh
         setTimeout(() => {
           onUpdate();
           setIsModalOpen(false);
@@ -257,288 +318,467 @@ const compressImage = (file: File, maxWidth = 1280, quality = 0.8): Promise<File
     }
   };
 
-  return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      {/* Header & Tools Area */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+  const renderInlineForm = (mode: 'add' | 'edit') => (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-5 flex items-center justify-between">
         <div>
-          <h2 className="text-4xl font-black text-slate-800 tracking-tighter uppercase leading-none">Inventory <span className="text-blue-600">Master</span></h2>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-2 flex items-center gap-2">
-            <span className="w-8 h-px bg-slate-200"></span>
-            Kelola Produk & Menu Kiosk
+          <h3 className="text-xl font-black uppercase tracking-tight text-slate-900">
+            {mode === 'edit' ? 'Update' : 'Add New'} <span className="text-blue-600">Product</span>
+          </h3>
+          <p className="mt-1 text-xs font-medium text-slate-500">
+            {mode === 'edit'
+              ? 'Ubah data produk langsung dari daftar inventory'
+              : 'Tambah produk baru ke dalam inventory'}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Search */}
-          <div className="relative group">
-            <input 
-              type="text"
-              placeholder="Cari menu atau ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-12 pr-6 py-3.5 bg-white border border-slate-200 rounded-2xl text-[11px] font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-600/5 focus:border-blue-200 transition-all w-64 shadow-sm"
-            />
-            <svg className="w-4 h-4 absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-          </div>
-
-          {/* Category Filter */}
-          <select 
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-6 py-3.5 bg-white border border-slate-200 rounded-2xl text-[11px] font-black text-slate-600 uppercase tracking-widest outline-none focus:border-blue-200 transition-all shadow-sm appearance-none cursor-pointer"
-          >
-            <option value="ALL">Semua Kategori</option>
-            {filteredCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          
-          <button 
-            onClick={() => { setEditingProduct(null); setIsModalOpen(true); }}
-            className="px-8 py-3.5 bg-slate-900 rounded-2xl text-[11px] font-black text-white hover:bg-blue-600 shadow-xl shadow-slate-900/10 hover:shadow-blue-600/20 transition-all active:scale-95 uppercase tracking-widest flex items-center gap-3"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-            Add Product
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={closeInlineForm}
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black uppercase text-slate-500 transition-all hover:bg-slate-50"
+        >
+          Kembali
+        </button>
       </div>
 
-      {/* Grid Content */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-        {filteredProducts.length === 0 ? (
-          <div className="col-span-full py-32 flex flex-col items-center justify-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100 opacity-60">
-             <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-3xl mb-4">🍽️</div>
-             <p className="text-[12px] font-black text-slate-400 uppercase tracking-[0.2em]">Tidak Ada Produk Ditemukan</p>
-          </div>
-        ) : (
-          filteredProducts.map((p) => (
-            <div key={p.id} className="group bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-blue-600/5 transition-all duration-500 overflow-hidden flex flex-col relative">
-              {/* Product Image Area */}
-              <div className="h-56 overflow-hidden relative bg-slate-50">
-<img 
-                    src={getImageUrl(p.image)} 
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
-                    alt={p.name} 
-                    onError={(e) => { (e.target as HTMLImageElement).src = '/images/no-image.svg'; }}
-                  />
-                
-                {/* Overlay Badges */}
-                <div className="absolute top-5 left-5 flex flex-col gap-2">
-                  <span className="px-4 py-1.5 bg-white/90 backdrop-blur-md rounded-xl text-[9px] font-black text-slate-800 shadow-lg uppercase tracking-widest border border-white/20">
-                    {getCategoryName(p.category)}
-                  </span>
-                  {p.isRecommended && (
-                    <span className="px-4 py-1.5 bg-rose-500 text-white rounded-xl text-[9px] font-black shadow-lg uppercase tracking-widest flex items-center gap-2">
-                      <span className="animate-pulse">★</span> Recommended
-                    </span>
-                  )}
-                </div>
+      {saveError && (
+        <div className="mb-5 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-[11px] font-bold uppercase tracking-wider text-rose-500">
+          {saveError}
+        </div>
+      )}
 
-                {/* Floating Price Tag */}
-                <div className="absolute bottom-5 right-5 px-5 py-2.5 bg-slate-900 text-white rounded-2xl shadow-xl transform translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
-                  <p className="text-[13px] font-black tracking-tight">Rp {Number(p.price).toLocaleString()}</p>
+      <form onSubmit={handleSave} className="space-y-5">
+        <input name="id" hidden defaultValue={editingProduct?.id} />
+
+        <div className="mb-5 flex items-center gap-4 rounded-2xl bg-slate-50 p-4">
+          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-white">
+            <img
+              src={getImageUrl(imagePreview || editingProduct?.image)}
+              alt="Product"
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/images/no-image.svg';
+              }}
+            />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="mb-1 flex items-center gap-3">
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase text-emerald-500">
+                Active
+              </span>
+              <p className="truncate text-[10px] font-black uppercase tracking-wider text-slate-400">
+                {editingProduct?.id || 'Produk Baru'}
+              </p>
+            </div>
+
+            <h4 className="truncate text-base font-black uppercase text-slate-900">
+              {editingProduct?.name || 'Produk Baru'}
+            </h4>
+            <p className="mt-1 text-sm font-medium text-slate-500">
+              {editingProduct?.description || 'Lengkapi data produk baru.'}
+            </p>
+          </div>
+
+          <div className="hidden items-center gap-3 lg:flex">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-500">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400">Kategori</p>
+              <p className="text-xs font-black uppercase text-slate-900">
+                {getCategoryName(editingProduct?.category) || '-'}
+              </p>
+            </div>
+          </div>
+
+          <div className="hidden items-center gap-3 xl:flex">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-500">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 12v-2" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400">Price</p>
+              <p className="text-xs font-black text-slate-900">
+                Rp {Number(editingProduct?.price || 0).toLocaleString()}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_220px_1fr]">
+          <div className="space-y-4">
+            <div>
+              <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
+                Tipe Produk
+              </label>
+
+              {adminProductType ? (
+                <div className="flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 text-xs font-black uppercase text-slate-700">
+                  {adminProductType.toUpperCase()}
                 </div>
+              ) : (
+                <select
+                  value={selectedProductType}
+                  onChange={(event) =>
+                    setSelectedProductType(event.target.value as 'kiosk' | 'cv')
+                  }
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-xs font-black uppercase text-slate-700 outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-600/10"
+                >
+                  <option value="kiosk">KIOSK</option>
+                  <option value="cv">CV</option>
+                </select>
+              )}
+            </div>
+
+            <div>
+              <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
+                Nama Produk
+              </label>
+              <input
+                name="name"
+                required
+                defaultValue={editingProduct?.name}
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-600/10"
+                placeholder="Masukkan nama produk"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Kategori
+                </label>
+                <select
+                  name="category"
+                  required
+                  defaultValue={
+                    filteredCategories.find(
+                      (c) =>
+                        String(c.id) === String(editingProduct?.category) ||
+                        String(c.name) === String(editingProduct?.category)
+                    )?.id ||
+                    editingProduct?.category ||
+                    ''
+                  }
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-xs font-black uppercase text-slate-700 outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-600/10"
+                >
+                  {filteredCategories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {/* Product Info */}
-              <div className="p-8 flex-1 flex flex-col">
-                <div className="mb-6">
-                  <div className="flex justify-between items-start">
-                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.3em] mb-1">{p.id}</p>
-                    {p.cashbackReward > 0 && (
-                      <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 uppercase tracking-widest">
-                        +{p.cashbackReward} Pts
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter leading-tight group-hover:text-blue-600 transition-colors">{p.name}</h3>
-                  <p className="text-[11px] text-slate-400 font-medium mt-2 line-clamp-2 leading-relaxed">
-                    {p.description || 'Tidak ada deskripsi tersedia untuk produk ini.'}
-                  </p>
-                </div>
-                
-                <div className="mt-auto pt-6 border-t border-slate-50 flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Price Tag</p>
-                    <p className="text-lg font-black text-slate-900 tracking-tight">Rp {Number(p.price).toLocaleString()}</p>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => { setEditingProduct(p); setIsModalOpen(true); }} 
-                      className="w-11 h-11 flex items-center justify-center bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all border border-slate-100"
-                    >
-                      <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                    </button>
-                    
-                    {confirmDeleteId === p.id ? (
-                      <div className="flex gap-1 animate-in slide-in-from-right-1 duration-200">
-                         <button onClick={() => executeDelete(p.id)} className="px-4 bg-rose-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 shadow-lg shadow-rose-200">{isDeleting ? '...' : 'OK'}</button>
-                         <button onClick={() => setConfirmDeleteId(null)} className="px-4 bg-slate-100 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest">NO</button>
-                      </div>
-                    ) : (
-                      <button 
-                        onClick={() => setConfirmDeleteId(p.id)} 
-                        className="w-11 h-11 flex items-center justify-center bg-slate-50 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-2xl transition-all border border-slate-100"
-                      >
-                        <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
-                    )}
-                  </div>
-                </div>
+              <div>
+                <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Harga
+                </label>
+                <input
+                  name="price"
+                  type="number"
+                  required
+                  defaultValue={editingProduct?.price}
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-blue-600 outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-600/10"
+                  placeholder="0"
+                />
               </div>
             </div>
-          ))
+
+            <div>
+              <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
+                Poin Cashback
+              </label>
+              <input
+                name="cashbackReward"
+                type="number"
+                defaultValue={editingProduct?.cashbackReward || 0}
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-emerald-600 outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-600/10"
+                placeholder="0"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
+              Product Visual
+            </label>
+
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-57.5 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 transition-all hover:border-blue-300"
+            >
+              {imagePreview ? (
+                <img src={getImageUrl(imagePreview)} alt="Preview" className="h-full w-full object-cover" />
+              ) : (
+                <>
+                  <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                    <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 16l4-4a3 3 0 014 0l1 1 2-2a3 3 0 014 0l1 1M4 6h16M4 6v12h16V6" />
+                    </svg>
+                  </div>
+                  <p className="text-xs font-black text-slate-500">
+                    Upload foto produk
+                  </p>
+                  <p className="mt-1 text-[10px] font-medium text-slate-400">
+                    PNG, JPG maks. 2MB
+                  </p>
+                </>
+              )}
+            </div>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageChange}
+              accept="image/*"
+              className="hidden"
+            />
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="mt-3 w-full rounded-xl bg-blue-50 py-3 text-[10px] font-black uppercase tracking-wider text-blue-600"
+            >
+              Ganti foto produk
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
+                Deskripsi Produk
+              </label>
+              <textarea
+                name="description"
+                rows={8}
+                defaultValue={editingProduct?.description}
+                className="h-57.5 w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600 outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-600/10"
+                placeholder="Tuliskan detail produk di sini..."
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                name="isRecommended"
+                id={`isRec-${editingProduct?.id || 'new'}`}
+                defaultChecked={editingProduct?.isRecommended}
+                className="h-4 w-4"
+              />
+              <label
+                htmlFor={`isRec-${editingProduct?.id || 'new'}`}
+                className="text-xs font-bold text-slate-500"
+              >
+                Tandai sebagai rekomendasi
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+          <button
+            type="button"
+            onClick={closeInlineForm}
+            className="rounded-xl bg-slate-100 px-7 py-3 text-xs font-black uppercase tracking-wider text-slate-500 transition-all hover:bg-slate-200"
+          >
+            Batal
+          </button>
+
+          <button
+            type="submit"
+            disabled={isSaving}
+            className="rounded-xl bg-blue-600 px-8 py-3 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700 active:scale-[0.98] disabled:opacity-70"
+          >
+            {isSaving
+              ? 'Memproses...'
+              : mode === 'edit'
+              ? 'Simpan Perubahan'
+              : 'Simpan Produk'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+          <h2 className="text-3xl font-black uppercase tracking-tight text-slate-900">
+            Inventory <span className="text-blue-600">Master</span>
+          </h2>
+          <p className="mt-1 text-sm font-medium text-slate-500">
+            Kelola produk & menu kiosk dengan lebih mudah
+          </p>
+          <div className="mt-3 h-1 w-12 rounded-full bg-blue-600" />
+        </div>
+
+        <button
+          onClick={openAddForm}
+          className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-6 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700 active:scale-95"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" />
+          </svg>
+          Add New Product
+        </button>
+      </div>
+
+      {!isModalOpen && (
+        <button
+          onClick={openAddForm}
+          className="flex w-full items-center justify-between overflow-hidden rounded-2xl border border-dashed border-blue-300 bg-blue-50/30 p-4 text-left transition-all hover:border-blue-400 hover:bg-blue-50"
+        >
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500">
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-black text-slate-900">
+                Tambah produk baru
+              </h3>
+              <p className="mt-1 text-xs font-medium text-slate-500">
+                Buat dan kelola produk menu terminal dengan mudah.
+              </p>
+            </div>
+          </div>
+
+          <span className="hidden rounded-xl border border-blue-200 bg-white px-5 py-2 text-xs font-black uppercase text-blue-600 md:inline-flex">
+            Add New Product
+          </span>
+        </button>
+      )}
+
+      {isModalOpen && !editingProduct && renderInlineForm('add')}
+
+      <div className="space-y-3">
+        {filteredProducts.length === 0 ? (
+          <div className="flex min-h-75 flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 bg-white">
+            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-slate-50 text-3xl">
+              🍽️
+            </div>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">
+              Tidak Ada Produk Ditemukan
+            </p>
+          </div>
+        ) : (
+          filteredProducts.map((p) => {
+            const isEditing = editingProduct?.id === p.id && isModalOpen;
+
+            return (
+              <React.Fragment key={p.id}>
+                {isEditing ? (
+                  renderInlineForm('edit')
+                ) : (
+                  <div className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
+                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-slate-50">
+                      <img
+                        src={getImageUrl(p.image)}
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        alt={p.name}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/images/no-image.svg';
+                        }}
+                      />
+                    </div>
+
+                    <div className="hidden min-w-22 justify-center md:flex">
+                      <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-500">
+                        Active
+                      </span>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="mb-1 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                        {p.id}
+                      </p>
+                      <h3 className="truncate text-base font-black uppercase text-slate-900">
+                        {p.name}
+                      </h3>
+                      <p className="mt-1 line-clamp-1 text-sm font-medium text-slate-500">
+                        {p.description || 'Tidak ada deskripsi untuk produk ini.'}
+                      </p>
+                    </div>
+
+                    <div className="hidden min-w-33.75 items-center gap-3 lg:flex">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-500">
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-400">Kategori</p>
+                        <p className="text-xs font-black uppercase text-slate-900">
+                          {getCategoryName(p.category) || '-'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="hidden min-w-30 items-center gap-3 xl:flex">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-500">
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 12v-2" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-400">Price</p>
+                        <p className="text-xs font-black text-slate-900">
+                          Rp {Number(p.price).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => openEditForm(p)}
+                        className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-blue-600 transition-all hover:border-blue-300 hover:bg-blue-50"
+                      >
+                        Edit
+                      </button>
+
+                      {confirmDeleteId === p.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => executeDelete(p.id)}
+                            className="h-10 rounded-xl bg-rose-500 px-3 text-[10px] font-black text-white transition-all hover:bg-rose-600"
+                          >
+                            {isDeleting ? '...' : 'OK'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="h-10 rounded-xl bg-slate-100 px-3 text-[10px] font-black text-slate-500 transition-all hover:bg-slate-200"
+                          >
+                            NO
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(p.id)}
+                          className="flex h-10 items-center gap-2 rounded-xl border border-rose-100 bg-white px-4 text-xs font-black text-rose-500 transition-all hover:bg-rose-50"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })
         )}
       </div>
 
-      {/* Modern Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xl flex items-center justify-center z-50 p-6 overflow-y-auto">
-          <div 
-            key={editingProduct?.id || 'new-product-modal'}
-            className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl p-12 animate-in zoom-in-95 duration-300 border border-white/20 my-auto"
-          >
-             <div className="flex justify-between items-center mb-10">
-               <div>
-                 <h3 className="text-3xl font-black text-slate-800 tracking-tighter uppercase leading-none">{editingProduct ? 'Update' : 'Register'} <span className="text-blue-600">Menu</span></h3>
-                 <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Inventory Data Center</p>
-               </div>
-               <button onClick={() => { setIsModalOpen(false); setSaveError(null); }} className="w-12 h-12 flex items-center justify-center bg-slate-50 text-slate-400 hover:text-rose-500 rounded-full transition-all active:scale-90">
-                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
-               </button>
-             </div>
-             
-             {saveError && (
-               <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex flex-col gap-3 animate-in fade-in slide-in-from-top-2">
-                 <div className="flex items-center gap-3 text-rose-500">
-                   <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                   <p className="text-[11px] font-bold uppercase tracking-wider">{saveError}</p>
-                 </div>
-                 <button 
-                   type="button"
-                   onClick={() => handleSave({ preventDefault: () => {} } as any)}
-                   className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline text-left ml-8"
-                 >
-                   Coba Simpan Lagi
-                 </button>
-               </div>
-             )}
-             
-             <form onSubmit={handleSave} className="space-y-8">
-                <input name="id" hidden defaultValue={editingProduct?.id} />
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                  {/* Left: Image Upload */}
-                  <div className="space-y-4">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Product Visual</label>
-                    <div 
-                      onClick={() => fileInputRef.current?.click()}
-                      className="relative aspect-square bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2.5rem] overflow-hidden cursor-pointer hover:border-blue-300 hover:bg-blue-50/30 transition-all flex flex-col items-center justify-center group"
-                    >
-                      {imagePreview ? (
-                        <>
-                          <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
-                             <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-blue-600 shadow-xl">
-                               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                             </div>
-                             <span className="text-white text-[9px] font-black uppercase tracking-widest">Ganti Foto</span>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="flex flex-col items-center gap-4 text-center p-6">
-                          <div className="w-16 h-16 rounded-3xl bg-white border border-slate-100 flex items-center justify-center text-slate-300 group-hover:text-blue-600 group-hover:scale-110 transition-all shadow-sm">
-                            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                          </div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">Ketuk untuk unggah<br/>foto produk (tanpa batas di form)</p>
-                        </div>
-                      )}
-                    </div>
-                    <input type="file" ref={fileInputRef} onChange={handleImageChange} accept="image/*" className="hidden" />
-                    
-                    <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                      <input type="checkbox" name="isRecommended" id="isRec" defaultChecked={editingProduct?.isRecommended} className="w-5 h-5 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-600" />
-                      <label htmlFor="isRec" className="text-[10px] font-black text-slate-600 uppercase tracking-widest cursor-pointer select-none">Tandai sebagai Rekomendasi</label>
-                    </div>
-
-                    {imagePreview && (
-                      <button 
-                        type="button"
-                        onClick={() => setImagePreview('')}
-                        className="w-full py-3 bg-rose-50 text-rose-600 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] hover:bg-rose-100 transition-all border border-rose-100"
-                      >
-                        Hapus Foto Produk
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Right: Text Inputs */}
-                  <div className="space-y-6">
-                    <div className="space-y-2">
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Tipe Produk</label>
-                      {adminProductType ? (
-                        <div className="inline-flex items-center px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-700">
-                          {adminProductType.toUpperCase()}
-                        </div>
-                      ) : (
-                        <select
-                          value={selectedProductType}
-                          onChange={(event) => setSelectedProductType(event.target.value as 'kiosk' | 'cv')}
-                          className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-black text-slate-700 text-[11px] uppercase tracking-widest"
-                        >
-                          <option value="kiosk">KIOSK</option>
-                          <option value="cv">CV</option>
-                        </select>
-                      )}
-                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest ml-2 italic">*Tipe produk dipakai untuk memisahkan menu Kiosk dan CV</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Nama Produk</label>
-                      <input name="name" required defaultValue={editingProduct?.name} className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-black text-slate-800 text-sm uppercase tracking-widest" placeholder="NAMA MENU" />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Kategori</label>
-                        <select 
-                          name="category" 
-                          required 
-                          defaultValue={filteredCategories.find(c => c.id === editingProduct?.category || c.name === editingProduct?.category)?.id || editingProduct?.category} 
-                          className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-black text-slate-600 text-[11px] appearance-none uppercase tracking-widest"
-                        >
-                          {filteredCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Harga (IDR)</label>
-                        <input name="price" type="number" required defaultValue={editingProduct?.price} className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-black text-blue-600 text-sm" placeholder="0" />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Poin Cashback (Reward)</label>
-                      <input name="cashbackReward" type="number" defaultValue={editingProduct?.cashbackReward || 0} className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-black text-emerald-600 text-sm" placeholder="0" />
-                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest ml-2 italic">*Poin yang didapat member saat membeli menu ini</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Deskripsi Produk</label>
-                      <textarea name="description" rows={4} defaultValue={editingProduct?.description} className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-medium text-slate-600 text-[13px] resize-none" placeholder="Tuliskan detail produk di sini..."></textarea>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-4 pt-4">
-                   <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-5 bg-slate-100 rounded-3xl font-black text-slate-400 hover:bg-slate-200 transition-all uppercase tracking-widest text-[11px]">Batal</button>
-                   <button type="submit" disabled={isSaving} className="flex-2 py-5 bg-blue-600 text-white rounded-3xl font-black shadow-2xl shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-[0.98] disabled:opacity-70 uppercase tracking-widest text-[11px] px-10">
-                     {isSaving ? 'Memproses...' : 'Simpan Data Produk'}
-                   </button>
-                </div>
-             </form>
-          </div>
-        </div>
-      )}
+      <p className="text-xs font-semibold text-slate-500">
+        Showing 1 to {filteredProducts.length} of {filteredProducts.length} products
+      </p>
     </div>
   );
 };

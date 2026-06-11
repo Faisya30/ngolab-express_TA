@@ -8,16 +8,20 @@ function generateId() {
 async function seed() {
     console.log('Seeding gamification data...');
     
-    // Create sample users
-    const users = ['user-001', 'user-002', 'user-003'];
-    for (const userId of users) {
+    // Get existing users for seeding gamification
+    const existingUsers = await query('SELECT user_id FROM users LIMIT 3');
+    const userIds = existingUsers.length > 0 
+        ? existingUsers.map(u => u.user_id) 
+        : ['user-001', 'user-002', 'user-003'];
+    
+    for (const userId of userIds) {
         await query(
             `INSERT IGNORE INTO UserGamification (user_id, points, memberLevel, streakCount, lastCheckIn) 
              VALUES (?, ?, ?, ?, ?)`,
             [userId, Math.floor(Math.random() * 100) + 50, 'Bronze', 0, null]
         );
     }
-    console.log(`Seeded ${users.length} users`);
+    console.log(`Seeded ${userIds.length} users`);
     
     // Create sample missions
     const missions = [

@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
 
 type BackendRequest = {
@@ -54,6 +55,8 @@ function mapActionToBackendRequest(action: string, data?: any): BackendRequest |
     }
     case 'initKiosk':
       return { method: 'GET', path: '/api/kiosk/init' };
+    case 'getKioskProducts':
+      return { method: 'GET', path: '/api/kiosk/products' };
     case 'getMember':
       return { method: 'GET', path: `/api/kiosk/member/${encodeURIComponent(String(data?.code || ''))}` };
     case 'getMemberByUserId':

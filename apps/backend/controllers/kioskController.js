@@ -100,7 +100,7 @@ export async function init(req, res) {
 						p.cashback_reward AS cashbackReward,
 						p.is_active AS isActive
 					FROM products p
-					WHERE p.is_active = 1 ${hasProductType ? "AND (p.product_type = 'kiosk' OR p.product_type IS NULL)" : ''}
+					WHERE p.is_active = 1 ${hasProductType ? "AND (p.product_type = 'kiosk' OR p.product_type IS NULL OR p.product_type = '')" : ''}
 					ORDER BY p.created_at DESC`;
 		} else {
 			productsQuery = `SELECT
@@ -140,6 +140,67 @@ export async function init(req, res) {
 		return res.json({ success: true, products, categories, vouchers: [] });
 	} catch (error) {
 		return res.status(500).json({ success: false, error: error.message });
+	}
+}
+
+export async function getKioskProducts(req, res) {
+	try {
+		const usesCategoryCode = await hasColumn('products', 'category_code');
+		const hasProductType = await hasColumn('products', 'product_type');
+
+		if (!hasProductType) {
+			return res.status(500).json({
+				success: false,
+				error: 'Kolom product_type belum tersedia.',
+			});
+		}
+
+		const productsQuery = usesCategoryCode
+			? `SELECT
+          p.code AS id,
+          p.code,
+          p.name,
+          p.price,
+          COALESCE(p.category_code, '') AS category,
+          COALESCE(CAST(p.image_url AS CHAR(255)), '') AS image,
+          COALESCE(p.description, '') AS description,
+          p.product_type,
+          p.is_recommended AS isRecommended,
+          p.cashback_reward AS cashbackReward,
+          p.is_active AS isActive
+        FROM products p
+        WHERE p.product_type = 'kiosk'
+          AND p.is_active = 1
+        ORDER BY p.created_at DESC`
+			: `SELECT
+          p.code AS id,
+          p.code,
+          p.name,
+          p.price,
+          COALESCE(c.code, '') AS category,
+          COALESCE(CAST(p.image_url AS CHAR(255)), '') AS image,
+          COALESCE(p.description, '') AS description,
+          p.product_type,
+          p.is_recommended AS isRecommended,
+          p.cashback_reward AS cashbackReward,
+          p.is_active AS isActive
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.product_type = 'kiosk'
+          AND p.is_active = 1
+        ORDER BY p.created_at DESC`;
+
+		const products = await query(productsQuery);
+
+		return res.json({
+			success: true,
+			products,
+		});
+	} catch (error) {
+		return res.status(500).json({
+			success: false,
+			error: error.message,
+		});
 	}
 }
 
@@ -446,11 +507,17 @@ export async function saveOrder(req, res) {
 				const price = toNumber(item.price);
 				const itemSubtotal = toNumber(item.subtotal) || price * qty;
 				const productCode = String(item.id || item.code || '').trim();
-				const [productRows] = await connection.query('SELECT id FROM products WHERE code = ? LIMIT 1', [productCode]);
+				const [productRows] = await connection.query(
+					`SELECT id FROM products 
+   WHERE code = ? 
+     AND (product_type = 'kiosk' OR product_type IS NULL OR product_type = '')
+   LIMIT 1`,
+					[productCode]
+				);
 				const productId = productRows[0]?.id ?? null;
 
 				if (!productId) {
-					throw new Error(`Produk dengan kode ${productCode} tidak ditemukan.`);
+					throw new Error(`Produk kiosk dengan kode ${productCode} tidak ditemukan atau bukan produk kiosk.`);
 				}
 
 				const itemColumns = ['product_name_snapshot', 'price_snapshot', 'qty', 'subtotal', 'order_item_type'];
@@ -488,10 +555,18 @@ export async function saveOrder(req, res) {
 		});
 		if (userId) {
 			try {
-				const { generateAiRecommendation } = await import('../services/geminiService.js');
-				generateAiRecommendation(userId).catch((err) => {
-					console.error('Fire-and-forget AI recommendation failed:', err.message);
-				});
+				(async () => {
+					try {
+						console.log('[AI] Menunggu transaksi commit selesai sebelum mulai AI...');
+						await new Promise((resolve) => setTimeout(resolve, 500));
+						console.log('[AI] Menjalankan generateAiRecommendation untuk user:', userId);
+						const { generateAiRecommendation } = await import('../services/geminiService.js');
+						const aiResult = await generateAiRecommendation(userId);
+						console.log('[AI] Hasil generateAiRecommendation:', aiResult);
+					} catch (aiError) {
+						console.error('[AI] Error pada fire-and-forget AI recommendation:', aiError);
+					}
+				})();
 			} catch (importError) {
 				console.error('Gagal memuat modul AI recommendation:', importError.message);
 			}
