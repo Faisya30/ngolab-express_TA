@@ -6,7 +6,6 @@ import Auth from './components/Auth';
 import ProductManagement from './components/ProductManagement';
 import CategoryManagement from './components/CategoryManagement';
 import TransactionList from './components/TransactionList';
-import Reports from './components/Reports';
 import { ViewType } from '../../types';
 import { fetchFromSheet, API_ACTIONS } from '@ngolab/shared-lib';
 import { getProductTypeFromRole } from './utils/productScope';
@@ -21,6 +20,7 @@ const AdminDashboard: React.FC = () => {
   const [orderDetails, setOrderDetails] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [period, setPeriod] = useState<'day' | 'week' | 'month' | 'all'>('day');
   const adminProductType = getProductTypeFromRole(user?.role);
 
   useEffect(() => {
@@ -51,31 +51,36 @@ const AdminDashboard: React.FC = () => {
 
   const loadDashboardData = useCallback(async () => {
     try {
-      const [ordersRes, orderDetailsRes, productsRes, categoriesRes] = await Promise.all([
-        fetchFromSheet(API_ACTIONS.GET_ORDERS),
-        fetchFromSheet(API_ACTIONS.GET_ORDER_DETAILS),
-        fetchFromSheet(API_ACTIONS.GET_PRODUCTS),
-        fetchFromSheet(API_ACTIONS.GET_CATEGORIES),
-      ]);
+      const res = await fetch(`http://localhost:4000/api/kiosk/admin/dashboard?period=${period}`);
+      const data = await res.json();
 
-      setOrders(normalizeRows(ordersRes));
-      setOrderDetails(normalizeRows(orderDetailsRes));
-      setProducts(normalizeRows(productsRes));
+      if (!data.success) {
+        throw new Error(data.error || 'Gagal mengambil dashboard data');
+      }
 
-      // Handle categories from backend API wrapper
+      setOrders(normalizeRows(data.orders || []));
+      setOrderDetails(normalizeRows(data.orderDetails || []));
+      setProducts(normalizeRows(data.products || []));
+
+      const categoriesRes = await fetchFromSheet(API_ACTIONS.GET_CATEGORIES);
       const categoryData = categoriesRes?.success ? categoriesRes.categories : categoriesRes;
       setCategories(Array.isArray(categoryData) ? categoryData : []);
     } catch (error) {
       console.error('Failed to load admin dashboard data:', error);
     }
-  }, [normalizeRows, user?.role]);
+  }, [normalizeRows, period]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      loadDashboardData();
-    }
-  }, [isAuthenticated, loadDashboardData]);
+    if (!isAuthenticated) return;
 
+    loadDashboardData();
+
+    const interval = setInterval(() => {
+      loadDashboardData();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, loadDashboardData]);
   const handleLogin = (userData: any) => {
     setUser(userData);
     setIsAuthenticated(true);
@@ -128,6 +133,8 @@ const AdminDashboard: React.FC = () => {
               orderDetails={orderDetails}
               products={products}
               onRefresh={handleRefresh}
+              period={period}
+              setPeriod={setPeriod}
             />
           )}
 
@@ -154,10 +161,6 @@ const AdminDashboard: React.FC = () => {
               orderDetails={orderDetails}
               onRefresh={handleRefresh}
             />
-          )}
-
-          {currentView === 'REPORTS' && (
-            <Reports />
           )}
 
         </div>

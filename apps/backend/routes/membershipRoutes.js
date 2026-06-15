@@ -4,6 +4,7 @@ import {
   createTransaction,
   earnPoints,
   getAllAffiliates,
+  getAllCommissionLogs,
   getAffiliateVerifications,
   getAllMembers,
   getCommissionLogs,
@@ -50,7 +51,9 @@ router.patch('/admin/members/:user_id/status', updateMemberStatus);
 router.patch('/admin/users/:user_id/role', updateUserRole);
 router.get('/settings', getGlobalSettings);
 router.patch('/settings/:setting_key', updateGlobalSetting);
+router.get('/admin/commission-logs', getAllCommissionLogs);
 router.get('/commission-logs', getCommissionLogs);
+router.get('/commission-logs/:user_id', getCommissionLogs);
 router.post('/redeem-points', redeemPoints);
 router.get('/point-logs/:user_id', getPointLogs);
 router.post('/transactions', createTransaction);

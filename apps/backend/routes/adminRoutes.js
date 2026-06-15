@@ -11,6 +11,12 @@ import {
   saveProduct,
   uploadProductImage,
 } from '../controllers/adminController.js';
+import {
+  getAllVouchers,
+  createVoucher,
+  updateVoucher,
+  deleteVoucher,
+} from '../controllers/voucherController.js';
 
 const router = Router();
 
@@ -23,5 +29,9 @@ router.post('/products/upload-image', multer({ storage: multer.memoryStorage(), 
 router.delete('/products/:id', deleteProduct);
 router.post('/categories', saveCategory);
 router.delete('/categories/:id', deleteCategory);
+router.get('/vouchers', getAllVouchers);
+router.post('/vouchers', createVoucher);
+router.put('/vouchers/:id', updateVoucher);
+router.delete('/vouchers/:id', deleteVoucher);
 
 export default router;

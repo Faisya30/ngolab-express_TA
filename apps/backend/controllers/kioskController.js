@@ -405,6 +405,57 @@ export async function lookupMemberByQr(req, res) {
 	}
 }
 
+export const getOrderHistoryByUserId = async (req, res) => {
+	try {
+		const { user_id } = req.params;
+
+		const [rows] = await db.query(
+			`
+      SELECT 
+        o.id AS order_id,
+        o.order_code,
+        o.service_type,
+        o.tipe_pelanggan,
+        o.nama_pelanggan,
+        o.user_id,
+        o.subtotal,
+        o.discount,
+        o.total,
+        o.payment_method,
+        o.points_earned,
+        o.points_used,
+        o.order_type,
+        o.created_at,
+
+        oi.id AS order_item_id,
+        oi.product_id,
+        oi.product_name_snapshot,
+        oi.price_snapshot,
+        oi.qty,
+        oi.order_item_type,
+        oi.subtotal AS item_subtotal
+      FROM orders o
+      LEFT JOIN order_items oi 
+        ON o.id = oi.order_id
+      WHERE o.user_id = ?
+      ORDER BY o.created_at DESC
+      `,
+			[user_id]
+		);
+
+		res.json({
+			success: true,
+			data: rows,
+		});
+	} catch (error) {
+		console.error('Gagal mengambil riwayat transaksi:', error);
+		res.status(500).json({
+			success: false,
+			message: 'Gagal mengambil riwayat transaksi',
+		});
+	}
+};
+
 export async function saveOrder(req, res) {
 	try {
 		const body = req.body || {};
@@ -576,4 +627,76 @@ export async function saveOrder(req, res) {
 	} catch (error) {
 		return res.status(500).json({ success: false, error: error.message });
 	}
+
+}
+export async function getAdminDashboard(req, res) {
+  try {
+    const period = String(req.query.period || 'all').toLowerCase();
+
+    let orderDateFilter = '';
+    let itemDateFilter = '';
+
+    if (period === 'day') {
+      orderDateFilter = `AND DATE(created_at) = CURDATE()`;
+      itemDateFilter = `AND DATE(o.created_at) = CURDATE()`;
+    }
+
+    if (period === 'week') {
+      orderDateFilter = `AND YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1)`;
+      itemDateFilter = `AND YEARWEEK(o.created_at, 1) = YEARWEEK(CURDATE(), 1)`;
+    }
+
+    if (period === 'month') {
+      orderDateFilter = `
+        AND YEAR(created_at) = YEAR(CURDATE())
+        AND MONTH(created_at) = MONTH(CURDATE())
+      `;
+      itemDateFilter = `
+        AND YEAR(o.created_at) = YEAR(CURDATE())
+        AND MONTH(o.created_at) = MONTH(CURDATE())
+      `;
+    }
+
+    const orders = await query(`
+      SELECT *
+      FROM orders
+      WHERE order_type = 'kiosk'
+      ${orderDateFilter}
+      ORDER BY created_at DESC
+    `);
+
+    const orderDetails = await query(`
+      SELECT 
+        oi.*,
+        o.order_code,
+        o.created_at,
+        o.payment_method
+      FROM order_items oi
+      LEFT JOIN orders o ON oi.order_id = o.id
+      WHERE oi.order_item_type = 'kiosk'
+      ${itemDateFilter}
+      ORDER BY oi.id DESC
+    `);
+
+    const products = await query(`
+      SELECT *
+      FROM products
+      WHERE product_type = 'kiosk'
+      ORDER BY created_at DESC
+    `);
+
+    return res.json({
+      success: true,
+      period,
+      orders,
+      orderDetails,
+      products,
+    });
+  } catch (error) {
+    console.error('Gagal mengambil dashboard admin:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
 }

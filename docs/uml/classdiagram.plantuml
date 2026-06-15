@@ -1,106 +1,91 @@
-@startuml
-hide circle
-skinparam linetype ortho
+erDiagram
+    COMPANY ||--o{ USER : memiliki
+    COMPANY ||--o{ COMPANY_PRODUCT : memiliki_akses
+    PRODUCT ||--o{ COMPANY_PRODUCT : diberikan_ke
+    USER ||--o{ ACTIVATION_TOKEN : memiliki
+    USER ||--o{ USER_ROLE : memiliki
+    ROLE ||--o{ USER_ROLE : diberikan
+    ROLE ||--o{ ROLE_PERMISSION : memiliki
+    PERMISSION ||--o{ ROLE_PERMISSION : digunakan
 
-entity "COMPANY" as COMPANY {
-  * company_id : int <<PK>>
-  --
-  company_name : string
-  address : string
-  phone : string
-  email : string
-  status : string
-  created_at : datetime
-  updated_at : datetime
-}
+    COMPANY {
+        int company_id PK
+        string company_name
+        string address
+        string phone
+        string email
+        string status
+        datetime created_at
+        datetime updated_at
+    }
 
-entity "USER" as USER {
-  * user_id : int <<PK>>
-  --
-  company_id : int <<FK>>
-  full_name : string
-  email : string
-  password : string
-  status : string
-  created_at : datetime
-  updated_at : datetime
-}
+    USER {
+        int user_id PK
+        int company_id FK
+        string full_name
+        string email
+        string password
+        string status
+        datetime created_at
+        datetime updated_at
+    }
 
-entity "ROLE" as ROLE {
-  * role_id : int <<PK>>
-  --
-  role_name : string
-  description : string
-  status : string
-  created_at : datetime
-  updated_at : datetime
-}
+    PRODUCT {
+        int product_id PK
+        string product_name
+        string description
+        string product_url
+        string status
+        datetime created_at
+        datetime updated_at
+    }
 
-entity "PERMISSION" as PERMISSION {
-  * permission_id : int <<PK>>
-  --
-  permission_name : string
-  module_name : string
-  action : string
-  created_at : datetime
-  updated_at : datetime
-}
+    COMPANY_PRODUCT {
+        int company_product_id PK
+        int company_id FK
+        int product_id FK
+        string access_status
+        datetime assigned_at
+    }
 
-entity "USER_ROLE" as USER_ROLE {
-  * user_role_id : int <<PK>>
-  --
-  user_id : int <<FK>>
-  role_id : int <<FK>>
-  assigned_at : datetime
-}
+    ROLE {
+        int role_id PK
+        string role_name
+        string description
+        string status
+        datetime created_at
+        datetime updated_at
+    }
 
-entity "ROLE_PERMISSION" as ROLE_PERMISSION {
-  * role_permission_id : int <<PK>>
-  --
-  role_id : int <<FK>>
-  permission_id : int <<FK>>
-  created_at : datetime
-}
+    PERMISSION {
+        int permission_id PK
+        string permission_name
+        string module_name
+        string action
+        datetime created_at
+        datetime updated_at
+    }
 
-entity "PRODUCT" as PRODUCT {
-  * product_id : int <<PK>>
-  --
-  product_name : string
-  description : string
-  status : string
-  created_at : datetime
-  updated_at : datetime
-}
+    USER_ROLE {
+        int user_role_id PK
+        int user_id FK
+        int role_id FK
+        datetime assigned_at
+    }
 
-entity "COMPANY_PRODUCT" as COMPANY_PRODUCT {
-  * company_product_id : int <<PK>>
-  --
-  company_id : int <<FK>>
-  product_id : int <<FK>>
-  assigned_at : datetime
-}
+    ROLE_PERMISSION {
+        int role_permission_id PK
+        int role_id FK
+        int permission_id FK
+        datetime created_at
+    }
 
-entity "ACTIVATION_TOKEN" as ACTIVATION_TOKEN {
-  * token_id : int <<PK>>
-  --
-  user_id : int <<FK>>
-  token : string
-  token_type : string
-  expired_at : datetime
-  status : string
-  created_at : datetime
-}
-
-COMPANY ||--o{ USER : memiliki
-USER ||--o{ USER_ROLE : memiliki
-ROLE ||--o{ USER_ROLE : diberikan
-
-ROLE ||--o{ ROLE_PERMISSION : memiliki
-PERMISSION ||--o{ ROLE_PERMISSION : digunakan
-
-COMPANY ||--o{ COMPANY_PRODUCT : memiliki_akses
-PRODUCT ||--o{ COMPANY_PRODUCT : diberikan
-
-USER ||--o{ ACTIVATION_TOKEN : memiliki
-
-@enduml
+    ACTIVATION_TOKEN {
+        int token_id PK
+        int user_id FK
+        string token
+        string token_type
+        datetime expired_at
+        string status
+        datetime created_at
+    }

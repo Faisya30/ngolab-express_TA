@@ -471,6 +471,9 @@ export async function register(req, res) {
 }
 
 export async function login(req, res) {
+  console.log('LOGIN CONTROLLER TERPANGGIL');
+  console.log('BODY LOGIN:', req.body);
+
   try {
     const body = req.body || {};
     const identifier = normalizeText(body.username || body.email);
@@ -482,6 +485,9 @@ export async function login(req, res) {
         error: 'username/email dan password wajib diisi.',
       });
     }
+
+    console.log('[LOGIN] Starting login query for identifier:', identifier);
+    const queryStart = Date.now();
     const rows = await query(
       `SELECT user_id, username, email, password, role, status, membership_level, referred_by, affiliate_upline, created_at, phone_number, profile_picture, ktm_picture, is_ktm, ai_reasoning
       FROM users
@@ -489,6 +495,7 @@ export async function login(req, res) {
       LIMIT 1`,
       [identifier, identifier]
     );
+    console.log('[LOGIN] Query completed in', Date.now() - queryStart, 'ms. Rows:', rows.length);
 
     if (!rows.length) {
       return res.status(401).json({ success: false, error: 'Akun tidak ditemukan.' });
@@ -512,8 +519,17 @@ export async function login(req, res) {
       return res.status(401).json({ success: false, error: 'Password salah.' });
     }
 
-    const affiliateRow = await fetchAffiliateNetworkRow(user.user_id);
+    const isAffiliate = String(user.role || '').toUpperCase() === 'MEMBER_AFFILIATE';
 
+    console.log('[LOGIN] Fetching affiliate network for user:', user.user_id);
+    const affiliateRow = isAffiliate ? await fetchAffiliateNetworkRow(user.user_id) : null;
+    console.log('[LOGIN] Affiliate network fetched for user:', user.user_id);
+
+    const referralCode = isAffiliate ? affiliateRow?.referral_code || null : null;
+    const publicUser = buildPublicUser(user);
+    publicUser.referral_code = referralCode;
+
+    console.log('[LOGIN] Fetching points for user:', user.user_id);
     const pointsRows = await query(
       `SELECT total_points, commission_points, mission_points, cashback_points, voucher_points
       FROM user_points
@@ -526,10 +542,10 @@ export async function login(req, res) {
       success: true,
       message: 'Login berhasil.',
       data: {
-        user: buildPublicUser(user),
-        ...createMembershipToken(buildPublicUser(user)),
-        affiliate_network: buildAffiliateNetwork(affiliateRow),
-        referralCode: affiliateRow?.referral_code || null,
+        user: publicUser,
+        ...createMembershipToken(publicUser),
+        affiliate_network: isAffiliate ? buildAffiliateNetwork(affiliateRow) : null,
+        referralCode,
         points: pointsRows[0] || null,
       },
     });
@@ -902,11 +918,25 @@ export async function verifyAffiliate(_req, res) {
       return res.status(404).json({ success: false, error: 'User tidak ditemukan.' });
     }
 
+    let verificationStatus = 'PENDING';
+    let nextUserRole = existingRows[0].role;
+    let nextUserStatus = existingRows[0].status;
+
     const detectedMatchesRegistered = registeredNim === detectedNim;
-    const approved = aiIsTelkom && detectedMatchesRegistered && aiConfidence >= confidenceThreshold;
-    const verificationStatus = approved ? 'APPROVED' : 'PENDING';
-    const nextUserRole = approved ? 'MEMBER_AFFILIATE' : existingRows[0].role;
-    const nextUserStatus = approved ? 'ACTIVE' : existingRows[0].status;
+    
+    if (!aiIsTelkom) {
+      verificationStatus = 'REJECTED';
+      nextUserRole = existingRows[0].role;
+      nextUserStatus = existingRows[0].status;
+    } else if (detectedMatchesRegistered && aiConfidence >= confidenceThreshold) {
+      verificationStatus = 'APPROVED';
+      nextUserRole = 'MEMBER_AFFILIATE';
+      nextUserStatus = 'ACTIVE';
+    } else {
+      verificationStatus = 'PENDING';
+      nextUserRole = existingRows[0].role;
+      nextUserStatus = existingRows[0].status;
+    }
 
     const result = await withTransaction(async (connection) => {
       const [verificationInsert] = await connection.query(
@@ -941,7 +971,7 @@ export async function verifyAffiliate(_req, res) {
             ktm_picture = COALESCE(?, ktm_picture)
         WHERE user_id = ?`,
         [
-          approved ? 1 : 0,
+          verificationStatus === 'APPROVED' ? 1 : 0,
           nextUserRole,
           nextUserStatus,
           aiReasoning || null,
@@ -960,7 +990,7 @@ export async function verifyAffiliate(_req, res) {
 
       let referralCode = affiliateRows[0]?.referral_code || null;
 
-      if (!affiliateRows.length && approved) {
+      if (!affiliateRows.length && verificationStatus === 'APPROVED') {
         referralCode = await ensureUniqueReferralCode(connection);
         await connection.query(
           `INSERT INTO affiliate_networks (
@@ -976,7 +1006,7 @@ export async function verifyAffiliate(_req, res) {
           ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0)`,
           [userId, `AFF-${userId}`, referralCode, affiliateTier, affiliateTier]
         );
-      } else if (approved) {
+      } else if (verificationStatus === 'APPROVED') {
         await connection.query(
           `UPDATE affiliate_networks
           SET affiliate_tier = ?,
@@ -1009,8 +1039,10 @@ export async function verifyAffiliate(_req, res) {
 
     return res.json({
       success: true,
-      message: approved
+      message: verificationStatus === 'APPROVED'
         ? 'Akun berhasil diverifikasi sebagai affiliate.'
+        : verificationStatus === 'REJECTED'
+        ? 'Verifikasi ditolak: dokumen tidak valid.'
         : 'Hasil OCR berhasil disimpan dan masuk antrean review.',
       status: verificationStatus,
       data: {
@@ -1487,21 +1519,40 @@ export async function updateGlobalSetting(_req, res) {
 export async function getCommissionLogs(_req, res) {
   try {
     const userId = normalizeText(_req.query?.user_id || _req.params?.user_id);
+    if (!userId) {
+      return res.status(400).json({ success: false, error: 'user_id wajib diisi.' });
+    }
+
+    const networkRows = await query(
+      `SELECT affiliate_id
+       FROM affiliate_networks
+       WHERE user_id = ?
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (!networkRows.length || !networkRows[0]?.affiliate_id) {
+      return res.json({
+        success: true,
+        message: 'User bukan affiliate atau belum memiliki affiliate_id.',
+        data: [],
+      });
+    }
+
+    const affiliateId = networkRows[0].affiliate_id;
     const rows = await query(
       `SELECT
-        cl.id,
-        cl.created_at,
-        cl.receiver_id,
-        receiver.username AS receiver_username,
-        cl.referred_user_id,
-        referred.username AS referred_username,
-        cl.earned_points
-      FROM commission_logs cl
-      LEFT JOIN users receiver ON receiver.user_id = cl.receiver_id
-      LEFT JOIN users referred ON referred.user_id = cl.referred_user_id
-      ${userId ? 'WHERE cl.receiver_id = ? OR cl.referred_user_id = ?' : ''}
-      ORDER BY cl.created_at DESC`,
-      userId ? [userId, userId] : []
+        id,
+        affiliate_id,
+        member_id,
+        transaction_code,
+        transaction_amount,
+        commission_earned,
+        created_at
+      FROM affiliate_commission_logs
+      WHERE affiliate_id = ?
+      ORDER BY created_at DESC`,
+      [affiliateId]
     );
 
     return res.json({
@@ -2018,15 +2069,27 @@ export async function getTransactionHistory(req, res) {
 
     const transactions = await query(
       `SELECT
+        o.id AS order_id,
         o.order_code,
-        o.created_at AS transaction_date,
+        o.user_id,
+        o.nama_pelanggan,
+        o.service_type,
+        o.subtotal,
+        o.discount,
         o.total,
         o.payment_method,
-        oi.product_name_snapshot AS item_name,
+        o.points_earned,
+        o.points_used,
+        o.order_type,
+        o.created_at,
+        oi.id AS order_item_id,
+        oi.product_id,
+        oi.product_name_snapshot,
+        oi.price_snapshot,
         oi.qty,
-        oi.subtotal AS item_total
+        oi.subtotal AS item_subtotal
       FROM orders o
-      JOIN order_items oi ON oi.order_code = o.order_code
+      LEFT JOIN order_items oi ON oi.order_id = o.id
       WHERE o.user_id = ?
       ORDER BY o.created_at DESC, oi.id ASC`,
       [userId]
@@ -2043,18 +2106,30 @@ export async function getTransactionHistory(req, res) {
     for (const row of transactions) {
       if (!grouped.has(row.order_code)) {
         grouped.set(row.order_code, {
+          order_id: Number(row.order_id || 0),
           order_code: row.order_code,
-          transaction_date: row.transaction_date,
+          user_id: row.user_id,
+          nama_pelanggan: row.nama_pelanggan,
+          service_type: row.service_type,
+          subtotal: Number(row.subtotal || 0),
+          discount: Number(row.discount || 0),
           total: Number(row.total || 0),
           payment_method: row.payment_method,
+          points_earned: Number(row.points_earned || 0),
+          points_used: Number(row.points_used || 0),
+          order_type: row.order_type,
+          transaction_date: row.created_at,
           items: [],
         });
       }
       const tx = grouped.get(row.order_code);
       tx.items.push({
-        item_name: row.item_name,
+        order_item_id: Number(row.order_item_id || 0),
+        product_id: row.product_id,
+        product_name_snapshot: row.product_name_snapshot,
+        price_snapshot: Number(row.price_snapshot || 0),
         qty: Number(row.qty || 0),
-        item_total: Number(row.item_total || 0),
+        item_subtotal: Number(row.item_subtotal || 0),
       });
     }
 
@@ -2064,6 +2139,45 @@ export async function getTransactionHistory(req, res) {
     });
   } catch (error) {
     return res.status(500).json({ message: error.message });
+  }
+}
+
+export async function getAllCommissionLogs(_req, res) {
+  try {
+    const rows = await query(
+      `SELECT
+        acl.id,
+        acl.affiliate_id,
+        acl.member_id,
+        acl.transaction_code,
+        acl.transaction_amount,
+        acl.commission_earned,
+        acl.created_at,
+        u_affiliate.username AS affiliate_username,
+        u_member.username AS member_username
+      FROM affiliate_commission_logs acl
+      LEFT JOIN affiliate_networks an ON an.affiliate_id = acl.affiliate_id
+      LEFT JOIN users u_affiliate ON u_affiliate.user_id = an.user_id
+      LEFT JOIN users u_member ON u_member.user_id = acl.member_id
+      ORDER BY acl.created_at DESC`
+    );
+
+    return res.json({
+      success: true,
+      data: rows.map((row) => ({
+        id: row.id,
+        affiliate_id: row.affiliate_id,
+        affiliate_username: row.affiliate_username || null,
+        member_id: row.member_id,
+        member_username: row.member_username || null,
+        transaction_code: row.transaction_code,
+        transaction_amount: Number(row.transaction_amount || 0),
+        commission_earned: Number(row.commission_earned || 0),
+        created_at: row.created_at,
+      })),
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
   }
 }
 

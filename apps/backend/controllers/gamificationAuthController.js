@@ -1,3 +1,4 @@
+import { query } from '../config/db.js';
 import { UserGamificationService } from '../services/UserGamificationService.js';
 
 const MEMBERSHIP_API_URL = process.env.MEMBERSHIP_API_URL || 'http://localhost:4000/api/membership';
@@ -51,6 +52,12 @@ export async function gamificationLogin(req, res) {
             });
         }
 
+        const isAffiliate = String(memberUser.role || '').toUpperCase() === 'MEMBER_AFFILIATE';
+        const affiliateRows = isAffiliate
+            ? await query('SELECT referral_code FROM affiliate_networks WHERE user_id = ? LIMIT 1', [extractedUserId])
+            : [];
+        const referralCode = isAffiliate ? affiliateRows[0]?.referral_code || null : null;
+
         // Get or create UserGamification record
         const userGamification = await UserGamificationService.getUserById(extractedUserId);
 
@@ -64,7 +71,8 @@ export async function gamificationLogin(req, res) {
                     email: memberUser.email,
                     membership_level: memberUser.membership_level,
                     role: memberUser.role,
-                    status: memberUser.status
+                    status: memberUser.status,
+                    referral_code: referralCode
                 },
                 userGamification: userGamification
             }

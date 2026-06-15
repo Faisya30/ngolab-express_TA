@@ -127,3 +127,29 @@ export async function playGame(req, res) {
         });
     }
 }
+
+export async function getCooldown(req, res) {
+    try {
+        const userId = String(req.query.userId || '').trim();
+        const gameId = String(req.query.gameId || '').trim();
+        
+        if (!userId || !gameId) {
+            return res.status(400).json({
+                success: false,
+                message: 'userId dan gameId wajib diisi'
+            });
+        }
+        
+        const result = await GameService.getCooldown(userId, gameId);
+        
+        return res.json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+}

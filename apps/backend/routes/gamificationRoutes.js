@@ -7,6 +7,9 @@ import * as pointsHistoryController from '../controllers/pointsHistoryController
 import * as gamePlayController from '../controllers/gamePlayController.js';
 import * as referralEarningsController from '../controllers/referralEarningsController.js';
 import * as gamificationAuthController from '../controllers/gamificationAuthController.js';
+import * as voucherController from '../controllers/voucherController.js';
+import * as referralController from '../controllers/referralController.js';
+import { requireMembershipJwt, requireSelfMembershipAccess } from '../middlewares/membershipAuth.js';
 
 const router = Router();
 
@@ -38,6 +41,7 @@ router.post('/games', gameController.createGame);
 router.put('/games/:id', gameController.updateGame);
 router.delete('/games/:id', gameController.deleteGame);
 router.post('/games/play', gameController.playGame);
+router.get('/games/cooldown', gameController.getCooldown);
 
 // Points History Routes
 router.get('/points-history', pointsHistoryController.getPointsHistory);
@@ -48,5 +52,14 @@ router.get('/game-plays', gamePlayController.getGamePlays);
 // Referral Earnings Routes
 router.get('/referral-earnings', referralEarningsController.getReferralEarnings);
 router.post('/referral-earnings', referralEarningsController.createReferralEarning);
+
+// Voucher Routes
+router.get('/vouchers', voucherController.getVouchers);
+router.post('/vouchers/claim', requireMembershipJwt, requireSelfMembershipAccess, voucherController.claimVoucher);
+router.get('/user-vouchers', requireMembershipJwt, requireSelfMembershipAccess, voucherController.getUserVouchers);
+
+// Referral Routes
+router.get('/referrals/members', requireMembershipJwt, referralController.getReferralMembers);
+router.get('/referrals/stats', requireMembershipJwt, referralController.getReferralStats);
 
 export default router;

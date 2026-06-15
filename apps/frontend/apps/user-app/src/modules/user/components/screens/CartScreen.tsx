@@ -149,13 +149,7 @@ const CartScreen: React.FC<Props> = ({
           </div>
         </div>
 
-        <div className="bg-[#07111f] text-white rounded-2xl px-5 py-3 flex items-center gap-3 shadow-lg">
-          <span className="text-xl">☝</span>
-          <div>
-            <p className="text-[10px] font-black uppercase">Gesture Aktif</p>
-            <p className="text-[8px] text-white/60">Gunakan tangan untuk navigasi</p>
-          </div>
-        </div>
+       
       </header>
 
       <main className="h-[calc(100vh-72px)] flex overflow-hidden px-6 pb-6 gap-6">

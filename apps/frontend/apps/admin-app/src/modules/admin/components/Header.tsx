@@ -14,7 +14,6 @@ const Header: React.FC<HeaderProps> = ({ currentView, user }) => {
       case 'CATEGORIES': return 'CATEGORIES';
       case 'PRODUCTS': return 'INVENTORY';
       case 'TRANSACTIONS': return 'ORDER HISTORY';
-      case 'REPORTS': return 'ANALYTICS';
       default: return 'ADMIN PANEL';
     }
   };

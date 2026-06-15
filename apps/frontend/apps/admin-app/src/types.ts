@@ -1,5 +1,9 @@
 
-export type ViewType = 'DASHBOARD' | 'CATEGORIES' | 'PRODUCTS' | 'TRANSACTIONS' | 'REPORTS';
+export type ViewType =
+  | 'DASHBOARD'
+  | 'CATEGORIES'
+  | 'PRODUCTS'
+  | 'TRANSACTIONS';
 
 export interface Category {
   id: string;
