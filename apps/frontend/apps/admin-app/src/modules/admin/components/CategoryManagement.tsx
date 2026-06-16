@@ -37,34 +37,56 @@ const CategoryManagement: React.FC<CategoryManagementProps> = ({
     );
   }, [categories, searchTerm]);
 
- const getProductCount = (category: Category) => {
+  const getProductCount = (category: Category) => {
   const safeProducts = Array.isArray(products) ? products : [];
-
-  const categoryId = String(category.id || '').toLowerCase().trim();
   const categoryName = String(category.name || '').toLowerCase().trim();
 
   return safeProducts.filter((product: any) => {
-    const productCategory = String(
-      product.category ||
-      product.kategori ||
-      product.category_code ||
-      product.categorycode ||
-      product.category_name ||
-      product.categoryname ||
-      ''
-    )
-      .toLowerCase()
-      .trim();
+    const productName = String(product.name || '').toLowerCase();
 
-    return productCategory === categoryId || productCategory === categoryName;
+    if (categoryName.includes('mie')) {
+      return productName.includes('mie') || productName.includes('yamin');
+    }
+
+    if (categoryName.includes('bakso')) {
+      return productName.includes('bakso');
+    }
+
+    if (categoryName.includes('gorengan')) {
+      return (
+        productName.includes('goreng') ||
+        productName.includes('pangsit') ||
+        productName.includes('tahu') ||
+        productName.includes('siomay') ||
+        productName.includes('kerupuk')
+      );
+    }
+
+    if (categoryName.includes('dorinku')) {
+      return (
+        productName.includes('ice') ||
+        productName.includes('tea') ||
+        productName.includes('juice') ||
+        productName.includes('coffe') ||
+        productName.includes('drink') ||
+        productName.includes('jeruk')
+      );
+    }
+
+    return false;
   }).length;
-};
+  };
+
   const executeDelete = async (id: string) => {
     if (!id) return;
     setIsDeleting(true);
 
     try {
-      const result = await fetchFromSheet('deleteRow', { sheetName: 'Categories', id });
+      const result = await fetchFromSheet('deleteRow', {
+        sheetName: 'Categories',
+        id,
+      });
+
       if (result && result.success) {
         onUpdate();
         setConfirmDeleteId(null);
@@ -89,7 +111,10 @@ const CategoryManagement: React.FC<CategoryManagementProps> = ({
     };
 
     try {
-      const result = await fetchFromSheet('saveCategory', { category: categoryData });
+      const result = await fetchFromSheet('saveCategory', {
+        category: categoryData,
+      });
+
       if (result.success) {
         onUpdate();
         setIsModalOpen(false);
@@ -172,7 +197,11 @@ const CategoryManagement: React.FC<CategoryManagementProps> = ({
             disabled={isSaving}
             className="rounded-xl bg-blue-600 px-5 py-2.5 text-[10px] font-black uppercase tracking-wider text-white shadow-lg shadow-blue-600/20 transition-all hover:bg-blue-700 disabled:opacity-70"
           >
-            {isSaving ? 'Menyimpan...' : editingCategory ? 'Simpan Perubahan' : 'Simpan Kategori'}
+            {isSaving
+              ? 'Menyimpan...'
+              : editingCategory
+              ? 'Simpan Perubahan'
+              : 'Simpan Kategori'}
           </button>
         </div>
       </div>
@@ -251,7 +280,7 @@ const CategoryManagement: React.FC<CategoryManagementProps> = ({
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-slate-100">
-          <table className="w-full min-w-212.5 border-collapse text-left">
+          <table className="w-full min-w-[850px] border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/80">
                 <th className="w-20 px-6 py-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -293,8 +322,11 @@ const CategoryManagement: React.FC<CategoryManagementProps> = ({
                   return (
                     <tr
                       key={cat.id}
-                      className={`transition-colors hover:bg-blue-50/20 ${editingCategory?.id === cat.id && isModalOpen ? 'bg-blue-50/30' : ''
-                        }`}
+                      className={`transition-colors hover:bg-blue-50/20 ${
+                        editingCategory?.id === cat.id && isModalOpen
+                          ? 'bg-blue-50/30'
+                          : ''
+                      }`}
                     >
                       <td className="px-6 py-4 text-center text-sm font-black text-slate-700">
                         {index + 1}
@@ -302,7 +334,9 @@ const CategoryManagement: React.FC<CategoryManagementProps> = ({
 
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-4">
-                          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ${visual.bg} ${visual.text}`}>
+                          <div
+                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ${visual.bg} ${visual.text}`}
+                          >
                             {visual.icon}
                           </div>
 

@@ -6,8 +6,11 @@ import { ProductType } from '../utils/productScope';
 const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
 
 type ProductWithType = Product & {
+  code?: string | number;
   product_type?: 'kiosk' | 'cv' | string;
-};
+  image_url?: string;
+  category_id?: string | number;
+}; 
 
 type CategoryWithType = Category & {
   product_type?: 'kiosk' | 'cv' | 'all' | string;
@@ -154,7 +157,7 @@ const ProductManagement: React.FC<Props> = ({
 
   useEffect(() => {
     if (isModalOpen) {
-      setImagePreview(editingProduct?.image || null);
+      setImagePreview(editingProduct?.image_url || editingProduct?.image || null);
 
       const productType =
         String(editingProduct?.product_type || '').toLowerCase() ||
@@ -196,24 +199,41 @@ const ProductManagement: React.FC<Props> = ({
   }, [products, searchTerm, selectedCategory, categories]);
 
   const executeDelete = async (id: string) => {
-    if (!id) return;
+  if (!id) return;
 
-    setIsDeleting(true);
+  setIsDeleting(true);
 
-    try {
-      const result = await fetchFromSheet('deleteRow', {
-        sheetName: 'Products',
-        id,
-      });
+  try {
+    const response = await fetch(
+      `${BACKEND_URL}/api/admin/products/${id}`,
+      {
+  method: 'DELETE',
+  headers: {
+    'x-admin-role': 'admin',
+  },
+}
+    );
 
-      if (result && result.success) {
-        onUpdate();
-        setConfirmDeleteId(null);
-      }
-    } finally {
-      setIsDeleting(false);
+    const result = await response.json();
+
+    console.log('[DELETE RESULT]', result);
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || 'Gagal menghapus produk');
     }
-  };
+
+    setProducts((prev) =>
+       prev.filter((product) => String(product.id) !== String(id))
+    );
+
+    setConfirmDeleteId(null);
+    //onUpdate();
+  } catch (error) {
+    console.error('[DELETE PRODUCT ERROR]', error);
+  } finally {
+    setIsDeleting(false);
+  }
+};
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -238,7 +258,7 @@ const ProductManagement: React.FC<Props> = ({
       setImagePreview(imageUrl);
     } catch (error: any) {
       URL.revokeObjectURL(objectUrl);
-      setImagePreview(editingProduct?.image || null);
+      setImagePreview(editingProduct?.image_url || editingProduct?.image || null);
       console.error('[❌ IMAGE UPLOAD ERROR]', error);
       setSaveError(error.message || 'Gagal mengupload foto. Coba file yang lain.');
     }
@@ -254,7 +274,7 @@ const ProductManagement: React.FC<Props> = ({
   const openEditForm = (product: ProductWithType) => {
     setEditingProduct(product);
     setSaveError(null);
-    setImagePreview(product.image || null);
+    setImagePreview(product.image_url || product.image || null);
     setIsModalOpen(true);
   };
 
@@ -272,7 +292,10 @@ const ProductManagement: React.FC<Props> = ({
     setSaveError(null);
 
     const formData = new FormData(e.currentTarget);
-    const productId = editingProduct?.id || `PROD-${Date.now()}`;
+    const productId =
+  editingProduct?.code ||
+  editingProduct?.id ||
+  `PROD-${Date.now()}`;
     const productTypeToSave = adminProductType || selectedProductType;
 
     const productData = {
@@ -294,6 +317,9 @@ const ProductManagement: React.FC<Props> = ({
     }
 
     try {
+      console.log('[EDITING PRODUCT]', editingProduct);
+console.log('[PRODUCT DATA]', productData); 
+
       const result = await fetchFromSheet('saveProduct', {
         product: productData,
       });
@@ -353,7 +379,7 @@ const ProductManagement: React.FC<Props> = ({
         <div className="mb-5 flex items-center gap-4 rounded-2xl bg-slate-50 p-4">
           <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-white">
             <img
-              src={getImageUrl(imagePreview || editingProduct?.image)}
+              src={getImageUrl(imagePreview || editingProduct?.image_url || editingProduct?.image)}
               alt="Product"
               className="h-full w-full object-cover"
               onError={(e) => {
@@ -681,7 +707,7 @@ const ProductManagement: React.FC<Props> = ({
                   <div className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
                     <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-slate-50">
                       <img
-                        src={getImageUrl(p.image)}
+                        src={getImageUrl(p.image_url || p.image)}
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                         alt={p.name}
                         onError={(e) => {
@@ -717,7 +743,7 @@ const ProductManagement: React.FC<Props> = ({
                       <div>
                         <p className="text-[10px] font-bold text-slate-400">Kategori</p>
                         <p className="text-xs font-black uppercase text-slate-900">
-                          {getCategoryName(p.category) || '-'}
+                          {getCategoryName(p.category || p.category_id) || '-'}
                         </p>
                       </div>
                     </div>

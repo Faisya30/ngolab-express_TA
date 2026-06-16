@@ -63,10 +63,12 @@ function mapActionToBackendRequest(action: string, data?: any): BackendRequest |
       return { method: 'GET', path: `/api/kiosk/members/${encodeURIComponent(String(data?.user_id || ''))}` };
     case 'lookupMemberByQr':
       return { method: 'POST', path: '/api/kiosk/members/qr-lookup', body: { code: data?.code || data?.user_id } };
-    case 'submitOrder':
-      return { method: 'POST', path: '/api/kiosk/orders', body: data };
+case 'submitOrder':
+       return { method: 'POST', path: '/api/kiosk/orders', body: data };
+    case 'getRecommendedProducts':
+       return { method: 'GET', path: '/api/membership/recommended-products' };
     default:
-      return null;
+       return null;
   }
 }
 

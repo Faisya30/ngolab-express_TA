@@ -415,17 +415,28 @@ export async function deleteProduct(req, res) {
       return res.status(403).json({ success: false, error: 'Role admin tidak diizinkan menghapus produk.' });
     }
 
-    const hasProductType = await hasColumn('products', 'product_type');
-    if (!hasProductType) {
-      return res.status(500).json({ success: false, error: 'Kolom product_type belum tersedia. Jalankan migrasi database terlebih dahulu.' });
-    }
+    const productId = req.params.id;
+
+    let result;
 
     if (requestProductType === 'all') {
-      await query('DELETE FROM products WHERE code = ?', [req.params.id]);
+      result = await query(
+        'DELETE FROM products WHERE code = ? OR id = ?',
+        [productId, productId]
+      );
     } else {
-      await query('DELETE FROM products WHERE code = ? AND product_type = ?', [req.params.id, requestProductType]);
+      result = await query(
+        'DELETE FROM products WHERE (code = ? OR id = ?) AND product_type = ?',
+        [productId, productId, requestProductType]
+      );
     }
-    res.json({ success: true });
+
+    console.log('[DELETE PRODUCT]', productId, result);
+
+    res.json({
+      success: true,
+      deletedRows: result.affectedRows || 0,
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

@@ -2221,3 +2221,47 @@ export async function lookupMember(req, res) {
     return res.status(500).json({ success: false, error: error.message });
   }
 }
+
+export async function getRecommendedProducts(_req, res) {
+  try {
+    const rows = await query(
+      `SELECT
+        id,
+        code,
+        name,
+        price,
+        image_url,
+        description,
+        cashback_reward
+      FROM products
+      WHERE product_type = 'kiosk'
+        AND is_active = 1
+        AND is_recommended = 1
+      ORDER BY created_at DESC`,
+    );
+
+    const baseUrl = _req.app?.get?.('baseUrl') || 'http://0.0.0.0:4000';
+
+    return res.json({
+      success: true,
+      data: rows.map((row) => {
+        let imageUrl = row.image_url || null;
+        if (imageUrl && !imageUrl.startsWith('http')) {
+          imageUrl = `${baseUrl}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+        }
+        return {
+          id: row.id,
+          code: row.code,
+          name: row.name,
+          price: Number(row.price || 0),
+          image_url: imageUrl,
+          description: row.description || null,
+          cashback_reward: Number(row.cashback_reward || 0),
+        };
+      }),
+    });
+  } catch (error) {
+    console.error('[getRecommendedProducts] Error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}

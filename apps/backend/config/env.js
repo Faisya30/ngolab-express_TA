@@ -8,6 +8,7 @@ function unique(items) {
 
 export function getServerConfig() {
   const port = Number(process.env.PORT || 4000);
+  const baseUrl = process.env.BASE_URL || `http://0.0.0.0:${port}`;
   const frontendOrigins = unique([
     'http://localhost:3000',
     'http://localhost:3001',
@@ -21,7 +22,7 @@ export function getServerConfig() {
       .filter(Boolean),
   ]).map((origin) => origin.trim());
 
-  return { port, frontendOrigins };
+  return { port, frontendOrigins, baseUrl };
 }
 
 export function validateEnvironment() {

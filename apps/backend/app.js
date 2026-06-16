@@ -10,7 +10,7 @@ function isAllowedLanFrontendOrigin(origin) {
   return /^http:\/\/(\d{1,3}\.){3}\d{1,3}:(3000|3001|3002|3004|3005|4000|5173|5175)$/.test(origin);
 }
 
-export function createApp({ frontendOrigins }) {
+export function createApp({ frontendOrigins, baseUrl }) {
   const app = express();
 
   app.use(
@@ -53,6 +53,8 @@ export function createApp({ frontendOrigins }) {
 
     res.status(statusCode).json({ success: false, error: message });
   });
+
+  app.set('baseUrl', baseUrl || 'http://0.0.0.0:4000');
 
   return app;
 }
