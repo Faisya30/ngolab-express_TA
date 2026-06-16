@@ -4,9 +4,28 @@ import logoNgolab from '../../../../shared/assets/images/logo_ngolab.png';
 import BowlNoodlesAltIcon from '@iconify-react/boxicons/bowl-noodles-alt';
 import DrinkIcon from '@iconify-react/pixelarticons/drop';
 import CircleIcon from '@iconify-react/pixelarticons/circle';
+import StarFourPointsIcon from '@iconify-react/mdi/star-four-points';
+import ViewGridOutlineIcon from '@iconify-react/mdi/view-grid-outline';
+import BowlIcon from '@iconify-react/mdi/bowl';
+import FoodCroissantIcon from '@iconify-react/mdi/food-croissant';
 
 const PLACEHOLDER_IMAGE = '/images/no-image.svg';
 const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '');
+
+interface Props {
+  cart: CartItem[];
+  member: Member | null;
+  products: Product[];
+  categories: any[];
+  onAddToCart: (product: Product) => void;
+  onUpdateQty: (id: string, delta: number) => void;
+  onRemove?: (id: string) => void;
+  onClearCart: () => void;
+  onOpenCart: () => void;
+  onBack: () => void;
+  total: number;
+  potentialPoints?: number;
+}
 
 function resolveImageSource(raw: unknown): string {
   if (!raw) return PLACEHOLDER_IMAGE;
@@ -37,8 +56,6 @@ function resolveImageSource(raw: unknown): string {
   return PLACEHOLDER_IMAGE;
 }
 
-console.log('[ImageResolver] MenuScreen image resolver ready');
-
 const normalizeCategoryId = (value: string | undefined | null) =>
   String(value || '').toLowerCase().trim();
 
@@ -50,11 +67,43 @@ const isRecommendedCategory = (categoryId: string) => {
 const getCategoryIcon = (categoryName: string) => {
   const normalized = normalizeCategoryId(categoryName);
 
-  if (normalized.includes('mie') || normalized.includes('yamin')) {
+  if (
+    normalized.includes('andalan') ||
+    normalized.includes('recommended')
+  ) {
+    return <StarFourPointsIcon height="22" />;
+  }
+
+  if (
+    normalized.includes('semua')
+  ) {
+    return <ViewGridOutlineIcon height="22" />;
+  }
+
+  if (
+    normalized.includes('bakso')
+  ) {
+    return <BowlIcon height="22" />;
+  }
+
+  if (
+    normalized.includes('mie') ||
+    normalized.includes('yamin')
+  ) {
     return <BowlNoodlesAltIcon height="22" />;
   }
 
-  if (normalized.includes('minuman')) {
+  if (
+    normalized.includes('gorengan')
+  ) {
+    return <FoodCroissantIcon height="22" />;
+  }
+
+  if (
+    normalized.includes('dorinku') ||
+    normalized.includes('minuman') ||
+    normalized.includes('drink')
+  ) {
     return <DrinkIcon height="22" />;
   }
 
@@ -75,8 +124,8 @@ const MenuScreen: React.FC<Props> = ({
 }) => {
   const [activeCategory, setActiveCategory] = useState(
     categories.find((c) => normalizeCategoryId(c?.id) === 'all')?.id ||
-    categories[0]?.id ||
-    'all'
+      categories[0]?.id ||
+      'all'
   );
 
   useEffect(() => {
@@ -108,13 +157,6 @@ const MenuScreen: React.FC<Props> = ({
 
     return byCategory.length > 0 ? byCategory : products;
   }, [activeCategory, products]);
-
-  console.log('[ImageResolver] Filtered products sample:', filteredProducts.slice(0, 3).map((p) => ({
-    id: p.id,
-    imageRaw: p.image,
-    imageType: typeof p.image,
-    imageResolved: resolveImageSource(p.image),
-  })));
 
   const itemCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
@@ -148,10 +190,11 @@ const MenuScreen: React.FC<Props> = ({
                 <button
                   key={cat.id}
                   onClick={() => setActiveCategory(cat.id)}
-                  className={`w-full min-h-[82px] flex flex-col items-center justify-center gap-2 transition-all relative ${isActive
-                    ? 'bg-orange-500 text-white'
-                    : 'text-white/60 hover:text-white hover:bg-white/5'
-                    }`}
+                  className={`w-full min-h-[82px] flex flex-col items-center justify-center gap-2 transition-all relative ${
+                    isActive
+                      ? 'bg-orange-500 text-white'
+                      : 'text-white/60 hover:text-white hover:bg-white/5'
+                  }`}
                 >
                   {isActive && (
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-white rounded-r-full" />
@@ -179,16 +222,7 @@ const MenuScreen: React.FC<Props> = ({
               className="flex items-center gap-3 bg-white rounded-full px-4 py-2 shadow-sm border border-orange-100 active:scale-95 transition"
             >
               <span className="w-7 h-7 rounded-full flex items-center justify-center">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
               </span>
@@ -219,10 +253,11 @@ const MenuScreen: React.FC<Props> = ({
                 <button
                   key={cat.id}
                   onClick={() => setActiveCategory(cat.id)}
-                  className={`shrink-0 rounded-full px-5 py-3 flex items-center gap-2 border transition-all ${isActive
-                    ? 'bg-white border-orange-500 text-orange-500 shadow-md'
-                    : 'bg-white border-orange-50 text-slate-500 hover:border-orange-200'
-                    }`}
+                  className={`shrink-0 rounded-full px-5 py-3 flex items-center gap-2 border transition-all ${
+                    isActive
+                      ? 'bg-white border-orange-500 text-orange-500 shadow-md'
+                      : 'bg-white border-orange-50 text-slate-500 hover:border-orange-200'
+                  }`}
                 >
                   <span className="w-4 h-4 flex items-center justify-center">
                     {getCategoryIcon(cat.name)}
@@ -246,10 +281,11 @@ const MenuScreen: React.FC<Props> = ({
                 <div
                   key={product.id}
                   onClick={() => onAddToCart(product)}
-                  className={`group relative bg-white rounded-[1.6rem] p-3 shadow-[0_10px_28px_rgba(15,23,42,0.08)] border cursor-pointer active:scale-[0.98] transition-all ${isSelected
-                    ? 'border-orange-500 ring-4 ring-orange-500/10'
-                    : 'border-white hover:border-orange-200'
-                    }`}
+                  className={`group relative bg-white rounded-[1.6rem] p-3 shadow-[0_10px_28px_rgba(15,23,42,0.08)] border cursor-pointer active:scale-[0.98] transition-all ${
+                    isSelected
+                      ? 'border-orange-500 ring-4 ring-orange-500/10'
+                      : 'border-white hover:border-orange-200'
+                  }`}
                 >
                   <div className="relative aspect-square rounded-[1.2rem] overflow-hidden bg-orange-50 mb-4">
                     <img
@@ -262,12 +298,6 @@ const MenuScreen: React.FC<Props> = ({
                       <div className="absolute top-3 left-3 bg-orange-500 text-white rounded-full px-3 py-1.5 flex items-center gap-1 shadow-lg">
                         <span className="text-[9px]">★</span>
                         <span className="text-[8px] font-black uppercase">Best Seller</span>
-                      </div>
-                    )}
-
-                    {Number(product.cashbackReward) > 0 && (
-                      <div className="absolute top-3 left-3 bg-orange-500 text-white rounded-full px-3 py-1.5 flex items-center gap-1 shadow-lg">
-                        <span className="text-[8px] font-black uppercase">Premium</span>
                       </div>
                     )}
 
@@ -329,7 +359,6 @@ const MenuScreen: React.FC<Props> = ({
             })}
           </div>
         </section>
-
       </main>
 
       <aside className="w-[320px] bg-white border-l border-orange-50 flex flex-col shrink-0 z-40 shadow-2xl">
@@ -353,14 +382,7 @@ const MenuScreen: React.FC<Props> = ({
           {cart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center">
               <div className="w-28 h-28 rounded-full bg-orange-50 flex items-center justify-center mb-5 text-slate-300">
-                <svg
-                  width="48"
-                  height="48"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                >
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
                   <circle cx="9" cy="21" r="1" />
                   <circle cx="20" cy="21" r="1" />
@@ -378,14 +400,14 @@ const MenuScreen: React.FC<Props> = ({
               {cart.map((item) => (
                 <div key={item.id} className="flex gap-3">
                   <img
-                     src={resolveImageSource(item.image)}
+                    src={resolveImageSource(item.image)}
                     alt={item.name}
                     className="w-14 h-14 rounded-xl object-cover bg-orange-50"
                   />
 
                   <div className="flex-1 min-w-0">
                     <h4 className="text-[11px] font-black uppercase truncate">
-                      {item.name}
+                     {item.name}
                     </h4>
 
                     <p className="text-orange-500 text-[11px] font-black mt-1">
@@ -437,10 +459,11 @@ const MenuScreen: React.FC<Props> = ({
           <button
             onClick={onOpenCart}
             disabled={cart.length === 0}
-            className={`mt-6 w-full rounded-2xl py-5 px-6 flex items-center justify-between uppercase font-black tracking-widest transition-all ${cart.length > 0
-              ? 'bg-orange-500 text-white shadow-xl shadow-orange-500/25 active:scale-95'
-              : 'bg-slate-100 text-slate-300 cursor-not-allowed'
-              }`}
+            className={`mt-6 w-full rounded-2xl py-5 px-6 flex items-center justify-between uppercase font-black tracking-widest transition-all ${
+              cart.length > 0
+                ? 'bg-orange-500 text-white shadow-xl shadow-orange-500/25 active:scale-95'
+                : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+            }`}
           >
             <span>Bayar</span>
             <span>›</span>

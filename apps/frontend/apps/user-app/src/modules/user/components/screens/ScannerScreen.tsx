@@ -32,14 +32,13 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack, validateUrl }) 
           config,
           (decodedText) => {
             console.log('QR TERDETEKSI:', decodedText);
-            alert(decodedText);
 
             if (!isMounted) return;
 
             setScanning(false);
 
             if (scannerRef.current) {
-              scannerRef.current.stop().catch(() => {});
+              scannerRef.current.stop().catch(() => { });
               scannerRef.current = null;
             }
 
@@ -93,7 +92,7 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack, validateUrl }) 
 
   const handleClose = async () => {
     if (scannerRef.current) {
-      await scannerRef.current.stop().catch(() => {});
+      await scannerRef.current.stop().catch(() => { });
       scannerRef.current = null;
     }
 
@@ -102,8 +101,8 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack, validateUrl }) 
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#f8fbff] px-8 py-8 text-slate-900">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(37,99,235,0.08),transparent_30%),radial-gradient(circle_at_80%_75%,rgba(99,102,241,0.08),transparent_35%)]" />
+    <div className="relative min-h-screen w-full overflow-hidden bg-[#fffaf5] px-8 py-8 text-slate-900">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(37,99,235,0.08),transparent_30%),radial-gradient(circle_at_80%_75%,rgba(99,102,241,0.08),transparent_35%)]" /><div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(249,115,22,0.10),transparent_30%),radial-gradient(circle_at_80%_75%,rgba(251,146,60,0.08),transparent_35%)]" />
 
       <div className="relative z-10 mx-auto flex min-h-[calc(100vh-64px)] max-w-7xl flex-col rounded-[28px] border border-slate-200 bg-white/85 p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)]">
         <div className="mb-8 flex items-center justify-between">
@@ -120,18 +119,12 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack, validateUrl }) 
             Kembali
           </button>
 
-          <div className="flex items-center gap-3 rounded-2xl bg-white px-5 py-3 text-xs font-black uppercase tracking-wider text-blue-600 shadow-sm ring-1 ring-blue-100">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            Aktifkan Kamera
-          </div>
         </div>
 
         <div className="grid flex-1 grid-cols-1 items-center gap-8 lg:grid-cols-[280px_1fr_260px]">
           <aside>
             <h2 className="text-3xl font-black uppercase tracking-tight text-slate-900">
-              Scan <span className="text-blue-600">Member</span>
+              Scan <span className="text-orange-600">Member</span>
             </h2>
 
             <p className="mt-3 text-sm font-medium leading-relaxed text-slate-500">
@@ -139,7 +132,7 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack, validateUrl }) 
             </p>
 
             <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="mb-5 text-xs font-black uppercase tracking-wider text-blue-600">
+              <h3 className="mb-5 text-xs font-black uppercase tracking-wider text-orange-600">
                 Cara Scan
               </h3>
 
@@ -175,7 +168,7 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack, validateUrl }) 
                   },
                 ].map((item) => (
                   <div key={item.title} className="flex gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 text-orange-600">
                       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         {item.icon}
                       </svg>
@@ -208,10 +201,11 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack, validateUrl }) 
 
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <div className="relative h-[280px] w-[280px]">
-                  <span className="absolute left-0 top-0 h-12 w-12 rounded-tl-2xl border-l-4 border-t-4 border-blue-300 shadow-[0_0_14px_rgba(147,197,253,0.9)]" />
-                  <span className="absolute right-0 top-0 h-12 w-12 rounded-tr-2xl border-r-4 border-t-4 border-blue-300 shadow-[0_0_14px_rgba(147,197,253,0.9)]" />
-                  <span className="absolute bottom-0 left-0 h-12 w-12 rounded-bl-2xl border-b-4 border-l-4 border-blue-300 shadow-[0_0_14px_rgba(147,197,253,0.9)]" />
-                  <span className="absolute bottom-0 right-0 h-12 w-12 rounded-br-2xl border-b-4 border-r-4 border-blue-300 shadow-[0_0_14px_rgba(147,197,253,0.9)]" />
+                  <span className="absolute left-0 top-0 h-12 w-12 rounded-tl-2xl border-l-4 border-t-4 border-orange-400
+shadow-[0_0_16px_rgba(251,146,60,0.9)]]" />
+                  <span className="absolute right-0 top-0 h-12 w-12 rounded-tr-2xl border-r-4 border-t-4 border-orange-400 shadow-[0_0_16px_rgba(251,146,60,0.9)]]" />
+                  <span className="absolute bottom-0 left-0 h-12 w-12 rounded-bl-2xl border-b-4 border-l-4 border-orange-400 shadow-[0_0_16px_rgba(251,146,60,0.9)]]" />
+                  <span className="absolute bottom-0 right-0 h-12 w-12 rounded-br-2xl border-b-4 border-r-4 border-orange-400 shadow-[0_0_16px_rgba(251,146,60,0.9)]]" />
                 </div>
               </div>
 
@@ -224,7 +218,7 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack, validateUrl }) 
               )}
 
               <div className="pointer-events-none absolute bottom-8 left-1/2 flex -translate-x-1/2 items-center gap-4 rounded-2xl bg-black/65 px-6 py-4 text-white shadow-lg">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-orange-400 border-t-transparent" />
                 <div>
                   <p className="text-sm font-black">Menunggu QR Member...</p>
                   <p className="mt-0.5 text-xs font-medium text-white/70">
@@ -241,15 +235,15 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack, validateUrl }) 
             </div>
           </main>
 
-          <aside className="rounded-2xl bg-blue-50/40 p-6">
+          <aside className="rounded-2xl bg-orange-50/40 p-6">
             <div className="mb-4 flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-orange-600">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 16h-1v-4h-1m1-4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
                 </svg>
               </div>
 
-              <h3 className="text-xs font-black uppercase tracking-wider text-blue-600">
+              <h3 className="text-xs font-black uppercase tracking-wider text-orange-600">
                 Informasi
               </h3>
             </div>
@@ -263,7 +257,8 @@ const ScannerScreen: React.FC<Props> = ({ onScanSuccess, onBack, validateUrl }) 
             </p>
 
             <div className="mt-10 flex justify-center">
-              <div className="relative flex h-36 w-24 items-center justify-center rounded-3xl border-4 border-blue-200 bg-white text-blue-300 shadow-sm">
+              <div className="relative flex h-36 w-24 items-center justify-center rounded-3xl border-4 border-orange-200
+text-orange-300 bg-white 0 shadow-sm">
                 <svg className="h-14 w-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm12 2h4m-4 4h4m-8-6h2m-2 4h2" />
                 </svg>
