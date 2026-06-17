@@ -6,6 +6,24 @@ import { createWorker } from 'tesseract.js';
 import { query, withTransaction } from '../config/db.js';
 import { createMembershipToken } from '../config/jwt.js';
 
+const tableColumnsCache = new Map();
+
+async function getTableColumns(tableName) {
+  if (tableColumnsCache.has(tableName)) {
+    return tableColumnsCache.get(tableName);
+  }
+
+  const rows = await query(`SHOW COLUMNS FROM ${tableName}`);
+  const cols = new Set(rows.map((row) => String(row.Field)));
+  tableColumnsCache.set(tableName, cols);
+  return cols;
+}
+
+async function hasColumn(tableName, columnName) {
+  const cols = await getTableColumns(tableName);
+  return cols.has(columnName);
+}
+
 const AFFILIATE_OCR_CONFIDENCE_THRESHOLD = Number(process.env.AFFILIATE_OCR_CONFIDENCE_THRESHOLD || 0.5);
 const AFFILIATE_REFERRAL_BONUS_BASIC = Number(process.env.AFFILIATE_REFERRAL_BONUS_BASIC || 5000);
 const AFFILIATE_REFERRAL_BONUS_STARTER = Number(process.env.AFFILIATE_REFERRAL_BONUS_STARTER || 5000);
@@ -165,6 +183,7 @@ async function fetchAffiliateNetworkRow(userId) {
     const rows = await query(fullSelect, [userId]);
     if (rows.length) return rows[0];
   } catch (error) {
+    console.warn('[fetchAffiliateNetworkRow] fullSelect failed, trying fallback:', error?.message);
     if (!isUnknownColumnError(error)) throw error;
   }
 
@@ -172,8 +191,8 @@ async function fetchAffiliateNetworkRow(userId) {
     const rows = await query(fallbackSelect, [userId]);
     if (rows.length) return rows[0];
   } catch (error) {
-    if (isUnknownColumnError(error)) {}
-    else throw error;
+    console.warn('[fetchAffiliateNetworkRow] fallbackSelect failed:', error?.message);
+    if (!isUnknownColumnError(error)) throw error;
   }
 
   try {
@@ -181,11 +200,13 @@ async function fetchAffiliateNetworkRow(userId) {
 `INSERT INTO affiliate_networks (user_id, total_referrals, total_downlines, commission_rate, commission_points, total_points)
        VALUES (?, 0, 0, ?, 0, 0)
        ON DUPLICATE KEY UPDATE user_id = user_id`,
-       [userId, AFFILIATE_COMMISSION_RATE_BASIC],
+      [userId, AFFILIATE_COMMISSION_RATE_BASIC],
     );
+    console.log('[fetchAffiliateNetworkRow] Insert attempted, result:', insertResult);
     const rows = await query(fullSelect, [userId]);
     return rows[0] || null;
   } catch (error) {
+    console.warn('[fetchAffiliateNetworkRow] Insert failed, returning null:', error?.message);
     return null;
   }
 }
@@ -471,15 +492,18 @@ export async function register(req, res) {
 }
 
 export async function login(req, res) {
-  console.log('LOGIN CONTROLLER TERPANGGIL');
-  console.log('BODY LOGIN:', req.body);
+  console.log('[LOGIN] ===== START =====');
+  console.log('[LOGIN] Request body:', req.body);
 
   try {
     const body = req.body || {};
     const identifier = normalizeText(body.username || body.email);
     const password = normalizeText(body.password);
 
+    console.log('[LOGIN] Identifier:', identifier);
+
     if (!identifier || !password) {
+      console.log('[LOGIN] Missing credentials - returning 400');
       return res.status(400).json({
         success: false,
         error: 'username/email dan password wajib diisi.',
@@ -498,6 +522,7 @@ export async function login(req, res) {
     console.log('[LOGIN] Query completed in', Date.now() - queryStart, 'ms. Rows:', rows.length);
 
     if (!rows.length) {
+      console.log('[LOGIN] User not found - returning 401');
       return res.status(401).json({ success: false, error: 'Akun tidak ditemukan.' });
     }
 
@@ -507,50 +532,82 @@ export async function login(req, res) {
     let validPassword = false;
 
     if (looksLikeBcrypt) {
+      console.log('[LOGIN] Comparing bcrypt password');
       validPassword = await bcrypt.compare(password, storedPassword);
     } else if (password === storedPassword) {
       validPassword = true;
       const migratedHash = await bcrypt.hash(password, 10);
+      console.log('[LOGIN] Migrating plaintext password to bcrypt');
       await query('UPDATE users SET password = ? WHERE user_id = ?', [migratedHash, user.user_id]);
       user.password = migratedHash;
     }
 
+    console.log('[LOGIN] Password valid:', validPassword);
+
     if (!validPassword) {
+      console.log('[LOGIN] Invalid password - returning 401');
       return res.status(401).json({ success: false, error: 'Password salah.' });
     }
 
     const isAffiliate = String(user.role || '').toUpperCase() === 'MEMBER_AFFILIATE';
 
-    console.log('[LOGIN] Fetching affiliate network for user:', user.user_id);
-    const affiliateRow = isAffiliate ? await fetchAffiliateNetworkRow(user.user_id) : null;
-    console.log('[LOGIN] Affiliate network fetched for user:', user.user_id);
+    console.log('[LOGIN] Fetching affiliate network for user:', user.user_id, 'isAffiliate:', isAffiliate);
+    let affiliateRow = null;
+    try {
+      affiliateRow = isAffiliate ? await fetchAffiliateNetworkRow(user.user_id) : null;
+      console.log('[LOGIN] Affiliate network fetched for user:', user.user_id);
+    } catch (affError) {
+      console.warn('[LOGIN] Warning: Failed to fetch affiliate network, continuing without it:', affError?.message);
+      affiliateRow = null;
+    }
 
     const referralCode = isAffiliate ? affiliateRow?.referral_code || null : null;
     const publicUser = buildPublicUser(user);
     publicUser.referral_code = referralCode;
 
     console.log('[LOGIN] Fetching points for user:', user.user_id);
-    const pointsRows = await query(
-      `SELECT total_points, commission_points, mission_points, cashback_points, voucher_points
-      FROM user_points
-      WHERE user_id = ?
-      LIMIT 1`,
-      [user.user_id]
-    );
+    let pointsRows = [];
+    try {
+      pointsRows = await query(
+        `SELECT total_points, commission_points, mission_points, cashback_points, voucher_points
+        FROM user_points
+        WHERE user_id = ?
+        LIMIT 1`,
+        [user.user_id]
+      );
+      console.log('[LOGIN] Points fetched:', pointsRows.length, 'rows');
+    } catch (pointsError) {
+      console.warn('[LOGIN] Warning: Failed to fetch user points, using null:', pointsError?.message);
+      pointsRows = [];
+    }
 
+    let tokenResult = null;
+    try {
+      tokenResult = createMembershipToken(publicUser);
+      console.log('[LOGIN] Token created successfully');
+    } catch (tokenError) {
+      console.error('[LOGIN] Error creating token:', tokenError);
+      return res.status(500).json({ success: false, error: 'Gagal membuat token autentikasi.' });
+    }
+
+    console.log('[LOGIN] ===== END - SUCCESS =====');
     return res.json({
       success: true,
       message: 'Login berhasil.',
       data: {
         user: publicUser,
-        ...createMembershipToken(publicUser),
+        ...tokenResult,
         affiliate_network: isAffiliate ? buildAffiliateNetwork(affiliateRow) : null,
         referralCode,
         points: pointsRows[0] || null,
       },
     });
   } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+    console.error('[LOGIN] ===== ERROR =====', error);
+    if (error?.stack) {
+      console.error('[LOGIN] Stack trace:', error.stack);
+    }
+    return res.status(500).json({ success: false, error: error?.message || 'Terjadi kesalahan pada server.' });
   }
 }
 
@@ -2262,6 +2319,119 @@ export async function getRecommendedProducts(_req, res) {
     });
   } catch (error) {
     console.error('[getRecommendedProducts] Error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+export async function getAdminAiInsights(_req, res) {
+  try {
+    const usesOrderCode = await hasColumn('order_items', 'order_code');
+    const hasMemberCode = await hasColumn('orders', 'member_code');
+    const hasUserIdInOrders = await hasColumn('orders', 'user_id');
+    const usesUserColumn = hasUserIdInOrders && !hasMemberCode;
+    const joinCondition = usesOrderCode
+      ? 'JOIN orders o ON o.order_code = oi.order_code'
+      : 'LEFT JOIN orders o ON oi.order_id = o.id';
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+
+    const todayProductRows = await query(
+      `SELECT oi.product_name_snapshot, SUM(oi.qty) AS total_qty
+       FROM order_items oi
+       ${joinCondition}
+       WHERE DATE(o.created_at) = ?
+       GROUP BY oi.product_name_snapshot
+       ORDER BY total_qty DESC
+       LIMIT 1`,
+      [todayStr]
+    );
+
+    const monthProductRows = await query(
+      `SELECT oi.product_name_snapshot, SUM(oi.qty) AS total_qty
+       FROM order_items oi
+       ${joinCondition}
+       WHERE DATE(o.created_at) >= ?
+       GROUP BY oi.product_name_snapshot
+       ORDER BY total_qty DESC
+       LIMIT 1`,
+      [firstDayOfMonth]
+    );
+
+    const ordersTodayRows = await query(
+      `SELECT COUNT(*) AS total_orders, SUM(total) AS total_revenue
+       FROM orders
+       WHERE DATE(created_at) = ?`,
+      [todayStr]
+    );
+
+    const hourRows = await query(
+      `SELECT HOUR(created_at) AS hour, COUNT(*) AS order_count
+       FROM orders
+       WHERE DATE(created_at) = ?
+       GROUP BY HOUR(created_at)
+       ORDER BY order_count DESC
+       LIMIT 1`,
+      [todayStr]
+    );
+
+    const activityRows = await query(
+      `SELECT DAYNAME(created_at) AS day_name, DATE(created_at) AS order_date,
+              ${usesUserColumn ? 'COUNT(DISTINCT o.user_id)' : 'COUNT(DISTINCT o.member_code)'} AS unique_users, COUNT(*) AS order_count
+       FROM orders o
+       WHERE DATE(created_at) >= DATE_SUB(?, INTERVAL 6 DAY)
+       GROUP BY DATE(created_at)
+       ORDER BY order_date`,
+      [todayStr]
+    );
+
+    const topProductToday = todayProductRows[0]?.product_name_snapshot || null;
+    const topProductMonth = monthProductRows[0]?.product_name_snapshot || null;
+    const peakHour = hourRows?.[0]?.hour != null
+      ? `${String(hourRows[0].hour).padStart(2, '0')}:00 - ${String(hourRows[0].hour + 1).padStart(2, '0')}:00`
+      : null;
+
+    const totalOrdersToday = Number(ordersTodayRows?.[0]?.total_orders || 0);
+    const totalRevenueToday = Number(ordersTodayRows?.[0]?.total_revenue || 0);
+    const averageOrderValue = totalOrdersToday > 0 ? Math.round(totalRevenueToday / totalOrdersToday) : 0;
+
+    const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+    const activityChart = activityRows.map((row) => {
+      const date = new Date(row.order_date);
+      const idx = date.getDay();
+      return {
+        label: dayNames[idx],
+        users: Number(row.unique_users || 0),
+        orders: Number(row.order_count || 0),
+      };
+    });
+
+    let recommendation = '';
+    if (topProductToday && peakHour) {
+      recommendation = `${topProductToday} menjadi produk terlaris hari ini. Siapkan stok tambahan untuk jam makan siang karena transaksi paling ramai terjadi pukul ${peakHour}.`;
+    } else if (topProductToday) {
+      recommendation = `${topProductToday} menjadi produk terlaris hari ini.`;
+    } else if (peakHour) {
+      recommendation = `Jam paling ramai terjadi pukul ${peakHour}.`;
+    } else {
+      recommendation = 'Belum ada data insight untuk hari ini.';
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        top_product_today: topProductToday,
+        top_product_month: topProductMonth,
+        peak_hour: peakHour,
+        total_orders_today: totalOrdersToday,
+        total_revenue_today: totalRevenueToday,
+        average_order_value: averageOrderValue,
+        recommendation,
+        activity_chart: activityChart,
+      },
+    });
+  } catch (error) {
+    console.error('[getAdminAiInsights] Error:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 }

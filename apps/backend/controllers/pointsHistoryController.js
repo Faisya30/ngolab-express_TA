@@ -3,9 +3,12 @@ import { PointsHistoryRepository } from '../repositories/PointsHistoryRepository
 export async function getPointsHistory(req, res) {
     try {
         const userId = req.query.userId;
+        const jwtUserId = req.membershipAuth?.user_id || req.membershipAuth?.sub;
         
         let history;
-        if (userId) {
+        if (jwtUserId) {
+            history = await PointsHistoryRepository.findByUserId(jwtUserId);
+        } else if (userId) {
             history = await PointsHistoryRepository.findByUserId(userId);
         } else {
             history = await PointsHistoryRepository.findAll();
@@ -14,7 +17,7 @@ export async function getPointsHistory(req, res) {
         return res.json({
             success: true,
             message: 'Berhasil',
-            data: history
+            data: history || []
         });
     } catch (error) {
         return res.status(500).json({

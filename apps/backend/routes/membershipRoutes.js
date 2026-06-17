@@ -5,6 +5,7 @@ import {
   earnPoints,
   getAllAffiliates,
   getAllCommissionLogs,
+  getAdminAiInsights,
   getAffiliateVerifications,
   getAllMembers,
   getCommissionLogs,
@@ -34,8 +35,14 @@ import { requireConnectionKey } from '../middlewares/connectionKey.js';
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
-router.post('/register', register);
-router.post('/login', login);
+function asyncHandler(fn) {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
+
+router.post('/register', asyncHandler(register));
+router.post('/login', asyncHandler(login));
 router.post('/lookup', lookupMember);
 router.get('/profile/:user_id', getUserProfile);
 router.put('/profile/:user_id', upload.single('profile_picture'), updateProfile);
@@ -62,5 +69,6 @@ router.get('/transactions/:transaction_code', getTransactionDetail);
 router.get('/transactions/history/:user_id', requireMembershipJwt, requireSelfMembershipAccess, getTransactionHistory);
 router.post('/gamification/earn-points', earnPoints);
 router.get('/recommended-products', getRecommendedProducts);
+router.get('/admin/ai-insights', getAdminAiInsights);
 
 export default router;

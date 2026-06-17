@@ -2,23 +2,43 @@ import { query } from '../config/db.js';
 
 export class GameRepository {
     static async findById(id) {
-        const rows = await query(
-            'SELECT id, type, name, cost_points, reward_points, is_active, config_data FROM Games WHERE id = ? LIMIT 1',
-            [id]
-        );
-        return rows[0] || null;
+        try {
+            const rows = await query(
+                'SELECT id, type, name, cost_points, reward_points, is_active, config_data FROM Games WHERE id = ? LIMIT 1',
+                [id]
+            );
+            return rows[0] || null;
+        } catch (error) {
+            if (this.isTableMissing(error)) return null;
+            throw error;
+        }
     }
 
     static async findAll() {
-        return await query(
-            'SELECT id, type, name, cost_points, reward_points, is_active, config_data FROM Games ORDER BY createdAt DESC'
-        );
+        try {
+            return await query(
+                'SELECT id, type, name, cost_points, reward_points, is_active, config_data FROM Games ORDER BY id DESC'
+            );
+        } catch (error) {
+            if (this.isTableMissing(error)) return [];
+            throw error;
+        }
     }
 
     static async findActive() {
-        return await query(
-            'SELECT id, type, name, cost_points, reward_points, is_active, config_data FROM Games WHERE is_active = TRUE'
-        );
+        try {
+            return await query(
+                'SELECT id, type, name, cost_points, reward_points, is_active, config_data FROM Games WHERE is_active = TRUE'
+            );
+        } catch (error) {
+            if (this.isTableMissing(error)) return [];
+            throw error;
+        }
+    }
+
+    static isTableMissing(error) {
+        const message = String(error?.message || '').toLowerCase();
+        return message.includes("doesn't exist") || message.includes('unknown table') || message.includes('no such table');
     }
 
     static async create(data) {

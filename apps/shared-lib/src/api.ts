@@ -67,6 +67,8 @@ case 'submitOrder':
        return { method: 'POST', path: '/api/kiosk/orders', body: data };
     case 'getRecommendedProducts':
        return { method: 'GET', path: '/api/membership/recommended-products' };
+    case 'getAdminAiInsights':
+       return { method: 'GET', path: '/api/membership/admin/ai-insights' };
     default:
        return null;
   }

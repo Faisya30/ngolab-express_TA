@@ -19,16 +19,16 @@ export async function getVouchers(req, res) {
 
 export async function claimVoucher(req, res) {
     try {
-        const { userId, voucherId } = req.body || {};
+        const { voucherCode } = req.body || {};
 
-        if (!userId || !voucherId) {
+        if (!voucherCode) {
             return res.status(400).json({
                 success: false,
-                message: 'userId dan voucherId wajib diisi'
+                message: 'voucherCode wajib diisi'
             });
         }
 
-        const result = await VoucherService.claimVoucher(userId, voucherId);
+        const result = await VoucherService.claimVoucher(req.membershipAuth.user_id, voucherCode);
 
         return res.json({
             success: true,

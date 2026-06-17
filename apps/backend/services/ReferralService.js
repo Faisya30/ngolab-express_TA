@@ -6,13 +6,15 @@ function normalizeText(value) {
 
 export class ReferralService {
     static async getReferralMembers(authUserId, affiliateId) {
-        if (authUserId !== affiliateId) {
-            throw new Error('Akses ditolak: Anda hanya dapat melihat referral milik sendiri.');
+        const targetUserId = String(authUserId || affiliateId || '').trim();
+
+        if (!targetUserId) {
+            throw new Error('user_id tidak ditemukan.');
         }
 
         const referredRows = await query(
             'SELECT user_id, username, created_at FROM users WHERE referred_by = ? ORDER BY created_at DESC',
-            [normalizeText(affiliateId)]
+            [targetUserId]
         );
 
         if (!referredRows.length) {

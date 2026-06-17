@@ -55,11 +55,17 @@ router.post('/referral-earnings', referralEarningsController.createReferralEarni
 
 // Voucher Routes
 router.get('/vouchers', voucherController.getVouchers);
-router.post('/vouchers/claim', requireMembershipJwt, requireSelfMembershipAccess, voucherController.claimVoucher);
+router.post('/vouchers/claim', requireMembershipJwt, voucherController.claimVoucher);
 router.get('/user-vouchers', requireMembershipJwt, requireSelfMembershipAccess, voucherController.getUserVouchers);
 
 // Referral Routes
 router.get('/referrals/members', requireMembershipJwt, referralController.getReferralMembers);
 router.get('/referrals/stats', requireMembershipJwt, referralController.getReferralStats);
+
+// Alias routes for frontend compatibility
+router.post('/checkin', requireMembershipJwt, gamificationController.checkin);
+router.get('/points/history', requireMembershipJwt, pointsHistoryController.getPointsHistory);
+router.post('/games/spin', requireMembershipJwt, gameController.playGame);
+router.post('/games/scratch', requireMembershipJwt, gameController.playGame);
 
 export default router;

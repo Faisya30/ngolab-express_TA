@@ -105,7 +105,7 @@ export async function addPoints(req, res) {
 
 export async function checkin(req, res) {
     try {
-        const user_id = String(req.params.id || '').trim();
+        const user_id = String(req.params?.id || req.membershipAuth?.user_id || req.membershipAuth?.sub || '').trim();
         
         if (!user_id) {
             return res.status(400).json({

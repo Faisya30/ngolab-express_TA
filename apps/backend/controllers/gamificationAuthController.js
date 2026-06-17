@@ -16,22 +16,41 @@ export async function gamificationLogin(req, res) {
         }
 
         // Call Membership API for authentication
-        const membershipResponse = await fetch(`${MEMBERSHIP_API_URL}/login`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ username, email, password })
-        });
+        console.log('[GAMIFICATION LOGIN] Calling membership API at:', `${MEMBERSHIP_API_URL}/login`);
+        let membershipResponse;
+        try {
+            membershipResponse = await fetch(`${MEMBERSHIP_API_URL}/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, email, password })
+            });
+        } catch (fetchError) {
+            console.error('[GAMIFICATION LOGIN] Fetch error:', fetchError.message);
+            return res.status(503).json({
+                success: false,
+                message: 'Tidak dapat terhubung ke layanan membership. Pastikan backend membership berjalan.'
+            });
+        }
 
-        const membershipResult = await membershipResponse.json();
+        let membershipResult;
+        try {
+            membershipResult = await membershipResponse.json();
+        } catch (jsonError) {
+            console.error('[GAMIFICATION LOGIN] JSON parse error:', jsonError.message);
+            return res.status(502).json({
+                success: false,
+                message: 'Response dari layanan membership tidak valid.'
+            });
+        }
 
         console.log('[DEBUG] membershipResult:', JSON.stringify(membershipResult, null, 2));
 
         if (!membershipResponse.ok || !membershipResult.success) {
             return res.status(401).json({
                 success: false,
-                message: membershipResult.message || 'Akun tidak ditemukan atau password salah'
+                message: membershipResult.message || membershipResult.error || 'Akun tidak ditemukan atau password salah'
             });
         }
 
@@ -53,13 +72,25 @@ export async function gamificationLogin(req, res) {
         }
 
         const isAffiliate = String(memberUser.role || '').toUpperCase() === 'MEMBER_AFFILIATE';
-        const affiliateRows = isAffiliate
-            ? await query('SELECT referral_code FROM affiliate_networks WHERE user_id = ? LIMIT 1', [extractedUserId])
-            : [];
+        let affiliateRows = [];
+        try {
+            affiliateRows = isAffiliate
+                ? await query('SELECT referral_code FROM affiliate_networks WHERE user_id = ? LIMIT 1', [extractedUserId])
+                : [];
+        } catch (affError) {
+            console.warn('[GAMIFICATION LOGIN] Warning: Failed to fetch affiliate data:', affError?.message);
+            affiliateRows = [];
+        }
         const referralCode = isAffiliate ? affiliateRows[0]?.referral_code || null : null;
 
         // Get or create UserGamification record
-        const userGamification = await UserGamificationService.getUserById(extractedUserId);
+        let userGamification;
+        try {
+            userGamification = await UserGamificationService.getUserById(extractedUserId);
+        } catch (ugError) {
+            console.warn('[GAMIFICATION LOGIN] Warning: Failed to fetch UserGamification:', ugError?.message);
+            userGamification = null;
+        }
 
         return res.json({
             success: true,
@@ -78,7 +109,10 @@ export async function gamificationLogin(req, res) {
             }
         });
     } catch (error) {
-        console.error('[GAMIFICATION LOGIN] Error:', error.message);
+        console.error('[GAMIFICATION LOGIN] Error:', error);
+        if (error?.stack) {
+            console.error('[GAMIFICATION LOGIN] Stack:', error.stack);
+        }
         return res.status(500).json({
             success: false,
             message: error.message || 'Terjadi kesalahan pada server'

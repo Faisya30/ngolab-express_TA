@@ -16,6 +16,10 @@ function getJwtConfig() {
 export function createMembershipToken(user) {
   const { secret, expiresIn } = getJwtConfig();
 
+  if (!secret) {
+    throw new Error('JWT_SECRET tidak terdefinisi.');
+  }
+
   const payload = {
     type: 'membership',
     sub: String(user?.user_id || ''),
@@ -25,14 +29,19 @@ export function createMembershipToken(user) {
     role: String(user?.role || ''),
   };
 
-  const token = jwt.sign(payload, secret, { expiresIn });
+  try {
+    const token = jwt.sign(payload, secret, { expiresIn });
 
-  return {
-    token,
-    accessToken: token,
-    expiresIn,
-    tokenType: 'Bearer',
-  };
+    return {
+      token,
+      accessToken: token,
+      expiresIn,
+      tokenType: 'Bearer',
+    };
+  } catch (error) {
+    console.error('[JWT] Error creating token:', error);
+    throw error;
+  }
 }
 
 export function verifyMembershipToken(token) {
