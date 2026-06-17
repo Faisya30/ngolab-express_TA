@@ -30,6 +30,7 @@ interface Props {
   discount: number;
   total: number;
   member: Member | null;
+  memberError?: string | null;
   useKoin: boolean;
   potentialPoints: number;
   onToggleKoin: () => void;
@@ -81,6 +82,7 @@ const CartScreen: React.FC<Props> = ({
   cart,
   subtotal,
   member,
+  memberError,
   useKoin,
   onToggleKoin,
   appliedVoucher,
@@ -367,6 +369,13 @@ const CartScreen: React.FC<Props> = ({
                 >
                   Punya Member? Scan QR
                 </button>
+                {memberError && (
+  <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+    <p className="text-[11px] font-bold text-red-500">
+      {memberError}
+    </p>
+  </div>
+)}
               </div>
             )}
           </div>

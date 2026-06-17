@@ -30,6 +30,7 @@ const UserKiosk: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [serviceType, setServiceType] = useState<ServiceType | null>(null);
   const [member, setMember] = useState<Member | null>(null);
+  const [memberError, setMemberError] = useState<string | null>(null);
   const [appliedVoucher, setAppliedVoucher] = useState<Voucher | null>(null);
   const [useKoin, setUseKoin] = useState(false);
   const [orderId, setOrderId] = useState(() => Math.floor(1000 + Math.random() * 9000).toString());
@@ -578,6 +579,7 @@ const UserKiosk: React.FC = () => {
             discount={voucherDiscount + koinDiscount}
             total={total}
             member={member}
+            memberError={memberError}
             useKoin={useKoin}
             onToggleKoin={() => setUseKoin(!useKoin)}
             potentialPoints={calculatePotentialPoints(cart)}
@@ -600,79 +602,84 @@ const UserKiosk: React.FC = () => {
           <ScannerScreen
             validateUrl="/api/kiosk/members/qr-lookup"
             onScanSuccess={async (code: string) => {
-              let userId: string | undefined;
+  let userId: string | undefined;
 
-              try {
-                const trimmed = String(code).trim();
-                const firstBrace = trimmed.indexOf('{');
-                const lastBrace = trimmed.lastIndexOf('}');
+  try {
+    const trimmed = String(code).trim();
+    const firstBrace = trimmed.indexOf('{');
+    const lastBrace = trimmed.lastIndexOf('}');
 
-                if (firstBrace >= 0 && lastBrace > firstBrace) {
-                  const jsonStr = trimmed.slice(firstBrace, lastBrace + 1);
-                  const parsed = JSON.parse(jsonStr);
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      const jsonStr = trimmed.slice(firstBrace, lastBrace + 1);
+      const parsed = JSON.parse(jsonStr);
 
-                  userId = parsed.user_id || parsed.userId || undefined;
+      userId = parsed.user_id || parsed.userId || undefined;
 
-                  if (!userId && parsed.user && parsed.user.id) {
-                    userId = String(parsed.user.id);
-                  }
-                }
-              } catch {
-                userId = undefined;
-              }
+      if (!userId && parsed.user && parsed.user.id) {
+        userId = String(parsed.user.id);
+      }
+    }
+  } catch {
+    userId = undefined;
+  }
 
-              try {
-                let data: any;
+  try {
+    let data: any;
 
-                if (userId && userId.length >= 3) {
-                  data = await fetchFromSheet('getMemberByUserId', { user_id: userId });
-                } else {
-                  data = await fetchFromSheet('lookupMemberByQr', { code: String(code) });
-                }
+    if (userId && userId.length >= 3) {
+      data = await fetchFromSheet('getMemberByUserId', { user_id: userId });
+    } else {
+      data = await fetchFromSheet('lookupMemberByQr', { code: String(code) });
+    }
 
-                console.log('[QR-LOOKUP] fetchFromSheet response:', data);
+    console.log('[QR-LOOKUP] fetchFromSheet response:', data);
 
-                if (data?.success && data?.user_id && data?.username) {
-                  const memberData = buildMemberData(data);
+    if (data?.success && data?.user_id && data?.username) {
+      const memberData = buildMemberData(data);
 
-                  console.log('[QR-LOOKUP] Member data set:', memberData);
-                  setMember(memberData);
-                } else {
-                  setMember(null);
-                }
-              } catch (fetchError) {
-                console.error('[QR-LOOKUP] fetchFromSheet error:', fetchError);
+      console.log('[QR-LOOKUP] Member data set:', memberData);
+      setMemberError(null);
+      setMember(memberData);
+    } else {
+      setMember(null);
+      setMemberError('Member tidak ditemukan atau QR tidak valid.');
+    }
+  } catch (fetchError) {
+    console.error('[QR-LOOKUP] fetchFromSheet error:', fetchError);
 
-                try {
-                  const base = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000').replace(/\/$/, '');
-                  const fallbackCode = userId || String(code);
+    try {
+      const base = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000').replace(/\/$/, '');
+      const fallbackCode = userId || String(code);
 
-                  const fallback = await fetch(`${base}/api/kiosk/members/qr-lookup`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code: fallbackCode }),
-                  });
+      const fallback = await fetch(`${base}/api/kiosk/members/qr-lookup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: fallbackCode }),
+      });
 
-                  const fallbackData = await fallback.json().catch(() => ({}));
+      const fallbackData = await fallback.json().catch(() => ({}));
 
-                  console.log('[QR-LOOKUP] fallback API response:', fallbackData);
+      console.log('[QR-LOOKUP] fallback API response:', fallbackData);
 
-                  if (fallbackData?.success && fallbackData?.user_id) {
-                    const memberData = buildMemberData(fallbackData);
+      if (fallbackData?.success && fallbackData?.user_id) {
+        const memberData = buildMemberData(fallbackData);
 
-                    console.log('[QR-LOOKUP] Member data set (fallback):', memberData);
-                    setMember(memberData);
-                  } else {
-                    setMember(null);
-                  }
-                } catch (fallbackError) {
-                  console.error('[QR-LOOKUP] fallback error:', fallbackError);
-                  setMember(null);
-                }
-              }
+        console.log('[QR-LOOKUP] Member data set (fallback):', memberData);
+        setMemberError(null);
+        setMember(memberData);
+      } else {
+        setMember(null);
+        setMemberError('Member tidak ditemukan atau QR tidak valid.');
+      }
+    } catch (fallbackError) {
+      console.error('[QR-LOOKUP] fallback error:', fallbackError);
+      setMember(null);
+      setMemberError('Member tidak ditemukan atau QR tidak valid.');
+    }
+  }
 
-              setCurrentScreen(Screen.CART);
-            }}
+  setCurrentScreen(Screen.CART);
+}}
             onBack={() => setCurrentScreen(Screen.CART)}
           />
         )}
