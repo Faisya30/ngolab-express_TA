@@ -29,6 +29,7 @@ export function requireMembershipJwt(req, res, next) {
 
     const decoded = verifyMembershipToken(token);
     req.membershipAuth = decoded;
+    console.log('[JWT PAYLOAD]', req.membershipAuth);
     return next();
   } catch (error) {
     const message = String(error?.name || '').toLowerCase() === 'tokenexpirederror'

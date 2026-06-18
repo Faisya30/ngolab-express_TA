@@ -10,7 +10,7 @@ type ProductWithType = Product & {
   product_type?: 'kiosk' | 'cv' | string;
   image_url?: string;
   category_id?: string | number;
-}; 
+};
 
 type CategoryWithType = Category & {
   product_type?: 'kiosk' | 'cv' | 'all' | string;
@@ -25,6 +25,17 @@ function getImageUrl(imagePath: string | null | undefined): string {
   }
 
   return imagePath || '/images/no-image.svg';
+}
+
+function isRecommendedValue(product: any): boolean {
+  return (
+    product?.isRecommended === true ||
+    product?.isRecommended === 1 ||
+    product?.isRecommended === '1' ||
+    product?.is_recommended === true ||
+    product?.is_recommended === 1 ||
+    product?.is_recommended === '1'
+  );
 }
 
 interface Props {
@@ -199,41 +210,41 @@ const ProductManagement: React.FC<Props> = ({
   }, [products, searchTerm, selectedCategory, categories]);
 
   const executeDelete = async (id: string) => {
-  if (!id) return;
+    if (!id) return;
 
-  setIsDeleting(true);
+    setIsDeleting(true);
 
-  try {
-    const response = await fetch(
-      `${BACKEND_URL}/api/admin/products/${id}`,
-      {
-  method: 'DELETE',
-  headers: {
-    'x-admin-role': 'admin',
-  },
-}
-    );
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/api/admin/products/${id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'x-admin-role': 'admin',
+          },
+        }
+      );
 
-    const result = await response.json();
+      const result = await response.json();
 
-    console.log('[DELETE RESULT]', result);
+      console.log('[DELETE RESULT]', result);
 
-    if (!response.ok || !result.success) {
-      throw new Error(result.error || 'Gagal menghapus produk');
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Gagal menghapus produk');
+      }
+
+      setProducts((prev) =>
+        prev.filter((product) => String(product.id) !== String(id))
+      );
+
+      setConfirmDeleteId(null);
+      //onUpdate();
+    } catch (error) {
+      console.error('[DELETE PRODUCT ERROR]', error);
+    } finally {
+      setIsDeleting(false);
     }
-
-    setProducts((prev) =>
-       prev.filter((product) => String(product.id) !== String(id))
-    );
-
-    setConfirmDeleteId(null);
-    //onUpdate();
-  } catch (error) {
-    console.error('[DELETE PRODUCT ERROR]', error);
-  } finally {
-    setIsDeleting(false);
-  }
-};
+  };
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -272,6 +283,8 @@ const ProductManagement: React.FC<Props> = ({
   };
 
   const openEditForm = (product: ProductWithType) => {
+    console.log('[EDIT PRODUCT]', product);
+
     setEditingProduct(product);
     setSaveError(null);
     setImagePreview(product.image_url || product.image || null);
@@ -293,9 +306,9 @@ const ProductManagement: React.FC<Props> = ({
 
     const formData = new FormData(e.currentTarget);
     const productId =
-  editingProduct?.code ||
-  editingProduct?.id ||
-  `PROD-${Date.now()}`;
+      editingProduct?.code ||
+      editingProduct?.id ||
+      `PROD-${Date.now()}`;
     const productTypeToSave = adminProductType || selectedProductType;
 
     const productData = {
@@ -318,7 +331,7 @@ const ProductManagement: React.FC<Props> = ({
 
     try {
       console.log('[EDITING PRODUCT]', editingProduct);
-console.log('[PRODUCT DATA]', productData); 
+      console.log('[PRODUCT DATA]', productData);
 
       const result = await fetchFromSheet('saveProduct', {
         product: productData,
@@ -593,7 +606,7 @@ console.log('[PRODUCT DATA]', productData);
                 type="checkbox"
                 name="isRecommended"
                 id={`isRec-${editingProduct?.id || 'new'}`}
-                defaultChecked={editingProduct?.isRecommended}
+                defaultChecked={isRecommendedValue(editingProduct)}
                 className="h-4 w-4"
               />
               <label
@@ -623,8 +636,8 @@ console.log('[PRODUCT DATA]', productData);
             {isSaving
               ? 'Memproses...'
               : mode === 'edit'
-              ? 'Simpan Perubahan'
-              : 'Simpan Produk'}
+                ? 'Simpan Perubahan'
+                : 'Simpan Produk'}
           </button>
         </div>
       </form>

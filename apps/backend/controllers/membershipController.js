@@ -1248,6 +1248,13 @@ export async function reviewAffiliateVerification(_req, res) {
             [currentVerification.user_id, `AFF-${currentVerification.user_id}`, referralCode]
           );
         }
+      } else if (status === 'REJECTED') {
+        await connection.query(
+          `UPDATE users
+          SET role = 'MEMBER'
+          WHERE user_id = ?`,
+          [currentVerification.user_id]
+        );
       }
 
       const [updatedRows] = await connection.query(

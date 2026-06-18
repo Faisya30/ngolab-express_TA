@@ -56,7 +56,7 @@ router.post('/referral-earnings', referralEarningsController.createReferralEarni
 // Voucher Routes
 router.get('/vouchers', voucherController.getVouchers);
 router.post('/vouchers/claim', requireMembershipJwt, voucherController.claimVoucher);
-router.get('/user-vouchers', requireMembershipJwt, requireSelfMembershipAccess, voucherController.getUserVouchers);
+router.get('/user-vouchers', requireMembershipJwt, voucherController.getUserVouchers);
 
 // Referral Routes
 router.get('/referrals/members', requireMembershipJwt, referralController.getReferralMembers);

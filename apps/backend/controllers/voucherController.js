@@ -44,21 +44,25 @@ export async function claimVoucher(req, res) {
 }
 
 export async function getUserVouchers(req, res) {
+    console.log('[USER VOUCHERS] Controller reached');
+    console.log('[USER VOUCHERS] userId:', req.membershipAuth?.user_id, req.membershipAuth?.sub);
     try {
         const userId = String(req.membershipAuth?.user_id || req.membershipAuth?.sub || '').trim();
-
+        
+        console.log('[USER VOUCHERS] Query user_id:', userId);
+        
         if (!userId) {
             return res.status(401).json({
                 success: false,
                 message: 'Token tidak valid.'
             });
         }
-
+        
         const rows = await query(
             'SELECT uv.id, uv.user_id, uv.voucher_code, v.voucher_name, v.voucher_type, v.value_amount, uv.claimed_at, uv.status FROM user_voucher uv JOIN vouchers v ON v.voucher_code = uv.voucher_code WHERE uv.user_id = ? ORDER BY uv.claimed_at DESC',
             [userId]
         );
-
+        
         const vouchers = rows.map((row) => ({
             id: row.id,
             userId: row.user_id,
@@ -69,13 +73,14 @@ export async function getUserVouchers(req, res) {
             claimedAt: row.claimed_at,
             status: row.status,
         }));
-
+        
         return res.json({
             success: true,
             message: 'Berhasil',
             data: vouchers
         });
     } catch (error) {
+        console.error('[USER VOUCHERS ERROR]', error);
         return res.status(500).json({
             success: false,
             message: error.message

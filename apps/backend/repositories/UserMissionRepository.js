@@ -25,7 +25,7 @@ export class UserMissionRepository {
 
     static async findAll() {
         return await query(
-            'SELECT id, userId, missionId, status, completedAt FROM UserMissions ORDER BY createdAt DESC'
+            'SELECT id, userId, missionId, status, completedAt FROM UserMissions ORDER BY id DESC'
         );
     }
 
