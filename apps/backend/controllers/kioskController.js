@@ -409,7 +409,7 @@ export const getOrderHistoryByUserId = async (req, res) => {
 	try {
 		const { user_id } = req.params;
 
-		const [rows] = await db.query(
+		const rows = await query(
 			`
       SELECT 
         o.id AS order_id,

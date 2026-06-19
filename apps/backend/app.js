@@ -7,7 +7,7 @@ import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './swagger.js';
 
 function isAllowedLanFrontendOrigin(origin) {
-  return /^http:\/\/(\d{1,3}\.){3}\d{1,3}:(3000|3001|3002|3004|3005|4000|5173|5175)$/.test(origin);
+  return /^http:\/\/(\d{1,3}\.){3}\d{1,3}:(3000|3001|3002|3003|3004|3005|4000|5173|5175)$/.test(origin);
 }
 
 export function createApp({ frontendOrigins, baseUrl }) {

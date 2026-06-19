@@ -20,14 +20,14 @@ import {
   getUserProfile,
   lookupMember,
   login,
+  getMembershipPoints,
   redeemPoints,
   register,
-  reviewAffiliateVerification,
   updateGlobalSetting,
   updateMemberStatus,
   updateProfile,
   updateUserRole,
-  verifyAffiliate,
+  verifyAffiliateByBarcode,
 } from '../controllers/membershipController.js';
 import { requireMembershipJwt, requireSelfMembershipAccess } from '../middlewares/membershipAuth.js';
 import { requireConnectionKey } from '../middlewares/connectionKey.js';
@@ -41,17 +41,25 @@ function asyncHandler(fn) {
   };
 }
 
+function deprecatedEndpoint(req, res) {
+  return res.status(410).json({
+    success: false,
+    error: 'Endpoint ini sudah tidak digunakan. Gunakan POST /api/membership/affiliate/verify-barcode untuk verifikasi affiliate.',
+  });
+}
+
 router.post('/register', asyncHandler(register));
 router.post('/login', asyncHandler(login));
 router.post('/lookup', lookupMember);
 router.get('/profile/:user_id', getUserProfile);
+router.get('/points/:user_id', getMembershipPoints);
 router.put('/profile/:user_id', upload.single('profile_picture'), updateProfile);
-// Accept multipart uploads (ktm_image) but also accept JSON fallback.
-router.post('/affiliate/verify', upload.single('ktm_image'), requireMembershipJwt, requireSelfMembershipAccess, verifyAffiliate);
+router.post('/affiliate/verify', deprecatedEndpoint);
+router.post('/affiliate/verify-barcode', requireMembershipJwt, requireSelfMembershipAccess, verifyAffiliateByBarcode);
 router.get('/affiliate/network/:user_id', requireMembershipJwt, requireSelfMembershipAccess, getAffiliateNetwork);
 router.get('/affiliate/stats/:user_id', requireMembershipJwt, requireSelfMembershipAccess, getAffiliateStats);
 router.get('/admin/affiliate-verifications', getAffiliateVerifications);
-router.patch('/admin/affiliate-verifications/:verification_id/status', reviewAffiliateVerification);
+router.patch('/admin/affiliate-verifications/:verification_id/status', deprecatedEndpoint);
 router.get('/admin/hub-data', getHubDataAdmin);
 router.get('/admin/members', getAllMembers);
 router.get('/admin/affiliates', getAllAffiliates);

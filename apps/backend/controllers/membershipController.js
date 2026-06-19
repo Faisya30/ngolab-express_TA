@@ -2,7 +2,6 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { createWorker } from 'tesseract.js';
 import { query, withTransaction } from '../config/db.js';
 import { createMembershipToken } from '../config/jwt.js';
 
@@ -24,7 +23,6 @@ async function hasColumn(tableName, columnName) {
   return cols.has(columnName);
 }
 
-const AFFILIATE_OCR_CONFIDENCE_THRESHOLD = Number(process.env.AFFILIATE_OCR_CONFIDENCE_THRESHOLD || 0.5);
 const AFFILIATE_REFERRAL_BONUS_BASIC = Number(process.env.AFFILIATE_REFERRAL_BONUS_BASIC || 5000);
 const AFFILIATE_REFERRAL_BONUS_STARTER = Number(process.env.AFFILIATE_REFERRAL_BONUS_STARTER || 5000);
 const AFFILIATE_REFERRAL_BONUS_PRO = Number(process.env.AFFILIATE_REFERRAL_BONUS_PRO || 10000);
@@ -44,19 +42,9 @@ function normalizeNim(value) {
   return normalizeText(value).replace(/\s+/g, '');
 }
 
-function parseBoolean(value) {
-  if (value === true || value === 1) return true;
-  if (value === false || value === 0) return false;
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y';
-  }
-  return false;
-}
-
-function parseConfidence(value) {
+function toNumber(value, fallback = 0) {
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function normalizeAffiliateTier(value) {
@@ -197,10 +185,10 @@ async function fetchAffiliateNetworkRow(userId) {
 
   try {
     const insertResult = await query(
-`INSERT INTO affiliate_networks (user_id, total_referrals, total_downlines, commission_rate, commission_points, total_points)
-       VALUES (?, 0, 0, ?, 0, 0)
+`INSERT INTO affiliate_networks (user_id, affiliate_id, referral_code, total_referrals, total_downlines, commission_rate, commission_points, total_points)
+       VALUES (?, ?, ?, 0, 0, ?, 0, 0)
        ON DUPLICATE KEY UPDATE user_id = user_id`,
-      [userId, AFFILIATE_COMMISSION_RATE_BASIC],
+      [userId, `AFF-${userId}`, await ensureUniqueReferralCodeFromPool(), AFFILIATE_COMMISSION_RATE_BASIC],
     );
     console.log('[fetchAffiliateNetworkRow] Insert attempted, result:', insertResult);
     const rows = await query(fullSelect, [userId]);
@@ -223,6 +211,38 @@ function generateReferralCode() {
   return `REF-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 }
 
+function extractNimFromBarcodeValue(value) {
+  const raw = normalizeText(value);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === 'string') return normalizeNim(parsed);
+    const candidate = parsed.nim || parsed.NIM || parsed.user_nim || null;
+    if (candidate) return normalizeNim(candidate);
+  } catch (_) {
+    // not JSON
+  }
+
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const url = new URL(raw);
+      const params = new URLSearchParams(url.search);
+      const fromQuery = params.get('nim') || params.get('NIM') || params.get('user_nim') || null;
+      if (fromQuery) return normalizeNim(fromQuery);
+      const segments = url.pathname.split('/').filter(Boolean);
+      const last = segments[segments.length - 1];
+      if (last && /^\d{8,15}$/.test(last)) return normalizeNim(last);
+    } catch (_) {
+      // not a valid URL
+    }
+    const plainFromUrl = raw.replace(/^https?:\/\/[^/]+/, '').replace(/[^0-9]/g, '');
+    if (plainFromUrl) return normalizeNim(plainFromUrl);
+  }
+
+  return normalizeNim(raw);
+}
+
 function buildPublicUser(row) {
   return {
     user_id: row.user_id,
@@ -239,8 +259,34 @@ function buildPublicUser(row) {
     profile_picture: row.profile_picture,
     ktm_picture: row.ktm_picture,
     is_ktm: Boolean(row.is_ktm),
-    ai_reasoning: row.ai_reasoning,
   };
+}
+
+function buildMembershipPointsPayload(membershipPointsRow, gamificationPoints) {
+  const membershipPoints = membershipPointsRow || {};
+  const commissionPoints = toNumber(membershipPoints.commission_points, 0);
+  const normalizedGamificationPoints = toNumber(gamificationPoints, 0);
+  const totalPoints = normalizedGamificationPoints + commissionPoints;
+
+  return {
+    ...membershipPoints,
+    gamification_points: normalizedGamificationPoints,
+    commission_points: commissionPoints,
+    total_points: totalPoints,
+    points: totalPoints,
+  };
+}
+
+async function fetchGamificationPoints(userId) {
+  const rows = await query(
+    `SELECT COALESCE(ug.points, 0) AS points
+    FROM UserGamification ug
+    WHERE ug.user_id = ?
+    LIMIT 1`,
+    [userId]
+  );
+
+  return toNumber(rows[0]?.points, 0);
 }
 
 function buildVerificationPayload(row) {
@@ -251,13 +297,9 @@ function buildVerificationPayload(row) {
     user_id: row.user_id,
     registered_nim: row.registered_nim,
     detected_nim: row.detected_nim,
-    ai_is_telkom: Boolean(row.ai_is_telkom),
-    ai_confidence: row.ai_confidence === null || row.ai_confidence === undefined ? null : Number(row.ai_confidence),
-    ai_reasoning: row.ai_reasoning,
     status: row.status,
     file_url: row.file_url,
-    reviewed_by: row.reviewed_by,
-    review_notes: row.review_notes,
+    verification_method: row.verification_method || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -303,6 +345,22 @@ async function ensureUniqueReferralCode(connection) {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const referralCode = generateReferralCode();
     const [rows] = await connection.query(
+      `SELECT user_id FROM affiliate_networks WHERE referral_code = ? LIMIT 1`,
+      [referralCode]
+    );
+
+    if (!rows.length) {
+      return referralCode;
+    }
+  }
+
+  throw new Error('Gagal membuat referral code unik.');
+}
+
+async function ensureUniqueReferralCodeFromPool() {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const referralCode = generateReferralCode();
+    const rows = await query(
       `SELECT user_id FROM affiliate_networks WHERE referral_code = ? LIMIT 1`,
       [referralCode]
     );
@@ -370,9 +428,8 @@ export async function register(req, res) {
           nim,
           profile_picture,
           ktm_picture,
-          is_ktm,
-          ai_reasoning
-        ) VALUES (?, ?, ?, ?, 'MEMBER', 'ACTIVE', 'Silver', ?, ?, ?, ?, ?, ?, 0, NULL)`;
+          is_ktm
+        ) VALUES (?, ?, ?, ?, 'MEMBER', 'ACTIVE', 'Silver', ?, ?, ?, ?, ?, ?, 0)`;
 
       console.log('[REGISTER] QUERY -> insert user');
       await connection.query(insertUserSql, [userId, username, email, passwordHash, referredBy, affiliateUpline, phoneNumber || null, nim || null, profilePicture || null, ktmPicture || null]);
@@ -469,7 +526,7 @@ export async function register(req, res) {
     });
 
     const createdRows = await query(
-      `SELECT user_id, username, email, role, status, membership_level, referred_by, affiliate_upline, created_at, phone_number, profile_picture, ktm_picture, is_ktm, ai_reasoning
+      `SELECT user_id, username, email, role, status, membership_level, referred_by, affiliate_upline, created_at, phone_number, profile_picture, ktm_picture, is_ktm
       FROM users
       WHERE user_id = ?
       LIMIT 1`,
@@ -513,7 +570,7 @@ export async function login(req, res) {
     console.log('[LOGIN] Starting login query for identifier:', identifier);
     const queryStart = Date.now();
     const rows = await query(
-      `SELECT user_id, username, email, password, role, status, membership_level, referred_by, affiliate_upline, created_at, phone_number, profile_picture, ktm_picture, is_ktm, ai_reasoning
+      `SELECT user_id, username, email, password, role, status, membership_level, referred_by, affiliate_upline, created_at, phone_number, profile_picture, ktm_picture, is_ktm
       FROM users
       WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)
       LIMIT 1`,
@@ -581,6 +638,14 @@ export async function login(req, res) {
       pointsRows = [];
     }
 
+    let gamificationPoints = 0;
+    try {
+      gamificationPoints = await fetchGamificationPoints(user.user_id);
+    } catch (gamificationError) {
+      console.warn('[LOGIN] Warning: Failed to fetch gamification points, using 0:', gamificationError?.message);
+      gamificationPoints = 0;
+    }
+
     let tokenResult = null;
     try {
       tokenResult = createMembershipToken(publicUser);
@@ -599,7 +664,7 @@ export async function login(req, res) {
         ...tokenResult,
         affiliate_network: isAffiliate ? buildAffiliateNetwork(affiliateRow) : null,
         referralCode,
-        points: pointsRows[0] || null,
+        points: buildMembershipPointsPayload(pointsRows[0], gamificationPoints),
       },
     });
   } catch (error) {
@@ -619,7 +684,7 @@ export async function getUserProfile(_req, res) {
     }
 
     const users = await query(
-      `SELECT user_id, username, email, nim, role, status, membership_level, referred_by, affiliate_upline, created_at, phone_number, profile_picture, ktm_picture, is_ktm, ai_reasoning
+      `SELECT user_id, username, email, nim, role, status, membership_level, referred_by, affiliate_upline, created_at, phone_number, profile_picture, ktm_picture, is_ktm
       FROM users
       WHERE user_id = ?
       LIMIT 1`,
@@ -640,6 +705,8 @@ export async function getUserProfile(_req, res) {
       [userId]
     );
 
+    const gamificationPoints = await fetchGamificationPoints(userId);
+
     const insightRows = await query(
       `SELECT favorite_category, peak_visit_time, ai_recommendation
       FROM user_ai_insights
@@ -659,8 +726,53 @@ export async function getUserProfile(_req, res) {
         user: buildPublicUser(users[0]),
         affiliate_network: affiliateNetwork,
         referralCode: affiliateNetwork?.referralCode || affiliateRow?.referral_code || null,
-        points: pointsRows[0] || null,
+        points: buildMembershipPointsPayload(pointsRows[0], gamificationPoints),
         ai_insight: insightRows[0] || null,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+export async function getMembershipPoints(_req, res) {
+  try {
+    const userId = normalizeText(_req.params?.user_id);
+
+    if (!userId) {
+      return res.status(400).json({ success: false, error: 'user_id wajib diisi.' });
+    }
+
+    const rows = await query(
+      `SELECT
+        u.user_id,
+        COALESCE(up.total_points, 0) AS total_points,
+        COALESCE(up.commission_points, 0) AS commission_points,
+        COALESCE(up.mission_points, 0) AS mission_points,
+        COALESCE(up.cashback_points, 0) AS cashback_points,
+        COALESCE(up.voucher_points, 0) AS voucher_points
+      FROM users u
+      LEFT JOIN user_points up ON up.user_id = u.user_id
+      WHERE u.user_id = ?
+      LIMIT 1`,
+      [userId]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ success: false, error: 'User tidak ditemukan.' });
+    }
+
+    const gamificationPoints = await fetchGamificationPoints(userId);
+    const points = buildMembershipPointsPayload(rows[0], gamificationPoints);
+
+    return res.json({
+      success: true,
+      data: {
+        user_id: userId,
+        points,
+        gamification_points: points.gamification_points,
+        commission_points: points.commission_points,
+        total_points: points.total_points,
       },
     });
   } catch (error) {
@@ -678,7 +790,7 @@ export async function updateProfile(_req, res) {
     }
 
     const existingRows = await query(
-      `SELECT user_id, username, email, nim, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm, ai_reasoning
+      `SELECT user_id, username, email, nim, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm
       FROM users
       WHERE user_id = ?
       LIMIT 1`,
@@ -696,7 +808,6 @@ export async function updateProfile(_req, res) {
     let nextProfilePicture = normalizeText(body.profile_picture ?? body.photo_url ?? body.profilePicture);
     const nextKtmPicture = normalizeText(body.ktm_picture ?? body.ktm_url ?? body.ktmPicture);
     const nextNim = normalizeText(body.nim ?? body.nim_number ?? body.nimNumber ?? body.student_id ?? body.studentId);
-    const nextAiReasoning = body.ai_reasoning ?? body.aiReasoning;
 
     if (nextUsername && nextUsername.toLowerCase() !== String(currentUser.username || '').toLowerCase()) {
       const duplicateUsername = await query(
@@ -766,11 +877,6 @@ export async function updateProfile(_req, res) {
       updateValues.push(nextKtmPicture || null);
     }
 
-    if (body.ai_reasoning !== undefined || body.aiReasoning !== undefined) {
-      updateFields.push('ai_reasoning = ?');
-      updateValues.push(nextAiReasoning ?? null);
-    }
-
     updateValues.push(userId);
 
     if (updateFields.length) {
@@ -783,7 +889,7 @@ export async function updateProfile(_req, res) {
     }
 
     const updatedRows = await query(
-      `SELECT user_id, username, email, nim, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm, ai_reasoning
+      `SELECT user_id, username, email, nim, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm
       FROM users
       WHERE user_id = ?
       LIMIT 1`,
@@ -802,198 +908,48 @@ export async function updateProfile(_req, res) {
   }
 }
 
-export async function verifyAffiliate(_req, res) {
+export async function verifyAffiliateByBarcode(req, res) {
   try {
-    const body = _req.body || {};
-    // If multipart with file upload, run OCR flow
-    let ocrResult = null;
-    if (_req.file && _req.file.buffer) {
-      const fileBuffer = _req.file.buffer;
-      const userIdFromForm = normalizeText(body.user_id || body.userId || _req.body?.user_id);
-      if (!userIdFromForm) {
-        return res.status(400).json({ success: false, error: 'user_id wajib diisi.' });
-      }
-
-      // fetch registered nim
-      const userRows = await query(`SELECT nim FROM users WHERE user_id = ? LIMIT 1`, [userIdFromForm]);
-      if (!userRows.length) {
-        return res.status(404).json({ success: false, error: 'User tidak ditemukan.' });
-      }
-
-      const registeredNim = normalizeNim(userRows[0].nim || '');
-
-      // save file to uploads folder
-      const uploadsDir = path.join(process.cwd(), 'apps', 'backend', 'uploads');
-      try {
-        await fs.promises.mkdir(uploadsDir, { recursive: true });
-      } catch (e) {
-        // ignore
-      }
-      const filename = `ktm-${Date.now()}-${crypto.randomBytes(3).toString('hex')}${path.extname(_req.file.originalname) || '.jpg'}`;
-      const filePath = path.join(uploadsDir, filename);
-      await fs.promises.writeFile(filePath, fileBuffer);
-      const fileUrl = `/uploads/${filename}`;
-
-      // run OCR with better error handling
-      let text = '';
-      let avgConfidence = 1.0;
-      let worker = null;
-      
-      try {
-        // Validate file size (max 10MB)
-        const MAX_FILE_SIZE = 10 * 1024 * 1024;
-        if (fileBuffer.length > MAX_FILE_SIZE) {
-          return res.status(400).json({ success: false, error: 'Ukuran file terlalu besar (max 10MB).' });
-        }
-
-        // Initialize Tesseract worker with proper configuration
-        worker = await createWorker();
-
-        console.log('[OCR] Worker created successfully');
-
-        console.log('[OCR] Starting recognition...');
-        
-        const startTime = Date.now();
-        const { data } = await worker.recognize(fileBuffer, 'eng');
-        const duration = Date.now() - startTime;
-        console.log(`[OCR] Recognition completed in ${duration}ms`);
-
-        text = String(data?.text || '').trim();
-        const words = Array.isArray(data?.words) ? data.words : [];
-        
-        if (words.length) {
-          const sum = words.reduce((s, w) => s + (Number(w.confidence) || 0), 0);
-          avgConfidence = sum / words.length / 100; // normalize 0..1
-        } else if (typeof data?.confidence === 'number') {
-          avgConfidence = Number(data.confidence) / 100;
-        } else {
-          avgConfidence = Math.max(0.5, 1.0); // Default confidence jika tidak ada data
-        }
-        
-        console.log(`[OCR] Extracted text length: ${text.length}, confidence: ${avgConfidence.toFixed(4)}`);
-      } catch (ocrError) {
-        console.error('[OCR] Recognition error:', ocrError);
-        // Fallback: try to extract text anyway or use empty
-        if (text.length === 0) {
-          console.warn('[OCR] Failed to extract text from image');
-        }
-      } finally {
-        // Clean up worker properly
-        if (worker) {
-          try {
-            await worker.terminate();
-            console.log('[OCR] Worker terminated successfully');
-          } catch (termError) {
-            console.error('[OCR] Error terminating worker:', termError);
-          }
-        }
-      }
-
-      const containsTelkom = /telkom|university/i.test(text);
-      const nimMatch = text.match(/\b(\d{8,15})\b/);
-      const detectedNim = nimMatch ? nimMatch[1] : null;
-      const detectedMatchesRegistered = detectedNim && registeredNim && normalizeNim(detectedNim) === normalizeNim(registeredNim);
-      const threshold = Number(process.env.AUTO_APPROVE_CONFIDENCE ?? process.env.AFFILIATE_OCR_CONFIDENCE_THRESHOLD ?? 0.5);
-      const autoApproved = Boolean(containsTelkom && detectedMatchesRegistered && Number(avgConfidence) >= Number(threshold));
-
-      // prepare ai_reasoning
-      const aiReasoningParts = [];
-      aiReasoningParts.push(`containsTelkom=${containsTelkom}`);
-      aiReasoningParts.push(`detectedNim=${detectedNim || 'none'}`);
-      aiReasoningParts.push(`registeredNim=${registeredNim || 'none'}`);
-      aiReasoningParts.push(`detectedMatchesRegistered=${detectedMatchesRegistered}`);
-      aiReasoningParts.push(`avgConfidence=${Number(avgConfidence).toFixed(4)}`);
-      const aiReasoning = aiReasoningParts.join('; ');
-
-      // now reuse existing body fields so later flow saves consistent data
-      body.registered_nim = registeredNim;
-      body.detected_nim = detectedNim || '';
-      body.ai_is_telkom = containsTelkom;
-      body.ai_confidence = Number(avgConfidence);
-      body.ai_reasoning = aiReasoning;
-      body.file_url = fileUrl;
-      ocrResult = {
-        detectedNim,
-        registeredNim,
-        containsTelkom,
-        avgConfidence: Number(avgConfidence),
-        autoApproved,
-      };
-      // continue to existing logic (will insert affiliate_verifications, update user, etc.)
-    }
+    const body = req.body || {};
     const userId = normalizeText(body.user_id || body.userId);
-    let registeredNim = normalizeNim(body.registered_nim || body.registeredNim);
-    let detectedNim = normalizeNim(body.detected_nim || body.detectedNim);
-    const aiIsTelkom = parseBoolean(body.ai_is_telkom ?? body.aiIsTelkom ?? body.is_telkom ?? body.isTelkom);
-    let aiConfidence = parseConfidence(body.ai_confidence ?? body.aiConfidence);
-    const aiReasoning = normalizeText(body.ai_reasoning ?? body.aiReasoning);
-    const fileUrl = normalizeText(body.file_url || body.fileUrl || body.ktm_picture || body.ktm_url || body.ktmPicture);
-    const affiliateTier = normalizeText(body.affiliate_tier || body.affiliateTier) || 'Basic';
-    const confidenceThreshold = Number.isFinite(AFFILIATE_OCR_CONFIDENCE_THRESHOLD) ? AFFILIATE_OCR_CONFIDENCE_THRESHOLD : 0.5;
+    const barcodeValue = normalizeText(body.barcode_value || body.barcodeValue || body.barcode);
 
     if (!userId) {
       return res.status(400).json({ success: false, error: 'user_id wajib diisi.' });
     }
 
-    if (!registeredNim) {
-      const fallbackRows = await query(
-        `SELECT nim
-        FROM users
-        WHERE user_id = ?
-        LIMIT 1`,
-        [userId]
-      );
-
-      registeredNim = normalizeNim(fallbackRows[0]?.nim || '');
+    if (!barcodeValue) {
+      return res.status(400).json({ success: false, error: 'barcode_value wajib diisi.' });
     }
 
-    // Ensure we have a registered NIM (from body or DB). If OCR didn't detect NIM
-    // that's OK: we'll accept the upload and create a PENDING verification.
-    if (!registeredNim) {
-      return res.status(400).json({ success: false, error: 'registered_nim wajib diisi.' });
+    const barcodeNim = extractNimFromBarcodeValue(barcodeValue);
+    if (!barcodeNim) {
+      return res.status(400).json({ success: false, error: 'Gagal mengekstrak NIM dari barcode.' });
     }
 
-    // If OCR didn't find a NIM, normalize to empty string instead of rejecting.
-    if (!detectedNim) {
-      detectedNim = '';
-    }
-
-    // If confidence isn't provided or can't be parsed, use 0.0 as default.
-    if (aiConfidence === null) {
-      aiConfidence = 0;
-    }
-
-    const existingRows = await query(
-      `SELECT user_id, username, email, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm, ai_reasoning
-      FROM users
-      WHERE user_id = ?
-      LIMIT 1`,
+    const userRows = await query(
+      `SELECT user_id, username, email, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm, nim
+       FROM users
+       WHERE user_id = ?
+       LIMIT 1`,
       [userId]
     );
 
-    if (!existingRows.length) {
+    if (!userRows.length) {
       return res.status(404).json({ success: false, error: 'User tidak ditemukan.' });
     }
 
-    let verificationStatus = 'PENDING';
-    let nextUserRole = existingRows[0].role;
-    let nextUserStatus = existingRows[0].status;
+    const registeredNim = normalizeNim(userRows[0].nim || '');
 
-    const detectedMatchesRegistered = registeredNim === detectedNim;
-    
-    if (!aiIsTelkom) {
-      verificationStatus = 'REJECTED';
-      nextUserRole = existingRows[0].role;
-      nextUserStatus = existingRows[0].status;
-    } else if (detectedMatchesRegistered && aiConfidence >= confidenceThreshold) {
-      verificationStatus = 'APPROVED';
-      nextUserRole = 'MEMBER_AFFILIATE';
-      nextUserStatus = 'ACTIVE';
-    } else {
-      verificationStatus = 'PENDING';
-      nextUserRole = existingRows[0].role;
-      nextUserStatus = existingRows[0].status;
+    if (!registeredNim) {
+      return res.status(400).json({ success: false, error: 'Akun belum memiliki NIM, tidak dapat verifikasi barcode.' });
     }
+
+    if (registeredNim !== barcodeNim) {
+      return res.status(400).json({ success: false, error: 'NIM barcode tidak sesuai dengan NIM akun.' });
+    }
+
+    const affiliateTier = 'Basic';
 
     const result = await withTransaction(async (connection) => {
       const [verificationInsert] = await connection.query(
@@ -1001,53 +957,33 @@ export async function verifyAffiliate(_req, res) {
           user_id,
           registered_nim,
           detected_nim,
-          ai_is_telkom,
-          ai_confidence,
-          ai_reasoning,
           status,
-          file_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          userId,
-          registeredNim,
-          detectedNim,
-          aiIsTelkom ? 1 : 0,
-          aiConfidence,
-          aiReasoning || null,
-          verificationStatus,
-          fileUrl || null,
-        ]
+          file_url,
+          verification_method
+        ) VALUES (?, ?, ?, ?, NULL, ?)`,
+        [userId, registeredNim, barcodeNim, 'APPROVED', 'BARCODE']
       );
 
       await connection.query(
         `UPDATE users
-        SET is_ktm = ?,
-            role = ?,
-            status = ?,
-            ai_reasoning = ?,
-            ktm_picture = COALESCE(?, ktm_picture)
-        WHERE user_id = ?`,
-        [
-          verificationStatus === 'APPROVED' ? 1 : 0,
-          nextUserRole,
-          nextUserStatus,
-          aiReasoning || null,
-          fileUrl || null,
-          userId,
-        ]
+         SET role = 'MEMBER_AFFILIATE',
+             status = 'ACTIVE'
+         WHERE user_id = ?`,
+        [userId]
       );
 
       const [affiliateRows] = await connection.query(
-        `SELECT user_id, referral_code, affiliate_tier, level, total_referrals, total_downlines, commission_points, total_points
-        FROM affiliate_networks
-        WHERE user_id = ?
-        LIMIT 1`,
+        `SELECT user_id, affiliate_id, referral_code, affiliate_tier, level, total_referrals, total_downlines, commission_points, total_points
+         FROM affiliate_networks
+         WHERE user_id = ?
+         LIMIT 1
+         FOR UPDATE`,
         [userId]
       );
 
       let referralCode = affiliateRows[0]?.referral_code || null;
 
-      if (!affiliateRows.length && verificationStatus === 'APPROVED') {
+      if (!affiliateRows.length) {
         referralCode = await ensureUniqueReferralCode(connection);
         await connection.query(
           `INSERT INTO affiliate_networks (
@@ -1063,32 +999,53 @@ export async function verifyAffiliate(_req, res) {
           ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0)`,
           [userId, `AFF-${userId}`, referralCode, affiliateTier, affiliateTier]
         );
-      } else if (verificationStatus === 'APPROVED') {
-        await connection.query(
-          `UPDATE affiliate_networks
-          SET affiliate_tier = ?,
-              level = ?
-          WHERE user_id = ?`,
-          [affiliateTier, affiliateTier, userId]
-        );
+      } else {
+        const updateFields = [];
+        const updateValues = [];
+
+        if (!affiliateRows[0].affiliate_id) {
+          updateFields.push('affiliate_id = ?');
+          updateValues.push(`AFF-${userId}`);
+        }
+
+        if (!referralCode) {
+          referralCode = await ensureUniqueReferralCode(connection);
+          updateFields.push('referral_code = ?');
+          updateValues.push(referralCode);
+        }
+
+        if (!affiliateRows[0].affiliate_tier || !affiliateRows[0].level) {
+          updateFields.push('affiliate_tier = ?', 'level = ?');
+          updateValues.push(affiliateTier, affiliateTier);
+        }
+
+        if (updateFields.length) {
+          updateValues.push(userId);
+          await connection.query(
+            `UPDATE affiliate_networks
+             SET ${updateFields.join(', ')}
+             WHERE user_id = ?`,
+            updateValues
+          );
+        }
       }
 
       return { referralCode, verificationId: verificationInsert.insertId };
     });
 
     const updatedUserRows = await query(
-      `SELECT user_id, username, email, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm, ai_reasoning
-      FROM users
-      WHERE user_id = ?
-      LIMIT 1`,
+      `SELECT user_id, username, email, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm, nim
+       FROM users
+       WHERE user_id = ?
+       LIMIT 1`,
       [userId]
     );
 
     const verificationRows = await query(
-      `SELECT id, user_id, registered_nim, detected_nim, ai_is_telkom, ai_confidence, ai_reasoning, status, file_url, reviewed_by, review_notes, created_at, updated_at
-      FROM affiliate_verifications
-      WHERE id = ?
-      LIMIT 1`,
+      `SELECT id, user_id, registered_nim, detected_nim, status, file_url, verification_method, created_at, updated_at
+       FROM affiliate_verifications
+       WHERE id = ?
+       LIMIT 1`,
       [result.verificationId]
     );
 
@@ -1096,19 +1053,14 @@ export async function verifyAffiliate(_req, res) {
 
     return res.json({
       success: true,
-      message: verificationStatus === 'APPROVED'
-        ? 'Akun berhasil diverifikasi sebagai affiliate.'
-        : verificationStatus === 'REJECTED'
-        ? 'Verifikasi ditolak: dokumen tidak valid.'
-        : 'Hasil OCR berhasil disimpan dan masuk antrean review.',
-      status: verificationStatus,
+      message: 'Akun berhasil diverifikasi sebagai affiliate.',
+      status: 'APPROVED',
       data: {
         verification_id: String(result.verificationId),
         user: buildPublicUser(updatedUserRows[0]),
         verification: buildVerificationPayload(verificationRows[0]),
         affiliate_network: buildAffiliateNetwork(updatedAffiliateRow),
         referral_code: result.referralCode || updatedAffiliateRow?.referral_code || null,
-        ocr: ocrResult,
       },
     });
   } catch (error) {
@@ -1157,7 +1109,7 @@ export async function getAffiliateVerifications(_req, res) {
     }
 
     const rows = await query(
-      `SELECT av.id, av.user_id, u.username, u.email, av.registered_nim, av.detected_nim, av.ai_is_telkom, av.ai_confidence, av.ai_reasoning, av.status, av.file_url, av.reviewed_by, av.review_notes, av.created_at, av.updated_at
+      `SELECT av.id, av.user_id, u.username, u.email, av.registered_nim, av.detected_nim, av.status, av.file_url, av.verification_method, av.created_at, av.updated_at
       FROM affiliate_verifications av
       LEFT JOIN users u ON u.user_id = av.user_id
       ${whereClause}
@@ -1172,117 +1124,6 @@ export async function getAffiliateVerifications(_req, res) {
         username: row.username || null,
         email: row.email || null,
       })),
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
-  }
-}
-
-export async function reviewAffiliateVerification(_req, res) {
-  try {
-    const verificationId = normalizeText(_req.params?.verification_id || _req.params?.id);
-    const body = _req.body || {};
-    const reviewerId = normalizeText(body.reviewed_by || body.reviewer_id || body.reviewerId);
-    const status = normalizeText(body.status).toUpperCase();
-    const reviewNotes = normalizeText(body.review_notes || body.notes || body.reviewNotes);
-
-    if (!verificationId) {
-      return res.status(400).json({ success: false, error: 'verification_id wajib diisi.' });
-    }
-
-    const allowedStatus = new Set(['PENDING', 'APPROVED', 'REJECTED']);
-    if (!allowedStatus.has(status)) {
-      return res.status(400).json({ success: false, error: 'status harus PENDING, APPROVED, atau REJECTED.' });
-    }
-
-    const verificationRows = await query(
-      `SELECT id, user_id, registered_nim, detected_nim, ai_is_telkom, ai_confidence, ai_reasoning, status, file_url, reviewed_by, review_notes, created_at, updated_at
-      FROM affiliate_verifications
-      WHERE id = ?
-      LIMIT 1`,
-      [verificationId]
-    );
-
-    if (!verificationRows.length) {
-      return res.status(404).json({ success: false, error: 'Data verifikasi tidak ditemukan.' });
-    }
-
-    const currentVerification = verificationRows[0];
-
-    const result = await withTransaction(async (connection) => {
-      await connection.query(
-        `UPDATE affiliate_verifications
-        SET status = ?,
-            reviewed_by = ?,
-            review_notes = ?
-        WHERE id = ?`,
-        [status, reviewerId || null, reviewNotes || null, verificationId]
-      );
-
-      if (status === 'APPROVED') {
-        await connection.query(
-          `UPDATE users
-          SET is_ktm = 1,
-              role = 'MEMBER_AFFILIATE',
-              status = 'ACTIVE'
-          WHERE user_id = ?`,
-          [currentVerification.user_id]
-        );
-
-        const [affiliateRows] = await connection.query(
-          `SELECT user_id FROM affiliate_networks WHERE user_id = ? LIMIT 1`,
-          [currentVerification.user_id]
-        );
-
-        if (!affiliateRows.length) {
-          const referralCode = await ensureUniqueReferralCode(connection);
-          await connection.query(
-            `INSERT INTO affiliate_networks (
-              user_id,
-              affiliate_id,
-              referral_code,
-              affiliate_tier,
-              total_referrals,
-              total_downlines
-            ) VALUES (?, ?, ?, 'Basic', 0, 0)`,
-            [currentVerification.user_id, `AFF-${currentVerification.user_id}`, referralCode]
-          );
-        }
-      } else if (status === 'REJECTED') {
-        await connection.query(
-          `UPDATE users
-          SET role = 'MEMBER'
-          WHERE user_id = ?`,
-          [currentVerification.user_id]
-        );
-      }
-
-      const [updatedRows] = await connection.query(
-        `SELECT id, user_id, registered_nim, detected_nim, ai_is_telkom, ai_confidence, ai_reasoning, status, file_url, reviewed_by, review_notes, created_at, updated_at
-        FROM affiliate_verifications
-        WHERE id = ?
-        LIMIT 1`,
-        [verificationId]
-      );
-
-      return { verification: updatedRows[0] };
-    });
-
-    const userRows = await query(
-      `SELECT user_id, username, email, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm, ai_reasoning
-      FROM users
-      WHERE user_id = ?
-      LIMIT 1`,
-      [currentVerification.user_id]
-    );
-
-    return res.json({
-      success: true,
-      message: 'Status verifikasi berhasil diperbarui.',
-      data: {
-        verification: buildVerificationPayload(result.verification),
-        user: buildPublicUser(userRows[0]),
-      },
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
@@ -1336,7 +1177,6 @@ export async function getAllMembers(_req, res) {
         u.profile_picture,
         u.ktm_picture,
         u.is_ktm,
-        u.ai_reasoning,
         COALESCE(up.total_points, 0) AS total_points,
         COALESCE(up.commission_points, 0) AS commission_points,
         COALESCE(up.mission_points, 0) AS mission_points,
