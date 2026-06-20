@@ -59,7 +59,7 @@ export async function getUserVouchers(req, res) {
         }
         
         const rows = await query(
-            'SELECT uv.id, uv.user_id, uv.voucher_code, v.voucher_name, v.voucher_type, v.value_amount, uv.claimed_at, uv.status FROM user_voucher uv JOIN vouchers v ON v.voucher_code = uv.voucher_code WHERE uv.user_id = ? ORDER BY uv.claimed_at DESC',
+            'SELECT uv.id, uv.user_id, uv.voucher_code, v.voucher_name, v.voucher_type, v.value_amount, v.description, v.stock, v.expiry_days, v.image_url, v.max_discount, v.min_purchase, v.cashier_instruction, v.is_active, uv.claimed_at, uv.status FROM user_voucher uv JOIN vouchers v ON v.voucher_code = uv.voucher_code WHERE uv.user_id = ? ORDER BY uv.claimed_at DESC',
             [userId]
         );
         
@@ -70,6 +70,14 @@ export async function getUserVouchers(req, res) {
             voucherName: row.voucher_name,
             voucherType: row.voucher_type,
             valueAmount: Number(row.value_amount || 0),
+            description: row.description || '',
+            stock: Number(row.stock || 0),
+            expiryDays: row.expiry_days,
+            imageUrl: row.image_url || '',
+            maxDiscount: row.max_discount !== null ? Number(row.max_discount) : null,
+            minPurchase: row.min_purchase !== null ? Number(row.min_purchase) : null,
+            cashierInstruction: row.cashier_instruction || '',
+            isActive: Boolean(row.is_active),
             claimedAt: row.claimed_at,
             status: row.status,
         }));
@@ -90,7 +98,10 @@ export async function getUserVouchers(req, res) {
 
 export async function createVoucher(req, res) {
     try {
-        const { voucher_code, voucher_name, voucher_type, points_cost, value_amount, is_active } = req.body || {};
+        console.log('=== CREATE_VOUCHER_BODY ===');
+        console.log(JSON.stringify(req.body, null, 2));
+
+        const { voucher_code, voucher_name, voucher_type, points_cost, value_amount, description, stock, expiry_days, image_url, max_discount, min_purchase, cashier_instruction, is_active } = req.body || {};
 
         if (!voucher_code || !voucher_name || !voucher_type || points_cost === undefined) {
             return res.status(400).json({
@@ -105,6 +116,13 @@ export async function createVoucher(req, res) {
             voucher_type,
             points_cost,
             value_amount,
+            description,
+            stock,
+            expiry_days,
+            image_url,
+            max_discount,
+            min_purchase,
+            cashier_instruction,
             is_active
         });
 
@@ -122,14 +140,24 @@ export async function createVoucher(req, res) {
 
 export async function updateVoucher(req, res) {
     try {
+        console.log('=== UPDATE_VOUCHER_BODY ===');
+        console.log(JSON.stringify(req.body, null, 2));
+
         const { id } = req.params;
-        const { voucher_name, voucher_type, points_cost, value_amount, is_active } = req.body || {};
+        const { voucher_name, voucher_type, points_cost, value_amount, description, stock, expiry_days, image_url, max_discount, min_purchase, cashier_instruction, is_active } = req.body || {};
 
         await VoucherService.updateVoucher(id, {
             voucher_name,
             voucher_type,
             points_cost,
             value_amount,
+            description,
+            stock,
+            expiry_days,
+            image_url,
+            max_discount,
+            min_purchase,
+            cashier_instruction,
             is_active
         });
 
