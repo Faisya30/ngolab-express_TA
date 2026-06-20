@@ -1,99 +1,143 @@
 @startuml
+title ERD Chen - Company Management
+
 left to right direction
-skinparam linetype ortho
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
 
-entity "customers" as customers {
-  * id_customer : int
-  --
-  nama : varchar
-  email : varchar
-  no_hp : varchar
-  qr_member : varchar
-}
+rectangle "COMPANY" as COMPANY
+rectangle "USER" as USER
+rectangle "PRODUCT" as PRODUCT
+rectangle "ROLE" as ROLE
+rectangle "PERMISSION" as PERMISSION
+rectangle "ACTIVATION_TOKEN" as ACTIVATION_TOKEN
 
-entity "categories" as categories {
-  * id_category : int
-  --
-  nama_category : varchar
-}
+rectangle "RELASI\nmemiliki" as R_COMPANY_USER
+rectangle "RELASI\nmemiliki_akses" as R_COMPANY_PRODUCT
+rectangle "RELASI\nmemiliki" as R_USER_TOKEN
+rectangle "RELASI\ndiberikan_role" as R_USER_ROLE
+rectangle "RELASI\nmemiliki_permission" as R_ROLE_PERMISSION
 
-entity "products" as products {
-  * id_product : int
-  --
-  id_category : int
-  nama_product : varchar
-  harga : decimal
-  stok : int
-  gambar : varchar
-}
+usecase "company_id\n(PK)" as C_ID
+usecase "company_name" as C_NAME
+usecase "address" as C_ADDRESS
+usecase "phone" as C_PHONE
+usecase "email" as C_EMAIL
+usecase "status" as C_STATUS
+usecase "created_at" as C_CREATED
+usecase "updated_at" as C_UPDATED
 
-entity "orders" as orders {
-  * id_order : int
-  --
-  id_customer : int
-  id_voucher : int
-  kode_order : varchar
-  tipe_pesanan : varchar
-  subtotal : decimal
-  diskon : decimal
-  total : decimal
-  status_order : varchar
-}
+C_ID -- COMPANY
+C_NAME -- COMPANY
+C_ADDRESS -- COMPANY
+C_PHONE -- COMPANY
+C_EMAIL -- COMPANY
+C_STATUS -- COMPANY
+C_CREATED -- COMPANY
+C_UPDATED -- COMPANY
 
-entity "order_items" as order_items {
-  * id_order_item : int
-  --
-  id_order : int
-  id_product : int
-  jumlah : int
-  harga : decimal
-  subtotal : decimal
-}
+usecase "user_id\n(PK)" as U_ID
+usecase "company_id\n(FK)" as U_COMPANY_ID
+usecase "full_name" as U_FULLNAME
+usecase "email" as U_EMAIL
+usecase "password" as U_PASSWORD
+usecase "status" as U_STATUS
+usecase "created_at" as U_CREATED
+usecase "updated_at" as U_UPDATED
 
-entity "payments" as payments {
-  * id_payment : int
-  --
-  id_order : int
-  metode_pembayaran : varchar
-  status_pembayaran : varchar
-  total_bayar : decimal
-  paid_at : datetime
-}
+U_ID -- USER
+U_COMPANY_ID -- USER
+U_FULLNAME -- USER
+U_EMAIL -- USER
+U_PASSWORD -- USER
+U_STATUS -- USER
+U_CREATED -- USER
+U_UPDATED -- USER
 
-entity "vouchers" as vouchers {
-  * id_voucher : int
-  --
-  kode_voucher : varchar
-  nama_voucher : varchar
-  nominal_diskon : decimal
-  status : varchar
-}
+usecase "product_id\n(PK)" as P_ID
+usecase "product_name" as P_NAME
+usecase "description" as P_DESC
+usecase "product_url" as P_URL
+usecase "status" as P_STATUS
+usecase "created_at" as P_CREATED
+usecase "updated_at" as P_UPDATED
 
-entity "member_points" as points {
-  * id_point : int
-  --
-  id_customer : int
-  jumlah_poin : int
-  keterangan : text
-}
+P_ID -- PRODUCT
+P_NAME -- PRODUCT
+P_DESC -- PRODUCT
+P_URL -- PRODUCT
+P_STATUS -- PRODUCT
+P_CREATED -- PRODUCT
+P_UPDATED -- PRODUCT
 
-entity "admins" as admins {
-  * id_admin : int
-  --
-  nama_admin : varchar
-  email : varchar
-  password : varchar
-}
+usecase "role_id\n(PK)" as RO_ID
+usecase "role_name" as RO_NAME
+usecase "description" as RO_DESC
+usecase "status" as RO_STATUS
+usecase "created_at" as RO_CREATED
+usecase "updated_at" as RO_UPDATED
 
-customers ||--o{ orders : melakukan
-orders ||--o{ order_items : memiliki
-products ||--o{ order_items : dipilih
-categories ||--o{ products : memiliki
-orders ||--|| payments : dibayar
-vouchers ||--o{ orders : digunakan
-customers ||--o{ points : memiliki
-admins ||--o{ products : mengelola
-admins ||--o{ categories : mengelola
-admins ||--o{ orders : memonitor
+RO_ID -- ROLE
+RO_NAME -- ROLE
+RO_DESC -- ROLE
+RO_STATUS -- ROLE
+RO_CREATED -- ROLE
+RO_UPDATED -- ROLE
+
+usecase "permission_id\n(PK)" as PE_ID
+usecase "permission_name" as PE_NAME
+usecase "module_name" as PE_MODULE
+usecase "action" as PE_ACTION
+usecase "created_at" as PE_CREATED
+usecase "updated_at" as PE_UPDATED
+
+PE_ID -- PERMISSION
+PE_NAME -- PERMISSION
+PE_MODULE -- PERMISSION
+PE_ACTION -- PERMISSION
+PE_CREATED -- PERMISSION
+PE_UPDATED -- PERMISSION
+
+usecase "token_id\n(PK)" as A_ID
+usecase "user_id\n(FK)" as A_USER_ID
+usecase "token" as A_TOKEN
+usecase "token_type" as A_TYPE
+usecase "expired_at" as A_EXPIRED
+usecase "status" as A_STATUS
+usecase "created_at" as A_CREATED
+
+A_ID -- ACTIVATION_TOKEN
+A_USER_ID -- ACTIVATION_TOKEN
+A_TOKEN -- ACTIVATION_TOKEN
+A_TYPE -- ACTIVATION_TOKEN
+A_EXPIRED -- ACTIVATION_TOKEN
+A_STATUS -- ACTIVATION_TOKEN
+A_CREATED -- ACTIVATION_TOKEN
+
+usecase "access_status" as CP_ACCESS_STATUS
+usecase "assigned_at" as CP_ASSIGNED_AT
+usecase "assigned_at" as UR_ASSIGNED_AT
+usecase "created_at" as RP_CREATED_AT
+
+CP_ACCESS_STATUS -- R_COMPANY_PRODUCT
+CP_ASSIGNED_AT -- R_COMPANY_PRODUCT
+UR_ASSIGNED_AT -- R_USER_ROLE
+RP_CREATED_AT -- R_ROLE_PERMISSION
+
+COMPANY "1" -- R_COMPANY_USER
+R_COMPANY_USER "N" -- USER
+
+COMPANY "M" -- R_COMPANY_PRODUCT
+R_COMPANY_PRODUCT "N" -- PRODUCT
+
+USER "1" -- R_USER_TOKEN
+R_USER_TOKEN "N" -- ACTIVATION_TOKEN
+
+USER "M" -- R_USER_ROLE
+R_USER_ROLE "N" -- ROLE
+
+ROLE "M" -- R_ROLE_PERMISSION
+R_ROLE_PERMISSION "N" -- PERMISSION
 
 @enduml

@@ -289,6 +289,84 @@ async function fetchGamificationPoints(userId) {
   return toNumber(rows[0]?.points, 0);
 }
 
+async function fetchUserGamificationLevel(userId) {
+  const rows = await query(
+    `SELECT COALESCE(memberLevel, 'SILVER') AS memberLevel
+    FROM UserGamification
+    WHERE user_id = ?
+    LIMIT 1`,
+    [userId]
+  );
+
+  return rows[0]?.memberLevel || 'SILVER';
+}
+
+async function fetchCashbackPoints(userId) {
+  const rows = await query(
+    `SELECT COALESCE(SUM(points_earned), 0) AS cashback_points
+    FROM orders
+    WHERE user_id = ?`,
+    [userId]
+  );
+
+  return toNumber(rows[0]?.cashback_points, 0);
+}
+
+async function fetchCommissionPoints(userId) {
+  const rows = await query(
+    `SELECT COALESCE(commission_points, 0) AS commission_points
+    FROM user_points
+    WHERE user_id = ?
+    LIMIT 1`,
+    [userId]
+  );
+
+  return toNumber(rows[0]?.commission_points, 0);
+}
+
+async function buildPointsPayload(userId) {
+  const [gamificationPoints, cashbackPoints, commissionPoints, memberLevel] = await Promise.all([
+    fetchGamificationPoints(userId),
+    fetchCashbackPoints(userId),
+    fetchCommissionPoints(userId),
+    fetchUserGamificationLevel(userId),
+  ]);
+
+  const totalPoints = gamificationPoints + cashbackPoints + commissionPoints;
+
+  return {
+    total_points: totalPoints,
+    poin_gamification: gamificationPoints,
+    cashback_points: cashbackPoints,
+    commission_points: commissionPoints,
+    memberLevel,
+  };
+}
+
+async function upsertUserPoints(userId) {
+  const [gamificationPoints, cashbackPoints, commissionPoints] = await Promise.all([
+    fetchGamificationPoints(userId),
+    fetchCashbackPoints(userId),
+    fetchCommissionPoints(userId),
+  ]);
+
+  const totalPoints = gamificationPoints + cashbackPoints + commissionPoints;
+
+  await query(
+    `INSERT INTO user_points (user_id, total_points, poin_gamification, cashback_points, commission_points)
+    VALUES (?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+      total_points = VALUES(total_points),
+      poin_gamification = VALUES(poin_gamification),
+      cashback_points = VALUES(cashback_points),
+      commission_points = VALUES(commission_points),
+      updated_at = CURRENT_TIMESTAMP`,
+    [userId, totalPoints, gamificationPoints, cashbackPoints, commissionPoints]
+  );
+
+  return { totalPoints, gamificationPoints, cashbackPoints, commissionPoints };
+}
+
 function buildVerificationPayload(row) {
   if (!row) return null;
 
@@ -296,9 +374,14 @@ function buildVerificationPayload(row) {
     id: row.id,
     user_id: row.user_id,
     registered_nim: row.registered_nim,
-    detected_nim: row.detected_nim,
+    detected_nim: row.registered_nim || row.detected_nim,
+    ai_is_telkom: null,
+    ai_confidence: 0,
+    ai_reasoning: null,
+    file_url: null,
+    reviewed_by: null,
+    review_notes: null,
     status: row.status,
-    file_url: row.file_url,
     verification_method: row.verification_method || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -449,15 +532,14 @@ export async function register(req, res) {
       await connection.query(insertAffiliateSql, [userId, `AFF-${userId}`, referralCode]);
       console.log('[REGISTER] INSERTED affiliate_network for', { userId, referralCode });
 
-      console.log('[REGISTER] QUERY -> insert user_points');
+console.log('[REGISTER] QUERY -> insert user_points');
       await connection.query(`INSERT INTO user_points (
           user_id,
           total_points,
-          commission_points,
-          mission_points,
+          poin_gamification,
           cashback_points,
-          voucher_points
-        ) VALUES (?, 0, 0, 0, 0, 0)`, [userId]);
+          commission_points
+        ) VALUES (?, 0, 0, 0, 0)`, [userId]);
       console.log('[REGISTER] INSERTED user_points for', { userId });
 
       if (referredBy) {
@@ -618,32 +700,18 @@ export async function login(req, res) {
       affiliateRow = null;
     }
 
-    const referralCode = isAffiliate ? affiliateRow?.referral_code || null : null;
+const referralCode = isAffiliate ? affiliateRow?.referral_code || null : null;
     const publicUser = buildPublicUser(user);
     publicUser.referral_code = referralCode;
 
     console.log('[LOGIN] Fetching points for user:', user.user_id);
-    let pointsRows = [];
+    let pointsPayload = { total_points: 0, poin_gamification: 0, cashback_points: 0, commission_points: 0, memberLevel: 'SILVER' };
     try {
-      pointsRows = await query(
-        `SELECT total_points, commission_points, mission_points, cashback_points, voucher_points
-        FROM user_points
-        WHERE user_id = ?
-        LIMIT 1`,
-        [user.user_id]
-      );
-      console.log('[LOGIN] Points fetched:', pointsRows.length, 'rows');
+      pointsPayload = await buildPointsPayload(user.user_id);
+      console.log('[LOGIN] Points fetched:', pointsPayload);
     } catch (pointsError) {
       console.warn('[LOGIN] Warning: Failed to fetch user points, using null:', pointsError?.message);
-      pointsRows = [];
-    }
-
-    let gamificationPoints = 0;
-    try {
-      gamificationPoints = await fetchGamificationPoints(user.user_id);
-    } catch (gamificationError) {
-      console.warn('[LOGIN] Warning: Failed to fetch gamification points, using 0:', gamificationError?.message);
-      gamificationPoints = 0;
+      pointsPayload = { total_points: 0, poin_gamification: 0, cashback_points: 0, commission_points: 0, memberLevel: 'SILVER' };
     }
 
     let tokenResult = null;
@@ -664,7 +732,7 @@ export async function login(req, res) {
         ...tokenResult,
         affiliate_network: isAffiliate ? buildAffiliateNetwork(affiliateRow) : null,
         referralCode,
-        points: buildMembershipPointsPayload(pointsRows[0], gamificationPoints),
+        points: pointsPayload,
       },
     });
   } catch (error) {
@@ -695,17 +763,9 @@ export async function getUserProfile(_req, res) {
       return res.status(404).json({ success: false, error: 'User tidak ditemukan.' });
     }
 
-    const affiliateRow = await fetchAffiliateNetworkRow(userId);
+const affiliateRow = await fetchAffiliateNetworkRow(userId);
 
-    const pointsRows = await query(
-      `SELECT total_points, commission_points, mission_points, cashback_points, voucher_points
-      FROM user_points
-      WHERE user_id = ?
-      LIMIT 1`,
-      [userId]
-    );
-
-    const gamificationPoints = await fetchGamificationPoints(userId);
+    const pointsPayload = await buildPointsPayload(userId);
 
     const insightRows = await query(
       `SELECT favorite_category, peak_visit_time, ai_recommendation
@@ -726,7 +786,7 @@ export async function getUserProfile(_req, res) {
         user: buildPublicUser(users[0]),
         affiliate_network: affiliateNetwork,
         referralCode: affiliateNetwork?.referralCode || affiliateRow?.referral_code || null,
-        points: buildMembershipPointsPayload(pointsRows[0], gamificationPoints),
+        points: pointsPayload,
         ai_insight: insightRows[0] || null,
       },
     });
@@ -743,36 +803,22 @@ export async function getMembershipPoints(_req, res) {
       return res.status(400).json({ success: false, error: 'user_id wajib diisi.' });
     }
 
-    const rows = await query(
-      `SELECT
-        u.user_id,
-        COALESCE(up.total_points, 0) AS total_points,
-        COALESCE(up.commission_points, 0) AS commission_points,
-        COALESCE(up.mission_points, 0) AS mission_points,
-        COALESCE(up.cashback_points, 0) AS cashback_points,
-        COALESCE(up.voucher_points, 0) AS voucher_points
-      FROM users u
-      LEFT JOIN user_points up ON up.user_id = u.user_id
-      WHERE u.user_id = ?
-      LIMIT 1`,
+    const [userRows] = await query(
+      `SELECT user_id FROM users WHERE user_id = ? LIMIT 1`,
       [userId]
     );
 
-    if (!rows.length) {
+    if (!userRows.length) {
       return res.status(404).json({ success: false, error: 'User tidak ditemukan.' });
     }
 
-    const gamificationPoints = await fetchGamificationPoints(userId);
-    const points = buildMembershipPointsPayload(rows[0], gamificationPoints);
+    const points = await buildPointsPayload(userId);
 
     return res.json({
       success: true,
       data: {
         user_id: userId,
         points,
-        gamification_points: points.gamification_points,
-        commission_points: points.commission_points,
-        total_points: points.total_points,
       },
     });
   } catch (error) {
@@ -862,7 +908,10 @@ export async function updateProfile(_req, res) {
       updateValues.push(nextPhoneNumber);
     }
 
-    if (body.profile_picture !== undefined || body.photo_url !== undefined || body.profilePicture !== undefined || _req.file) {
+    if (_req.file) {
+      updateFields.push('profile_picture = ?');
+      updateValues.push(nextProfilePicture || null);
+    } else if (body.profile_picture !== undefined || body.photo_url !== undefined || body.profilePicture !== undefined) {
       updateFields.push('profile_picture = ?');
       updateValues.push(nextProfilePicture || null);
     }
@@ -901,6 +950,8 @@ export async function updateProfile(_req, res) {
       message: 'Profil berhasil diperbarui.',
       data: {
         user: buildPublicUser(updatedRows[0]),
+        profile_picture: updatedRows[0]?.profile_picture || null,
+        photo_url: updatedRows[0]?.profile_picture || null,
       },
     });
   } catch (error) {
@@ -951,18 +1002,16 @@ export async function verifyAffiliateByBarcode(req, res) {
 
     const affiliateTier = 'Basic';
 
-    const result = await withTransaction(async (connection) => {
-      const [verificationInsert] = await connection.query(
-        `INSERT INTO affiliate_verifications (
-          user_id,
-          registered_nim,
-          detected_nim,
-          status,
-          file_url,
-          verification_method
-        ) VALUES (?, ?, ?, ?, NULL, ?)`,
-        [userId, registeredNim, barcodeNim, 'APPROVED', 'BARCODE']
-      );
+const result = await withTransaction(async (connection) => {
+       const [verificationInsert] = await connection.query(
+         `INSERT INTO affiliate_verifications (
+           user_id,
+           registered_nim,
+           status,
+           verification_method
+         ) VALUES (?, ?, ?, ?)`,
+         [userId, registeredNim, 'APPROVED', 'BARCODE']
+       );
 
       await connection.query(
         `UPDATE users
@@ -1041,28 +1090,43 @@ export async function verifyAffiliateByBarcode(req, res) {
       [userId]
     );
 
-    const verificationRows = await query(
-      `SELECT id, user_id, registered_nim, detected_nim, status, file_url, verification_method, created_at, updated_at
-       FROM affiliate_verifications
-       WHERE id = ?
-       LIMIT 1`,
-      [result.verificationId]
-    );
+const verificationRows = await query(
+       `SELECT id, user_id, registered_nim, status, verification_method, created_at, updated_at
+        FROM affiliate_verifications
+        WHERE id = ?
+        LIMIT 1`,
+       [result.verificationId]
+     );
 
-    const updatedAffiliateRow = await fetchAffiliateNetworkRow(userId);
+     const updatedAffiliateRow = await fetchAffiliateNetworkRow(userId);
 
-    return res.json({
-      success: true,
-      message: 'Akun berhasil diverifikasi sebagai affiliate.',
-      status: 'APPROVED',
-      data: {
-        verification_id: String(result.verificationId),
-        user: buildPublicUser(updatedUserRows[0]),
-        verification: buildVerificationPayload(verificationRows[0]),
-        affiliate_network: buildAffiliateNetwork(updatedAffiliateRow),
-        referral_code: result.referralCode || updatedAffiliateRow?.referral_code || null,
-      },
-    });
+     return res.json({
+       success: true,
+       message: 'Akun berhasil diverifikasi sebagai affiliate.',
+       status: 'APPROVED',
+       data: {
+         verification_id: String(result.verificationId),
+         user: buildPublicUser(updatedUserRows[0]),
+         verification: {
+           id: verificationRows[0].id,
+           user_id: verificationRows[0].user_id,
+           registered_nim: verificationRows[0].registered_nim,
+           detected_nim: verificationRows[0].registered_nim,
+           ai_is_telkom: null,
+           ai_confidence: 0,
+           ai_reasoning: null,
+           file_url: null,
+           reviewed_by: null,
+           review_notes: null,
+           status: verificationRows[0].status,
+           verification_method: verificationRows[0].verification_method || null,
+           created_at: verificationRows[0].created_at,
+           updated_at: verificationRows[0].updated_at,
+         },
+         affiliate_network: buildAffiliateNetwork(updatedAffiliateRow),
+         referral_code: result.referralCode || updatedAffiliateRow?.referral_code || null,
+       },
+     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
@@ -1108,23 +1172,36 @@ export async function getAffiliateVerifications(_req, res) {
       params.push(status);
     }
 
-    const rows = await query(
-      `SELECT av.id, av.user_id, u.username, u.email, av.registered_nim, av.detected_nim, av.status, av.file_url, av.verification_method, av.created_at, av.updated_at
-      FROM affiliate_verifications av
-      LEFT JOIN users u ON u.user_id = av.user_id
-      ${whereClause}
-      ORDER BY av.created_at DESC`,
-      params
-    );
+const rows = await query(
+       `SELECT av.id, av.user_id, u.username, u.email, av.registered_nim, av.status, av.verification_method, av.created_at, av.updated_at
+       FROM affiliate_verifications av
+       LEFT JOIN users u ON u.user_id = av.user_id
+       ${whereClause}
+       ORDER BY av.created_at DESC`,
+       params
+     );
 
-    return res.json({
-      success: true,
-      data: rows.map((row) => ({
-        ...buildVerificationPayload(row),
-        username: row.username || null,
-        email: row.email || null,
-      })),
-    });
+     return res.json({
+       success: true,
+       data: rows.map((row) => ({
+         id: row.id,
+         user_id: row.user_id,
+         registered_nim: row.registered_nim,
+         detected_nim: row.registered_nim,
+         ai_is_telkom: null,
+         ai_confidence: 0,
+         ai_reasoning: null,
+         file_url: null,
+         reviewed_by: null,
+         review_notes: null,
+         status: row.status,
+         verification_method: row.verification_method || null,
+         created_at: row.created_at,
+         updated_at: row.updated_at,
+         username: row.username || null,
+         email: row.email || null,
+       })),
+     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
@@ -1161,7 +1238,7 @@ export async function getHubDataAdmin(_req, res) {
 
 export async function getAllMembers(_req, res) {
   try {
-    const rows = await query(
+    const userRows = await query(
       `SELECT
         u.user_id,
         u.nim,
@@ -1177,37 +1254,243 @@ export async function getAllMembers(_req, res) {
         u.profile_picture,
         u.ktm_picture,
         u.is_ktm,
-        COALESCE(up.total_points, 0) AS total_points,
-        COALESCE(up.commission_points, 0) AS commission_points,
-        COALESCE(up.mission_points, 0) AS mission_points,
-        COALESCE(up.cashback_points, 0) AS cashback_points,
-        COALESCE(up.voucher_points, 0) AS voucher_points,
         an.referral_code,
         an.affiliate_tier,
         an.total_referrals
       FROM users u
-      LEFT JOIN user_points up ON up.user_id = u.user_id
       LEFT JOIN affiliate_networks an ON an.user_id = u.user_id
       ORDER BY u.created_at DESC`
     );
 
+    const pointsResults = await Promise.all(userRows.map(row => buildPointsPayload(row.user_id)));
+    const pointsMap = new Map(pointsResults.map((p, i) => [userRows[i].user_id, p]));
+
     return res.json({
       success: true,
-      data: rows.map((row) => ({
-        ...buildPublicUser(row),
-        total_points: Number(row.total_points || 0),
-        commission_points: Number(row.commission_points || 0),
-        mission_points: Number(row.mission_points || 0),
-        cashback_points: Number(row.cashback_points || 0),
-        voucher_points: Number(row.voucher_points || 0),
-        referral_code: row.referral_code || null,
-        affiliate_tier: row.affiliate_tier || null,
-        total_referrals: Number(row.total_referrals || 0),
-        nim: row.nim || null,
-        affiliate_network: buildAffiliateNetwork(row),
-      })),
+      data: userRows.map((row) => {
+        const pts = pointsMap.get(row.user_id) || { total_points: 0, poin_gamification: 0, cashback_points: 0, commission_points: 0, memberLevel: 'SILVER' };
+        return {
+          ...buildPublicUser(row),
+          total_points: pts.total_points,
+          commission_points: pts.commission_points,
+          mission_points: 0,
+          cashback_points: pts.cashback_points,
+          voucher_points: 0,
+          referral_code: row.referral_code || null,
+          affiliate_tier: row.affiliate_tier || null,
+          total_referrals: Number(row.total_referrals || 0),
+          nim: row.nim || null,
+          affiliate_network: buildAffiliateNetwork(row),
+        };
+      }),
     });
   } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+export async function getAdminAiInsights(_req, res) {
+  try {
+    const usesOrderCode = await hasColumn('order_items', 'order_code');
+    const hasMemberCode = await hasColumn('orders', 'member_code');
+    const hasUserIdInOrders = await hasColumn('orders', 'user_id');
+    const usesUserColumn = hasUserIdInOrders && !hasMemberCode;
+    const joinCondition = usesOrderCode
+      ? 'JOIN orders o ON o.order_code = oi.order_code'
+      : 'LEFT JOIN orders o ON oi.order_id = o.id';
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+
+    const todayProductRows = await query(
+      `SELECT oi.product_name_snapshot, SUM(oi.qty) AS total_qty
+       FROM order_items oi
+       ${joinCondition}
+       WHERE DATE(o.created_at) = ?
+       GROUP BY oi.product_name_snapshot
+       ORDER BY total_qty DESC
+       LIMIT 1`,
+      [todayStr]
+    );
+
+    const monthProductRows = await query(
+      `SELECT oi.product_name_snapshot, SUM(oi.qty) AS total_qty
+       FROM order_items oi
+       ${joinCondition}
+       WHERE DATE(o.created_at) >= ?
+       GROUP BY oi.product_name_snapshot
+       ORDER BY total_qty DESC
+       LIMIT 1`,
+      [firstDayOfMonth]
+    );
+
+    const ordersTodayRows = await query(
+      `SELECT COUNT(*) AS total_orders, SUM(total) AS total_revenue
+       FROM orders
+       WHERE DATE(created_at) = ?`,
+      [todayStr]
+    );
+
+    const hourRows = await query(
+      `SELECT HOUR(created_at) AS hour, COUNT(*) AS order_count
+       FROM orders
+       WHERE DATE(created_at) = ?
+       GROUP BY HOUR(created_at)
+       ORDER BY order_count DESC
+       LIMIT 1`,
+      [todayStr]
+    );
+
+    const activityRows = await query(
+      `SELECT DAYNAME(created_at) AS day_name, DATE(created_at) AS order_date,
+               ${usesUserColumn ? 'COUNT(DISTINCT o.user_id)' : 'COUNT(DISTINCT o.member_code)'} AS unique_users, COUNT(*) AS order_count
+       FROM orders o
+       WHERE DATE(created_at) >= DATE_SUB(?, INTERVAL 6 DAY)
+       GROUP BY DATE(created_at)
+       ORDER BY order_date`,
+      [todayStr]
+    );
+
+    const topProductToday = todayProductRows[0]?.product_name_snapshot || null;
+    const topProductMonth = monthProductRows[0]?.product_name_snapshot || null;
+    const peakHour = hourRows?.[0]?.hour != null
+      ? `${String(hourRows[0].hour).padStart(2, '0')}:00 - ${String(hourRows[0].hour + 1).padStart(2, '0')}:00`
+      : null;
+
+    const totalOrdersToday = Number(ordersTodayRows?.[0]?.total_orders || 0);
+    const totalRevenueToday = Number(ordersTodayRows?.[0]?.total_revenue || 0);
+    const averageOrderValue = totalOrdersToday > 0 ? Math.round(totalRevenueToday / totalOrdersToday) : 0;
+
+    const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+    const activityChart = activityRows.map((row) => {
+      const date = new Date(row.order_date);
+      const idx = date.getDay();
+      return {
+        label: dayNames[idx],
+        users: Number(row.unique_users || 0),
+        orders: Number(row.order_count || 0),
+      };
+    });
+
+    let recommendation = '';
+    if (topProductToday && peakHour) {
+      recommendation = `${topProductToday} menjadi produk terlaris hari ini. Siapkan stok tambahan untuk jam makan siang karena transaksi paling ramai terjadi pukul ${peakHour}.`;
+    } else if (topProductToday) {
+      recommendation = `${topProductToday} menjadi produk terlaris hari ini.`;
+    } else if (peakHour) {
+      recommendation = `Jam paling ramai terjadi pukul ${peakHour}.`;
+    } else {
+      recommendation = 'Belum ada data insight untuk hari ini.';
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        top_product_today: topProductToday,
+        top_product_month: topProductMonth,
+        peak_hour: peakHour,
+        total_orders_today: totalOrdersToday,
+        total_revenue_today: totalRevenueToday,
+        average_order_value: averageOrderValue,
+        recommendation,
+        activity_chart: activityChart,
+      },
+    });
+  } catch (error) {
+    console.error('[getAdminAiInsights] Error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+export async function getUserVouchers(_req, res) {
+  try {
+    const userId = normalizeText(_req.params?.user_id || _req.query?.user_id);
+    if (!userId) {
+      return res.status(400).json({ success: false, error: 'user_id wajib diisi.' });
+    }
+
+    let userVoucherCols;
+    let userVoucherTable = 'user_voucher';
+    try {
+      userVoucherCols = await getTableColumns('user_voucher');
+    } catch {
+      try {
+        userVoucherCols = await getTableColumns('user_vouchers');
+        userVoucherTable = 'user_vouchers';
+      } catch {
+        return res.json({ success: true, data: [] });
+      }
+    }
+
+    const hasStatus = userVoucherCols.has('status');
+    const hasClaimedAt = userVoucherCols.has('claimed_at');
+
+    const voucherCols = await getTableColumns('vouchers');
+    const hasDescription = voucherCols.has('description');
+    const hasImageUrl = voucherCols.has('image_url');
+    const hasExpiryDays = voucherCols.has('expiry_days');
+    const hasMaxDiscount = voucherCols.has('max_discount');
+    const hasMinPurchase = voucherCols.has('min_purchase');
+    const hasCashierInstruction = voucherCols.has('cashier_instruction');
+
+    const extraVoucherCols = [
+      hasDescription ? 'v.description' : 'NULL AS description',
+      hasImageUrl ? 'v.image_url' : 'NULL AS image_url',
+      hasExpiryDays ? 'v.expiry_days' : 'NULL AS expiry_days',
+      hasMaxDiscount ? 'v.max_discount' : 'NULL AS max_discount',
+      hasMinPurchase ? 'v.min_purchase' : 'NULL AS min_purchase',
+      hasCashierInstruction ? 'v.cashier_instruction' : 'NULL AS cashier_instruction',
+    ].join(',\n        ');
+
+    let statusFilter = '';
+    if (hasStatus) {
+      statusFilter = "AND (uv.status = 'CLAIMED' OR uv.status = 'ACTIVE' OR uv.status = 'UNUSED')";
+    }
+
+    const rows = await query(
+      `SELECT
+        uv.voucher_code,
+        v.voucher_name,
+        v.voucher_type,
+        v.points_cost,
+        v.value_amount,
+        ${extraVoucherCols}
+      FROM ${userVoucherTable} uv
+      JOIN vouchers v ON uv.voucher_code = v.voucher_code
+      WHERE uv.user_id = ?
+        ${statusFilter}
+      ORDER BY uv.${hasClaimedAt ? 'claimed_at' : 'created_at'} DESC`,
+      [userId]
+    );
+
+    const vouchers = rows.map((row) => ({
+      voucher_code: row.voucher_code,
+      voucher_name: row.voucher_name,
+      voucher_type: row.voucher_type,
+      points_cost: Number(row.points_cost || 0),
+      value_amount: Number(row.value_amount || 0),
+      description: row.description || '',
+      image_url: row.image_url || '',
+      expiry_days: Number(row.expiry_days || 0),
+      max_discount: Number(row.max_discount || 0),
+      min_purchase: Number(row.min_purchase || 0),
+      cashier_instruction: row.cashier_instruction || '',
+      status: row.status || 'ACTIVE',
+      claimed_at: row.claimed_at || row.created_at || null,
+    }));
+
+    return res.json({
+      success: true,
+      data: vouchers,
+    });
+  } catch (error) {
+    console.error('[getUserVouchers] Error:', error);
+    if (String(error?.message || '').includes("doesn't exist") || String(error?.message || '').includes('Unknown table')) {
+      return res.json({
+        success: true,
+        data: [],
+      });
+    }
     return res.status(500).json({ success: false, error: error.message });
   }
 }
@@ -1512,9 +1795,9 @@ export async function redeemPoints(_req, res) {
       return res.status(400).json({ success: false, error: 'Poin yang dipakai belum sesuai biaya voucher.' });
     }
 
-    const result = await withTransaction(async (connection) => {
+const result = await withTransaction(async (connection) => {
       const [pointRows] = await connection.query(
-        `SELECT total_points, commission_points, mission_points, cashback_points, voucher_points
+        `SELECT total_points
         FROM user_points
         WHERE user_id = ?
         LIMIT 1
@@ -1531,16 +1814,13 @@ export async function redeemPoints(_req, res) {
         throw new Error('Poin user tidak mencukupi.');
       }
 
-      const currentVoucherPoints = Number(pointRows[0].voucher_points || 0);
-      const nextVoucherPoints = Math.max(currentVoucherPoints - pointsUsed, 0);
       const nextTotalPoints = currentPoints - pointsUsed;
 
       await connection.query(
         `UPDATE user_points
-        SET total_points = ?,
-            voucher_points = ?
+        SET total_points = ?
         WHERE user_id = ?`,
-        [nextTotalPoints, nextVoucherPoints, userId]
+        [nextTotalPoints, userId]
       );
 
       await connection.query(
@@ -1719,26 +1999,18 @@ export async function createTransaction(_req, res) {
       }
 
       if (userId && pointsEarned > 0) {
-        await connection.query(
-          `INSERT INTO point_logs (
-            user_id,
-            point_type,
-            points,
-            reference_type,
-            reference_id,
-            note
-          ) VALUES (?, 'cashback', ?, 'transaction', ?, 'Points earned from transaction')`,
-          [userId, pointsEarned, transactionCode]
-        );
-
-        await connection.query(
-          `UPDATE user_points
-          SET total_points = total_points + ?,
-              cashback_points = cashback_points + ?
-          WHERE user_id = ?`,
-          [pointsEarned, pointsEarned, userId]
-        );
-      }
+await connection.query(
+      `INSERT INTO point_logs (
+        user_id,
+        point_type,
+        points,
+        reference_type,
+        reference_id,
+        note
+      ) VALUES (?, 'cashback', ?, 'transaction', ?, 'Points earned from transaction')`,
+      [userId, pointsEarned, transactionCode]
+    );
+  }
 
       if (userId && total > 0) {
         const [memberRows] = await connection.query(
@@ -1892,7 +2164,7 @@ export async function earnPoints(_req, res) {
       return res.status(400).json({ success: false, error: 'points harus lebih dari 0.' });
     }
 
-    const allowedPointTypes = new Set(['commission', 'mission', 'cashback', 'voucher']);
+    const allowedPointTypes = new Set(['commission', 'cashback']);
     if (!allowedPointTypes.has(pointType)) {
       return res.status(400).json({ success: false, error: 'point_type tidak valid.' });
     }
@@ -1904,7 +2176,7 @@ export async function earnPoints(_req, res) {
 
     const result = await withTransaction(async (connection) => {
       const [pointRows] = await connection.query(
-        `SELECT total_points, commission_points, mission_points, cashback_points, voucher_points
+        `SELECT total_points, commission_points, cashback_points
         FROM user_points
         WHERE user_id = ?
         LIMIT 1
@@ -1918,20 +2190,16 @@ export async function earnPoints(_req, res) {
 
       const current = pointRows[0];
       const nextCommission = Number(current.commission_points || 0) + (pointType === 'commission' ? points : 0);
-      const nextMission = Number(current.mission_points || 0) + (pointType === 'mission' ? points : 0);
       const nextCashback = Number(current.cashback_points || 0) + (pointType === 'cashback' ? points : 0);
-      const nextVoucher = Number(current.voucher_points || 0) + (pointType === 'voucher' ? points : 0);
       const nextTotal = Number(current.total_points || 0) + points;
 
       await connection.query(
         `UPDATE user_points
         SET total_points = ?,
             commission_points = ?,
-            mission_points = ?,
-            cashback_points = ?,
-            voucher_points = ?
+            cashback_points = ?
         WHERE user_id = ?`,
-        [nextTotal, nextCommission, nextMission, nextCashback, nextVoucher, userId]
+        [nextTotal, nextCommission, nextCashback, userId]
       );
 
       await connection.query(
@@ -2104,21 +2372,15 @@ export async function lookupMember(req, res) {
       return res.status(404).json({ success: false, error: 'User tidak ditemukan.' });
     }
 
-    const userRow = rows[0];
+const userRow = rows[0];
 
-    const pointsRows = await query(
-      `SELECT total_points, commission_points, mission_points, cashback_points, voucher_points
-      FROM user_points
-      WHERE user_id = ?
-      LIMIT 1`,
-      [userRow.user_id]
-    );
+    const pointsPayload = await buildPointsPayload(userRow.user_id);
 
     return res.json({
       success: true,
       user: {
         ...buildPublicUser(userRow),
-        points: pointsRows[0] || { total_points: 0, commission_points: 0, mission_points: 0, cashback_points: 0, voucher_points: 0 },
+        points: pointsPayload,
       },
     });
   } catch (error) {
@@ -2144,7 +2406,7 @@ export async function getRecommendedProducts(_req, res) {
       ORDER BY created_at DESC`,
     );
 
-    const baseUrl = _req.app?.get?.('baseUrl') || 'http://0.0.0.0:4000';
+const baseUrl = _req.app?.get?.('baseUrl') || 'http://0.0.0.0:4000';
 
     return res.json({
       success: true,
@@ -2166,119 +2428,6 @@ export async function getRecommendedProducts(_req, res) {
     });
   } catch (error) {
     console.error('[getRecommendedProducts] Error:', error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-}
-
-export async function getAdminAiInsights(_req, res) {
-  try {
-    const usesOrderCode = await hasColumn('order_items', 'order_code');
-    const hasMemberCode = await hasColumn('orders', 'member_code');
-    const hasUserIdInOrders = await hasColumn('orders', 'user_id');
-    const usesUserColumn = hasUserIdInOrders && !hasMemberCode;
-    const joinCondition = usesOrderCode
-      ? 'JOIN orders o ON o.order_code = oi.order_code'
-      : 'LEFT JOIN orders o ON oi.order_id = o.id';
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-
-    const todayProductRows = await query(
-      `SELECT oi.product_name_snapshot, SUM(oi.qty) AS total_qty
-       FROM order_items oi
-       ${joinCondition}
-       WHERE DATE(o.created_at) = ?
-       GROUP BY oi.product_name_snapshot
-       ORDER BY total_qty DESC
-       LIMIT 1`,
-      [todayStr]
-    );
-
-    const monthProductRows = await query(
-      `SELECT oi.product_name_snapshot, SUM(oi.qty) AS total_qty
-       FROM order_items oi
-       ${joinCondition}
-       WHERE DATE(o.created_at) >= ?
-       GROUP BY oi.product_name_snapshot
-       ORDER BY total_qty DESC
-       LIMIT 1`,
-      [firstDayOfMonth]
-    );
-
-    const ordersTodayRows = await query(
-      `SELECT COUNT(*) AS total_orders, SUM(total) AS total_revenue
-       FROM orders
-       WHERE DATE(created_at) = ?`,
-      [todayStr]
-    );
-
-    const hourRows = await query(
-      `SELECT HOUR(created_at) AS hour, COUNT(*) AS order_count
-       FROM orders
-       WHERE DATE(created_at) = ?
-       GROUP BY HOUR(created_at)
-       ORDER BY order_count DESC
-       LIMIT 1`,
-      [todayStr]
-    );
-
-    const activityRows = await query(
-      `SELECT DAYNAME(created_at) AS day_name, DATE(created_at) AS order_date,
-              ${usesUserColumn ? 'COUNT(DISTINCT o.user_id)' : 'COUNT(DISTINCT o.member_code)'} AS unique_users, COUNT(*) AS order_count
-       FROM orders o
-       WHERE DATE(created_at) >= DATE_SUB(?, INTERVAL 6 DAY)
-       GROUP BY DATE(created_at)
-       ORDER BY order_date`,
-      [todayStr]
-    );
-
-    const topProductToday = todayProductRows[0]?.product_name_snapshot || null;
-    const topProductMonth = monthProductRows[0]?.product_name_snapshot || null;
-    const peakHour = hourRows?.[0]?.hour != null
-      ? `${String(hourRows[0].hour).padStart(2, '0')}:00 - ${String(hourRows[0].hour + 1).padStart(2, '0')}:00`
-      : null;
-
-    const totalOrdersToday = Number(ordersTodayRows?.[0]?.total_orders || 0);
-    const totalRevenueToday = Number(ordersTodayRows?.[0]?.total_revenue || 0);
-    const averageOrderValue = totalOrdersToday > 0 ? Math.round(totalRevenueToday / totalOrdersToday) : 0;
-
-    const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
-    const activityChart = activityRows.map((row) => {
-      const date = new Date(row.order_date);
-      const idx = date.getDay();
-      return {
-        label: dayNames[idx],
-        users: Number(row.unique_users || 0),
-        orders: Number(row.order_count || 0),
-      };
-    });
-
-    let recommendation = '';
-    if (topProductToday && peakHour) {
-      recommendation = `${topProductToday} menjadi produk terlaris hari ini. Siapkan stok tambahan untuk jam makan siang karena transaksi paling ramai terjadi pukul ${peakHour}.`;
-    } else if (topProductToday) {
-      recommendation = `${topProductToday} menjadi produk terlaris hari ini.`;
-    } else if (peakHour) {
-      recommendation = `Jam paling ramai terjadi pukul ${peakHour}.`;
-    } else {
-      recommendation = 'Belum ada data insight untuk hari ini.';
-    }
-
-    return res.json({
-      success: true,
-      data: {
-        top_product_today: topProductToday,
-        top_product_month: topProductMonth,
-        peak_hour: peakHour,
-        total_orders_today: totalOrdersToday,
-        total_revenue_today: totalRevenueToday,
-        average_order_value: averageOrderValue,
-        recommendation,
-        activity_chart: activityChart,
-      },
-    });
-  } catch (error) {
-    console.error('[getAdminAiInsights] Error:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 }
