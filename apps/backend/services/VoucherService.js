@@ -37,7 +37,24 @@ export class VoucherService {
             'SELECT voucher_code, voucher_name, voucher_type, points_cost, value_amount, description, stock, expiry_days, image_url, max_discount, min_purchase, cashier_instruction, is_active FROM vouchers WHERE voucher_code = ? LIMIT 1',
             [normalizeText(voucherCode)]
         );
-        return rows[0] || null;
+        if (!rows[0]) return null;
+        const row = rows[0];
+        return {
+            voucherCode: row.voucher_code,
+            voucherName: row.voucher_name,
+            voucherType: row.voucher_type,
+            pointsCost: Number(row.points_cost || 0),
+            valueAmount: Number(row.value_amount || 0),
+            description: row.description || '',
+            stock: Number(row.stock || 0),
+            expiryDays: row.expiry_days,
+            imageUrl: row.image_url || '',
+            maxDiscount: row.max_discount !== null ? Number(row.max_discount) : null,
+            minPurchase: row.min_purchase !== null ? Number(row.min_purchase) : null,
+            cashierInstruction: row.cashier_instruction || '',
+            isActive: Boolean(row.is_active),
+            createdAt: row.created_at,
+        };
     }
 
     static async claimVoucher(userId, voucherCode) {
@@ -51,52 +68,73 @@ export class VoucherService {
             throw new Error('Voucher sedang tidak aktif.');
         }
 
-        const pointsCost = Number(voucher.points_cost || 0);
+        const pointsCost = Number(voucher.pointsCost || 0);
 
         return await withTransaction(async (connection) => {
             const queryWithConn = (sql, params) => connection.query(sql, params);
 
+            const existingClaim = await queryWithConn(
+                'SELECT id FROM user_voucher WHERE user_id = ? AND voucher_code = ? AND status = ? LIMIT 1',
+                [userId, voucherCode, 'ACTIVE']
+            );
+
+            if (existingClaim[0] && existingClaim[0].length > 0) {
+                throw new Error('Voucher ini sudah ada di koleksi Anda. Gunakan voucher yang tersedia terlebih dahulu atau pilih voucher lainnya.');
+            }
+
             const pointRows = await queryWithConn(
-                'SELECT total_points, voucher_points FROM user_points WHERE user_id = ? FOR UPDATE',
+                'SELECT user_id, points FROM UserGamification WHERE user_id = ? FOR UPDATE',
                 [userId]
             );
 
             let currentPoints = 0;
-            let currentVoucherPoints = 0;
 
-            if (pointRows.length) {
-                currentPoints = Number(pointRows[0].total_points || 0);
-                currentVoucherPoints = Number(pointRows[0].voucher_points || 0);
-            } else {
+            if (!pointRows[0] || pointRows[0].length === 0) {
                 await queryWithConn(
-                    'INSERT INTO user_points (user_id, total_points, commission_points, mission_points, cashback_points, voucher_points) VALUES (?, 0, 0, 0, 0, 0)',
+                    'INSERT INTO UserGamification (user_id, points, memberLevel, streakCount, lastCheckIn) VALUES (?, 0, ?, 0, NULL)',
+                    [userId, 'Bronze']
+                );
+                const newPointRows = await queryWithConn(
+                    'SELECT user_id, points FROM UserGamification WHERE user_id = ? FOR UPDATE',
                     [userId]
                 );
+                currentPoints = Number(newPointRows[0][0]?.points || 0);
+            } else {
+                currentPoints = Number(pointRows[0][0].points || 0);
             }
 
             if (currentPoints < pointsCost) {
                 throw new Error('Poin user tidak mencukupi.');
             }
 
-            const nextVoucherPoints = Math.max(currentVoucherPoints - pointsCost, 0);
+            const voucherStockRows = await queryWithConn(
+                'SELECT stock FROM vouchers WHERE voucher_code = ? FOR UPDATE',
+                [voucherCode]
+            );
+
+            const currentStock = Number(voucherStockRows[0][0]?.stock || 0);
+            if (currentStock <= 0) {
+                throw new Error('Voucher sudah habis. Silakan coba voucher lainnya atau tunggu stok tersedia kembali.');
+            }
+
             const nextTotalPoints = currentPoints - pointsCost;
 
             await queryWithConn(
-                'UPDATE user_points SET total_points = ?, voucher_points = ? WHERE user_id = ?',
-                [nextTotalPoints, nextVoucherPoints, userId]
+                'UPDATE UserGamification SET points = ? WHERE user_id = ?',
+                [nextTotalPoints, userId]
             );
 
             const redemptionId = generateId();
             await queryWithConn(
                 'INSERT INTO redemption_logs (id, user_id, voucher_code, points_used, status, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
-                [redemptionId, userId, voucher.voucher_code, pointsCost, 'COMPLETED']
+                [redemptionId, userId, voucher.voucherCode, pointsCost, 'COMPLETED']
             );
 
             try {
                 const voucherClaimId = generateId();
                 await queryWithConn(
                     'INSERT INTO user_voucher (id, user_id, voucher_code, claimed_at, status) VALUES (?, ?, ?, NOW(), ?)',
-                    [voucherClaimId, userId, voucher.voucher_code, 'ACTIVE']
+                    [voucherClaimId, userId, voucher.voucherCode, 'ACTIVE']
                 );
             } catch (tableError) {
                 console.warn('[VoucherService] user_voucher table may not exist:', tableError.message);
@@ -104,14 +142,19 @@ export class VoucherService {
 
             await queryWithConn(
                 'INSERT INTO point_logs (user_id, point_type, points, reference_type, reference_id, note, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
-                [userId, 'voucher', -pointsCost, 'voucher', voucher.voucher_code, 'Claim voucher: ' + voucher.voucher_name]
+                [userId, 'voucher', -pointsCost, 'voucher', voucher.voucherCode, 'Claim voucher: ' + voucher.voucherName]
+            );
+
+            await queryWithConn(
+                'UPDATE vouchers SET stock = stock - 1 WHERE voucher_code = ? AND stock > 0',
+                [voucherCode]
             );
 
             return {
                 userId,
-                voucherCode: voucher.voucher_code,
-                voucherName: voucher.voucher_name,
-                voucherType: voucher.voucher_type,
+                voucherCode: voucher.voucherCode,
+                voucherName: voucher.voucherName,
+                voucherType: voucher.voucherType,
                 pointsUsed: pointsCost,
                 remainingPoints: nextTotalPoints,
                 status: 'ACTIVE',
