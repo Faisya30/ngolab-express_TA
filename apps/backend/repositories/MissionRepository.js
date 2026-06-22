@@ -4,10 +4,11 @@ export class MissionRepository {
     static async findById(id) {
         try {
             const rows = await query(
-                'SELECT id, title, description, rewardPoints, target, type, icon, status FROM Missions WHERE id = ? LIMIT 1',
+                'SELECT id, title, description, rewardPoints, target, type, product_code, icon, status FROM Missions WHERE id = ? LIMIT 1',
                 [id]
             );
-            return rows[0] || null;
+            if (!rows[0] || rows[0].length === 0) return null;
+            return this.mapToApiResponse(rows[0][0]);
         } catch (error) {
             if (this.isTableMissing(error)) return null;
             throw error;
@@ -16,9 +17,11 @@ export class MissionRepository {
 
     static async findAll() {
         try {
-            return await query(
-                'SELECT id, title, description, rewardPoints, target, type, icon, status FROM Missions ORDER BY id DESC'
+            const rows = await query(
+                'SELECT id, title, description, rewardPoints, target, type, product_code, icon, status FROM Missions ORDER BY id DESC'
             );
+            if (!rows[0] || !Array.isArray(rows[0])) return [];
+            return rows[0].map(row => this.mapToApiResponse(row));
         } catch (error) {
             if (this.isTableMissing(error)) return [];
             throw error;
@@ -27,14 +30,30 @@ export class MissionRepository {
 
     static async findActive() {
         try {
-            return await query(
-                'SELECT id, title, description, rewardPoints, target, type, icon, status FROM Missions WHERE status = ?',
+            const rows = await query(
+                'SELECT id, title, description, rewardPoints, target, type, product_code, icon, status FROM Missions WHERE status = ?',
                 ['active']
             );
+            if (!rows[0] || !Array.isArray(rows[0])) return [];
+            return rows[0].map(row => this.mapToApiResponse(row));
         } catch (error) {
             if (this.isTableMissing(error)) return [];
             throw error;
         }
+    }
+
+    static mapToApiResponse(row) {
+        if (!row) return null;
+        return {
+            id: row.id,
+            title: row.title,
+            description: row.description,
+            missionType: row.type,
+            rewardPoints: row.rewardPoints,
+            target: row.target,
+            productCode: row.product_code,
+            status: row.status
+        };
     }
 
     static isTableMissing(error) {
@@ -43,30 +62,34 @@ export class MissionRepository {
     }
 
     static async create(data) {
-        const { id, title, description, rewardPoints = 0, target = 1, type = 'daily', icon = null, status = 'active' } = data;
+        const { id, title, description, rewardPoints = 0, target = 1, type, productCode, icon = null, status = 'active' } = data;
+        const validTypes = ['CHECKIN', 'TRANSACTION', 'PRODUCT_PURCHASE'];
+        const missionType = validTypes.includes(type) ? type : 'CHECKIN';
+
         await query(
-            `INSERT INTO Missions (id, title, description, rewardPoints, target, type, icon, status) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, title, description, rewardPoints, target, type, icon, status]
+            `INSERT INTO Missions (id, title, description, rewardPoints, target, type, product_code, icon, status) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, title, description, rewardPoints, target, missionType, productCode || null, icon, status]
         );
         return await this.findById(id);
     }
 
     static async update(id, data) {
-        const { title, description, rewardPoints, target, type, icon, status } = data;
+        const { title, description, rewardPoints, target, type, productCode, icon, status } = data;
         const fields = [];
         const values = [];
-        
+
         if (title !== undefined) { fields.push('title = ?'); values.push(title); }
         if (description !== undefined) { fields.push('description = ?'); values.push(description); }
         if (rewardPoints !== undefined) { fields.push('rewardPoints = ?'); values.push(rewardPoints); }
         if (target !== undefined) { fields.push('target = ?'); values.push(target); }
         if (type !== undefined) { fields.push('type = ?'); values.push(type); }
+        if (productCode !== undefined) { fields.push('product_code = ?'); values.push(productCode); }
         if (icon !== undefined) { fields.push('icon = ?'); values.push(icon); }
         if (status !== undefined) { fields.push('status = ?'); values.push(status); }
-        
+
         if (fields.length === 0) return await this.findById(id);
-        
+
         values.push(id);
         await query(
             `UPDATE Missions SET ${fields.join(', ')} WHERE id = ?`,

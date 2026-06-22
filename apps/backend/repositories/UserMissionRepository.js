@@ -10,10 +10,16 @@ export class UserMissionRepository {
     }
 
     static async findByUserId(userId) {
-        return await query(
-            'SELECT id, userId, missionId, status, completedAt FROM UserMissions WHERE userId = ?',
+        const rows = await query(
+            `SELECT um.id, um.userId, um.missionId, um.status, um.completedAt,
+                    m.type as missionType, m.target, m.product_code as productCode, m.rewardPoints
+             FROM UserMissions um
+             JOIN Missions m ON m.id = um.missionId
+             WHERE um.userId = ?`,
             [userId]
         );
+        if (!rows[0] || !Array.isArray(rows[0])) return [];
+        return rows[0];
     }
 
     static async findByMissionId(missionId) {

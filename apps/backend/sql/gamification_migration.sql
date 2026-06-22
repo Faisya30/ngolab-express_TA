@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS Missions (
     description TEXT,
     rewardPoints INT DEFAULT 0,
     target INT DEFAULT 1,
-    type VARCHAR(100) DEFAULT 'daily',
+    type VARCHAR(100) DEFAULT 'CHECKIN',
+    product_code VARCHAR(255) NULL,
     icon VARCHAR(255),
     status VARCHAR(100) DEFAULT 'active'
 );
