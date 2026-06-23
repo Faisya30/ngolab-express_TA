@@ -6,21 +6,49 @@ export class UserMissionRepository {
             'SELECT id, userId, missionId, status, completedAt FROM UserMissions WHERE id = ? LIMIT 1',
             [id]
         );
-        return rows[0] || null;
+        if (!rows || rows.length === 0) return null;
+        return rows[0];
     }
 
     static async findByUserId(userId) {
-        return await query(
-            'SELECT id, userId, missionId, status, completedAt FROM UserMissions WHERE userId = ?',
+        const rows = await query(
+            `SELECT um.id, um.userId, um.missionId, um.status, um.completedAt,
+                    m.type as missionType, m.target, m.product_code as productCode, m.rewardPoints
+             FROM UserMissions um
+             JOIN Missions m ON m.id = um.missionId
+             WHERE um.userId = ?`,
             [userId]
         );
+        if (!rows || !Array.isArray(rows)) return [];
+        return rows.map(row => ({
+            id: row.id,
+            userId: row.userId,
+            missionId: row.missionId,
+            status: row.status,
+            completedAt: row.completedAt,
+            missionType: row.missionType,
+            target: row.target,
+            productCode: row.productCode,
+            rewardPoints: row.rewardPoints
+        }));
     }
 
     static async findByMissionId(missionId) {
-        return await query(
+        const rows = await query(
             'SELECT id, userId, missionId, status, completedAt FROM UserMissions WHERE missionId = ?',
             [missionId]
         );
+        if (!rows || !Array.isArray(rows)) return [];
+        return rows;
+    }
+
+    static async findByUserIdAndMissionId(userId, missionId) {
+        const rows = await query(
+            'SELECT id, userId, missionId, status, completedAt FROM UserMissions WHERE userId = ? AND missionId = ? LIMIT 1',
+            [userId, missionId]
+        );
+        if (!rows || rows.length === 0) return null;
+        return rows[0];
     }
 
     static async findAll() {

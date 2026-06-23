@@ -19,28 +19,29 @@ export async function getMissions(req, res) {
 
 export async function createMission(req, res) {
     try {
-        const { title, description, rewardPoints, target, type, icon, status } = req.body || {};
-        
+        const { title, description, missionType, rewardPoints, target, productCode, icon, status } = req.body || {};
+
         if (!title) {
             return res.status(400).json({
                 success: false,
                 message: 'title wajib diisi'
             });
         }
-        
+
         const mission = await MissionService.createMission({
             title,
             description,
+            missionType,
             rewardPoints,
             target,
-            type,
+            productCode,
             icon,
             status
         });
-        
+
         return res.json({
             success: true,
-            message: 'Mis berhasil dibuat',
+            message: 'Mission berhasil dibuat',
             data: mission
         });
     } catch (error) {

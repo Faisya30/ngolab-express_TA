@@ -6,7 +6,8 @@ export class UserGamificationRepository {
             'SELECT user_id, points, memberLevel, streakCount, lastCheckIn FROM UserGamification WHERE user_id = ? LIMIT 1',
             [user_id]
         );
-        return rows[0] || null;
+        if (!rows || rows.length === 0) return null;
+        return rows[0];
     }
 
     static async findAll() {
