@@ -18,6 +18,7 @@ import {
   getTransactionDetail,
   getTransactionHistory,
   getUserProfile,
+  getUserVouchers,
   lookupMember,
   login,
   getMembershipPoints,
@@ -78,5 +79,6 @@ router.get('/transactions/history/:user_id', requireMembershipJwt, requireSelfMe
 router.post('/gamification/earn-points', earnPoints);
 router.get('/recommended-products', getRecommendedProducts);
 router.get('/admin/ai-insights', getAdminAiInsights);
+router.get('/users/:user_id/vouchers', getUserVouchers);
 
 export default router;

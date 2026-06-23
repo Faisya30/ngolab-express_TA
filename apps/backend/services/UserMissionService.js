@@ -13,33 +13,77 @@ export class UserMissionService {
     }
 
     static async getUserMissions(userId) {
-        const userMissions = await UserMissionRepository.findByUserId(userId);
-        const query = (sql, params) => this._queryWithProgress(sql, params);
+        console.log('DEBUG getUserMissions - userId received:', userId);
+        
+        const activeMissions = await MissionRepository.findActive();
+        console.log('DEBUG activeMissions raw:', JSON.stringify(activeMissions, null, 2));
 
-        const missionsWithProgress = [];
-        for (const um of userMissions) {
-            let progress = 0;
+        const claimedMissions = await UserMissionRepository.findByUserId(userId);
+        console.log('DEBUG claimedMissions raw:', JSON.stringify(claimedMissions, null, 2));
+        
+        const claimedMap = new Map();
+        for (const cm of claimedMissions) {
+            claimedMap.set(cm.missionId, cm);
+        }
 
-            if (um.missionType === 'CHECKIN') {
-                progress = await this._getCheckinProgress(um.userId);
-            } else if (um.missionType === 'TRANSACTION') {
-                progress = await this._getTransactionProgress(um.userId);
-            } else if (um.missionType === 'PRODUCT_PURCHASE') {
-                progress = await this._getProductPurchaseProgress(um.userId, um.productCode);
+        console.log('MISSION DEBUG', {
+            userId,
+            activeMissionCount: activeMissions.length,
+            claimedMissionCount: claimedMissions.length
+        });
+
+        const missionsWithStatus = [];
+        for (const mission of activeMissions) {
+            console.log('DEBUG Processing mission:', {
+                missionId: mission.id,
+                missionType: mission.missionType,
+                target: mission.target
+            });
+            
+            const progress = await this._calculateProgress(userId, mission.missionType, mission.target, mission.productCode);
+            console.log('DEBUG progress for mission:', {
+                missionId: mission.id,
+                missionType: mission.missionType,
+                target: mission.target,
+                progress
+            });
+            
+            const alreadyClaimed = claimedMap.get(mission.id);
+
+            let status;
+            if (alreadyClaimed && alreadyClaimed.status === 'claimed') {
+                status = 'claimed';
+            } else if (progress >= mission.target) {
+                status = 'completed';
+            } else {
+                status = 'in_progress';
             }
 
-            missionsWithProgress.push({
-                missionId: um.missionId,
-                missionType: um.missionType,
+            console.log('MISSION DEBUG', {
+                userId,
+                missionId: mission.id,
+                missionType: mission.missionType,
                 progress,
-                target: um.target,
-                status: um.status,
-                productCode: um.productCode,
-                rewardPoints: um.rewardPoints
+                target: mission.target,
+                status
+            });
+
+            missionsWithStatus.push({
+                missionId: mission.id,
+                missionType: mission.missionType,
+                title: mission.title,
+                description: mission.description,
+                icon: mission.icon,
+                progress,
+                target: mission.target,
+                status,
+                productCode: mission.productCode,
+                rewardPoints: mission.rewardPoints
             });
         }
 
-        return missionsWithProgress;
+        console.log('DEBUG missionsWithStatus before return:', JSON.stringify(missionsWithStatus, null, 2));
+        return missionsWithStatus;
     }
 
     static async _queryWithProgress(sql, params) {
@@ -47,125 +91,150 @@ export class UserMissionService {
         return await query(sql, params);
     }
 
-    static async _getCheckinProgress(userId) {
+    static async _calculateProgress(userId, missionType, target, productCode) {
+        if (missionType === 'CHECKIN') {
+            return await this._getCheckinProgress(userId, target);
+        } else if (missionType === 'STREAK') {
+            return await this._getStreakProgress(userId);
+        } else if (missionType === 'TRANSACTION') {
+            return await this._getTransactionProgress(userId);
+        } else if (missionType === 'PRODUCT_PURCHASE') {
+            return await this._getProductPurchaseProgress(userId, productCode);
+        }
+        return 0;
+    }
+
+    static async _getCheckinProgress(userId, target) {
         const rows = await this._queryWithProgress(
-            'SELECT lastCheckIn FROM UserGamification WHERE user_id = ? LIMIT 1',
+            'SELECT lastCheckIn, streakCount FROM UserGamification WHERE user_id = ? LIMIT 1',
             [userId]
         );
-        if (!rows[0] || !rows[0][0]) return 0;
-        const lastCheckIn = rows[0][0].lastCheckIn;
+        if (!rows || rows.length === 0) return 0;
+        const lastCheckIn = rows[0].lastCheckIn;
+        const streakCount = rows[0].streakCount || 0;
         if (!lastCheckIn) return 0;
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const checkinDate = new Date(lastCheckIn);
         checkinDate.setHours(0, 0, 0, 0);
+        if (target && target > 1) {
+            return checkinDate.getTime() === today.getTime() ? streakCount : 0;
+        }
         return checkinDate.getTime() === today.getTime() ? 1 : 0;
+    }
+
+    static async _getStreakProgress(userId) {
+        const rows = await this._queryWithProgress(
+            'SELECT streakCount FROM UserGamification WHERE user_id = ? LIMIT 1',
+            [userId]
+        );
+        if (!rows || rows.length === 0) return 0;
+        return rows[0].streakCount || 0;
     }
 
     static async _getTransactionProgress(userId) {
         const rows = await this._queryWithProgress(
-            'SELECT COUNT(*) as count FROM transactions WHERE user_id = ?',
+            'SELECT COUNT(*) as count FROM transactions WHERE user_id = ? AND DATE(created_at) = CURDATE()',
             [userId]
         );
-        return rows[0][0]?.count || 0;
+        if (!rows || rows.length === 0) return 0;
+        return rows[0].count || 0;
     }
 
     static async _getProductPurchaseProgress(userId, productCode) {
         const rows = await this._queryWithProgress(
             `SELECT SUM(ti.qty) as qty FROM transactions t
              JOIN transaction_items ti ON ti.transaction_code = t.transaction_code
-             WHERE t.user_id = ? AND ti.menu_item_code = ?`,
+             WHERE t.user_id = ? AND ti.menu_item_code = ? AND DATE(t.created_at) = CURDATE()`,
             [userId, productCode]
         );
-        return rows[0][0]?.qty || 0;
+        if (!rows || rows.length === 0) return 0;
+        return rows[0].qty || 0;
     }
 
     static async completeMission(userId, missionId) {
         return await withTransaction(async (connection) => {
-            const queryWithConn = (sql, params) => connection.query(sql, params);
+            const queryWithConn = async (sql, params) => {
+                const [rows] = await connection.query(sql, params);
+                return rows;
+            };
 
-            let userMissions = await queryWithConn(
-                'SELECT id, userId, missionId, status, completedAt FROM UserMissions WHERE userId = ? AND missionId = ? LIMIT 1',
-                [userId, missionId]
-            );
-
-            let userMission = userMissions[0] && userMissions[0][0] ? userMissions[0][0] : null;
-
-            if (userMission && userMission.status === 'claimed') {
-                throw new Error('Reward mission sudah pernah diklaim.');
-            }
-
-            let userMissionId;
-            if (!userMission) {
-                userMissionId = generateId();
-                await queryWithConn(
-                    'INSERT INTO UserMissions (id, userId, missionId, status, completedAt) VALUES (?, ?, ?, ?, NOW())',
-                    [userMissionId, userId, missionId, 'completed']
-                );
-            } else if (userMission.status === 'in_progress') {
-                userMissionId = userMission.id;
-                await queryWithConn(
-                    'UPDATE UserMissions SET status = ?, completedAt = NOW() WHERE id = ?',
-                    ['completed', userMissionId]
-                );
-            } else {
-                userMissionId = userMission.id;
-            }
-
-            let missionRows = await queryWithConn(
+            const missionRows = await queryWithConn(
                 'SELECT id, title, description, rewardPoints, target, type, product_code, icon, status FROM Missions WHERE id = ? LIMIT 1',
                 [missionId]
             );
 
-            let missionRow = missionRows[0] && missionRows[0][0] ? missionRows[0][0] : null;
+            console.log('MISSION RAW', missionRows);
+            console.log('MISSION FIRST', missionRows[0]);
 
-            if (!missionRow) {
+            if (!missionRows || missionRows.length === 0) {
                 throw new Error('Mission tidak ditemukan');
             }
 
-            const rewardPoints = missionRow.rewardPoints || 0;
-            const target = missionRow.target || 1;
-            const missionType = missionRow.type;
+            const mission = missionRows[0];
+            const rewardPoints = mission.rewardPoints || 0;
+            const target = mission.target || 1;
+            const missionType = mission.type;
 
-            let progress = 0;
-            if (missionType === 'CHECKIN') {
-                progress = await this._getCheckinProgress(userId);
-            } else if (missionType === 'TRANSACTION') {
-                progress = await this._getTransactionProgress(userId);
-            } else if (missionType === 'PRODUCT_PURCHASE') {
-                progress = await this._getProductPurchaseProgress(userId, missionRow.product_code);
-            }
+            const progress = await this._calculateProgress(userId, missionType, target, mission.product_code);
+
+            console.log('CLAIM DEBUG', {
+                missionId,
+                missionType: mission.type,
+                target: mission.target,
+                progress
+            });
 
             if (progress < target) {
                 throw new Error('Target mission belum tercapai.');
             }
 
-            let userRows = await queryWithConn(
+            const existingClaim = await queryWithConn(
+                'SELECT id, status, completedAt FROM UserMissions WHERE userId = ? AND missionId = ? LIMIT 1',
+                [userId, missionId]
+            );
+
+            let userMissionId;
+
+            if (existingClaim && existingClaim.length > 0 && existingClaim[0].status === 'claimed') {
+                throw new Error('Reward mission sudah pernah diklaim.');
+            }
+
+            if (existingClaim && existingClaim.length > 0) {
+                userMissionId = existingClaim[0].id;
+                await queryWithConn(
+                    'UPDATE UserMissions SET status = ?, completedAt = NOW() WHERE id = ?',
+                    ['claimed', userMissionId]
+                );
+            } else {
+                userMissionId = generateId();
+                await queryWithConn(
+                    'INSERT INTO UserMissions (id, userId, missionId, status, completedAt) VALUES (?, ?, ?, ?, NOW())',
+                    [userMissionId, userId, missionId, 'claimed']
+                );
+            }
+
+            const userCheck = await queryWithConn(
                 'SELECT user_id, points FROM UserGamification WHERE user_id = ? FOR UPDATE',
                 [userId]
             );
 
-            if (!userRows[0] || userRows[0].length === 0) {
+            if (!userCheck || userCheck.length === 0) {
                 await queryWithConn(
-                    'INSERT INTO UserGamification (user_id, points, memberLevel, streakCount, lastCheckIn) VALUES (?, 0, ?, 0, NULL)',
-                    [userId, 'Bronze']
+                    'INSERT INTO UserGamification (user_id, points, memberLevel, streakCount, lastCheckIn) VALUES (?, ?, ?, ?, NULL)',
+                    [userId, 0, 'Bronze', 0]
                 );
             }
 
             const historyId = generateId();
             await queryWithConn(
                 'INSERT INTO PointsHistory (id, userId, points, description, createdAt) VALUES (?, ?, ?, ?, NOW())',
-                [historyId, userId, rewardPoints, `Menuntut misi: ${missionRow.title}`]
+                [historyId, userId, rewardPoints, `Menuntut misi: ${mission.title}`]
             );
 
             await queryWithConn(
                 'UPDATE UserGamification SET points = points + ? WHERE user_id = ?',
                 [rewardPoints, userId]
-            );
-
-            await queryWithConn(
-                'UPDATE UserMissions SET status = ? WHERE id = ?',
-                ['claimed', userMissionId]
             );
 
             const updatedUser = await queryWithConn(
@@ -179,8 +248,8 @@ export class UserMissionService {
             );
 
             return {
-                userMission: updatedMissionRows[0][0],
-                userGamification: updatedUser[0][0]
+                userMission: updatedMissionRows[0],
+                userGamification: updatedUser[0]
             };
         });
     }

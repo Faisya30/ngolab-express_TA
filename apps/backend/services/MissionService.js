@@ -20,10 +20,10 @@ export class MissionService {
 
     static async createMission(data) {
         const { id, title, description, missionType, rewardPoints, target, productCode, icon, status } = data;
-        const validTypes = ['CHECKIN', 'TRANSACTION', 'PRODUCT_PURCHASE'];
+        const validTypes = ['CHECKIN', 'TRANSACTION', 'PRODUCT_PURCHASE', 'STREAK'];
 
         if (missionType && !validTypes.includes(missionType)) {
-            throw new Error('missionType tidak valid. Harus CHECKIN, TRANSACTION, atau PRODUCT_PURCHASE.');
+            throw new Error('missionType tidak valid. Harus CHECKIN, TRANSACTION, PRODUCT_PURCHASE, atau STREAK.');
         }
 
         if (missionType === 'PRODUCT_PURCHASE' && !productCode) {
@@ -47,10 +47,10 @@ export class MissionService {
 
     static async updateMission(id, data) {
         const { missionType, productCode, ...rest } = data;
-        const validTypes = ['CHECKIN', 'TRANSACTION', 'PRODUCT_PURCHASE'];
+        const validTypes = ['CHECKIN', 'TRANSACTION', 'PRODUCT_PURCHASE', 'STREAK'];
 
         if (missionType && !validTypes.includes(missionType)) {
-            throw new Error('missionType tidak valid. Harus CHECKIN, TRANSACTION, atau PRODUCT_PURCHASE.');
+            throw new Error('missionType tidak valid. Harus CHECKIN, TRANSACTION, PRODUCT_PURCHASE, atau STREAK.');
         }
 
         if (missionType === 'PRODUCT_PURCHASE' && !productCode) {

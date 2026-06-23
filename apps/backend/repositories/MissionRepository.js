@@ -7,8 +7,8 @@ export class MissionRepository {
                 'SELECT id, title, description, rewardPoints, target, type, product_code, icon, status FROM Missions WHERE id = ? LIMIT 1',
                 [id]
             );
-            if (!rows[0] || rows[0].length === 0) return null;
-            return this.mapToApiResponse(rows[0][0]);
+            if (!rows || rows.length === 0) return null;
+            return this.mapToApiResponse(rows[0]);
         } catch (error) {
             if (this.isTableMissing(error)) return null;
             throw error;
@@ -20,8 +20,8 @@ export class MissionRepository {
             const rows = await query(
                 'SELECT id, title, description, rewardPoints, target, type, product_code, icon, status FROM Missions ORDER BY id DESC'
             );
-            if (!rows[0] || !Array.isArray(rows[0])) return [];
-            return rows[0].map(row => this.mapToApiResponse(row));
+            if (!rows || !Array.isArray(rows)) return [];
+            return rows.map(row => this.mapToApiResponse(row));
         } catch (error) {
             if (this.isTableMissing(error)) return [];
             throw error;
@@ -34,12 +34,21 @@ export class MissionRepository {
                 'SELECT id, title, description, rewardPoints, target, type, product_code, icon, status FROM Missions WHERE status = ?',
                 ['active']
             );
-            if (!rows[0] || !Array.isArray(rows[0])) return [];
-            return rows[0].map(row => this.mapToApiResponse(row));
+            if (!rows || !Array.isArray(rows)) return [];
+            return rows.map(row => this.mapToApiResponse(row));
         } catch (error) {
             if (this.isTableMissing(error)) return [];
             throw error;
         }
+    }
+
+    static normalizeStatus(status) {
+        if (!status) return 'active';
+        const normalized = String(status).trim().toLowerCase();
+        if (normalized === 'active' || normalized === 'inactive') return normalized;
+        if (normalized === 'in_progress' || normalized === 'progress') return 'active';
+        if (normalized === 'completed') return 'inactive';
+        return 'active';
     }
 
     static mapToApiResponse(row) {
@@ -52,7 +61,8 @@ export class MissionRepository {
             rewardPoints: row.rewardPoints,
             target: row.target,
             productCode: row.product_code,
-            status: row.status
+            icon: row.icon,
+            status: this.normalizeStatus(row.status)
         };
     }
 
@@ -63,13 +73,14 @@ export class MissionRepository {
 
     static async create(data) {
         const { id, title, description, rewardPoints = 0, target = 1, type, productCode, icon = null, status = 'active' } = data;
-        const validTypes = ['CHECKIN', 'TRANSACTION', 'PRODUCT_PURCHASE'];
+        const validTypes = ['CHECKIN', 'TRANSACTION', 'PRODUCT_PURCHASE', 'STREAK'];
         const missionType = validTypes.includes(type) ? type : 'CHECKIN';
+        const normalizedStatus = this.normalizeStatus(status);
 
         await query(
             `INSERT INTO Missions (id, title, description, rewardPoints, target, type, product_code, icon, status) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, title, description, rewardPoints, target, missionType, productCode || null, icon, status]
+            [id, title, description, rewardPoints, target, missionType, productCode || null, icon, normalizedStatus]
         );
         return await this.findById(id);
     }
@@ -86,7 +97,7 @@ export class MissionRepository {
         if (type !== undefined) { fields.push('type = ?'); values.push(type); }
         if (productCode !== undefined) { fields.push('product_code = ?'); values.push(productCode); }
         if (icon !== undefined) { fields.push('icon = ?'); values.push(icon); }
-        if (status !== undefined) { fields.push('status = ?'); values.push(status); }
+        if (status !== undefined) { fields.push('status = ?'); values.push(this.normalizeStatus(status)); }
 
         if (fields.length === 0) return await this.findById(id);
 

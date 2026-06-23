@@ -1,25 +1,189 @@
 @startuml
-title Sequence Diagram Gesture Navigation
+title ERD Chen - Company Management
+left to right direction
 
-actor Customer
-participant Camera
-participant MediaPipe
-participant "Kiosk UI" as UI
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
 
-Customer -> Camera : Melakukan gesture tangan
-Camera -> MediaPipe : Mengirim frame kamera
+'=====================
+' ENTITY
+'=====================
+rectangle COMPANY
+rectangle USER
+rectangle PRODUCT
+rectangle ROLE
+rectangle PERMISSION
+rectangle ACTIVATION_TOKEN
 
-MediaPipe -> MediaPipe : Mendeteksi tangan dan posisi jari
-MediaPipe -> MediaPipe : Mengidentifikasi gesture
+'=====================
+' RELATIONSHIP
+'=====================
+diamond R_COMPANY_USER {
+  memiliki
+}
 
-MediaPipe --> UI : Mengirim hasil gesture
+diamond R_COMPANY_PRODUCT {
+  memiliki_akses
+}
 
-alt Gesture dikenali
-    UI -> UI : Menentukan aksi navigasi
-    UI -> UI : Memperbarui tampilan menu
-    UI --> Customer : Menampilkan perubahan halaman
-else Gesture tidak dikenali
-    UI --> Customer : Menampilkan instruksi gesture ulang
-end
+diamond R_USER_TOKEN {
+  memiliki
+}
+
+diamond R_USER_ROLE {
+  diberikan_role
+}
+
+diamond R_ROLE_PERMISSION {
+  memiliki_permission
+}
+
+'=====================
+' COMPANY ATTRIBUTES
+'=====================
+ellipse "company_id (PK)" as C_ID
+ellipse "company_name" as C_NAME
+ellipse "address" as C_ADDRESS
+ellipse "phone" as C_PHONE
+ellipse "email" as C_EMAIL
+ellipse "status" as C_STATUS
+ellipse "created_at" as C_CREATED
+ellipse "updated_at" as C_UPDATED
+
+COMPANY -- C_ID
+COMPANY -- C_NAME
+COMPANY -- C_ADDRESS
+COMPANY -- C_PHONE
+COMPANY -- C_EMAIL
+COMPANY -- C_STATUS
+COMPANY -- C_CREATED
+COMPANY -- C_UPDATED
+
+'=====================
+' USER ATTRIBUTES
+'=====================
+ellipse "user_id (PK)" as U_ID
+ellipse "company_id (FK)" as U_COMPANY
+ellipse "full_name" as U_NAME
+ellipse "email" as U_EMAIL
+ellipse "password" as U_PASSWORD
+ellipse "status" as U_STATUS
+ellipse "created_at" as U_CREATED
+ellipse "updated_at" as U_UPDATED
+
+USER -- U_ID
+USER -- U_COMPANY
+USER -- U_NAME
+USER -- U_EMAIL
+USER -- U_PASSWORD
+USER -- U_STATUS
+USER -- U_CREATED
+USER -- U_UPDATED
+
+'=====================
+' PRODUCT ATTRIBUTES
+'=====================
+ellipse "product_id (PK)" as P_ID
+ellipse "product_name" as P_NAME
+ellipse "description" as P_DESC
+ellipse "product_url" as P_URL
+ellipse "status" as P_STATUS
+ellipse "created_at" as P_CREATED
+ellipse "updated_at" as P_UPDATED
+
+PRODUCT -- P_ID
+PRODUCT -- P_NAME
+PRODUCT -- P_DESC
+PRODUCT -- P_URL
+PRODUCT -- P_STATUS
+PRODUCT -- P_CREATED
+PRODUCT -- P_UPDATED
+
+'=====================
+' ROLE ATTRIBUTES
+'=====================
+ellipse "role_id (PK)" as RO_ID
+ellipse "role_name" as RO_NAME
+ellipse "description" as RO_DESC
+ellipse "status" as RO_STATUS
+ellipse "created_at" as RO_CREATED
+ellipse "updated_at" as RO_UPDATED
+
+ROLE -- RO_ID
+ROLE -- RO_NAME
+ROLE -- RO_DESC
+ROLE -- RO_STATUS
+ROLE -- RO_CREATED
+ROLE -- RO_UPDATED
+
+'=====================
+' PERMISSION ATTRIBUTES
+'=====================
+ellipse "permission_id (PK)" as PE_ID
+ellipse "permission_name" as PE_NAME
+ellipse "module_name" as PE_MODULE
+ellipse "action" as PE_ACTION
+ellipse "created_at" as PE_CREATED
+ellipse "updated_at" as PE_UPDATED
+
+PERMISSION -- PE_ID
+PERMISSION -- PE_NAME
+PERMISSION -- PE_MODULE
+PERMISSION -- PE_ACTION
+PERMISSION -- PE_CREATED
+PERMISSION -- PE_UPDATED
+
+'=====================
+' ACTIVATION TOKEN ATTRIBUTES
+'=====================
+ellipse "token_id (PK)" as A_ID
+ellipse "user_id (FK)" as A_USER
+ellipse "token" as A_TOKEN
+ellipse "token_type" as A_TYPE
+ellipse "expired_at" as A_EXPIRED
+ellipse "status" as A_STATUS
+ellipse "created_at" as A_CREATED
+
+ACTIVATION_TOKEN -- A_ID
+ACTIVATION_TOKEN -- A_USER
+ACTIVATION_TOKEN -- A_TOKEN
+ACTIVATION_TOKEN -- A_TYPE
+ACTIVATION_TOKEN -- A_EXPIRED
+ACTIVATION_TOKEN -- A_STATUS
+ACTIVATION_TOKEN -- A_CREATED
+
+'=====================
+' RELATIONSHIP ATTRIBUTES
+'=====================
+ellipse "access_status" as CP_STATUS
+ellipse "assigned_at" as CP_ASSIGNED
+ellipse "assigned_at" as UR_ASSIGNED
+ellipse "created_at" as RP_CREATED
+
+R_COMPANY_PRODUCT -- CP_STATUS
+R_COMPANY_PRODUCT -- CP_ASSIGNED
+
+R_USER_ROLE -- UR_ASSIGNED
+
+R_ROLE_PERMISSION -- RP_CREATED
+
+'=====================
+' CARDINALITY
+'=====================
+COMPANY "1" -- R_COMPANY_USER
+R_COMPANY_USER "N" -- USER
+
+COMPANY "M" -- R_COMPANY_PRODUCT
+R_COMPANY_PRODUCT "N" -- PRODUCT
+
+USER "1" -- R_USER_TOKEN
+R_USER_TOKEN "N" -- ACTIVATION_TOKEN
+
+USER "M" -- R_USER_ROLE
+R_USER_ROLE "N" -- ROLE
+
+ROLE "M" -- R_ROLE_PERMISSION
+R_ROLE_PERMISSION "N" -- PERMISSION
 
 @enduml
