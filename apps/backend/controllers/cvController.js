@@ -21,7 +21,7 @@ async function hasColumn(tableName, columnName) {
 
 function toNumber(value) {
   if (value === undefined || value === null || value === '') return 0;
-  if (typeof value === 'number') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
 
   const cleaned = String(value).replace(/[^0-9.-]/g, '');
   return Number(cleaned) || 0;
@@ -88,6 +88,58 @@ function buildOrderCode(rawOrderCode) {
   return input.startsWith('ORD-') ? input : `ORD-${input}`;
 }
 
+function extractUserIdFromQr(rawCode) {
+  const trimmed = String(rawCode || '').trim();
+
+  if (!trimmed) return null;
+
+  try {
+    const firstBrace = trimmed.indexOf('{');
+    const lastBrace = trimmed.lastIndexOf('}');
+
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      const jsonStr = trimmed.slice(firstBrace, lastBrace + 1);
+      const parsed = JSON.parse(jsonStr);
+
+      const value =
+        parsed.user_id ||
+        parsed.userId ||
+        parsed.user?.id ||
+        parsed.member_id ||
+        parsed.memberId ||
+        parsed.member_code ||
+        parsed.memberCode ||
+        parsed.code ||
+        parsed.qr_code ||
+        null;
+
+      if (value) return String(value).trim();
+    }
+  } catch {
+    // Bukan JSON, lanjut cek format URL/kode biasa.
+  }
+
+  try {
+    const url = new URL(trimmed);
+
+    const value =
+      url.searchParams.get('user_id') ||
+      url.searchParams.get('userId') ||
+      url.searchParams.get('member_id') ||
+      url.searchParams.get('memberId') ||
+      url.searchParams.get('member_code') ||
+      url.searchParams.get('memberCode') ||
+      url.searchParams.get('code') ||
+      url.searchParams.get('qr_code');
+
+    if (value) return String(value).trim();
+  } catch {
+    // Bukan URL, berarti dianggap kode biasa.
+  }
+
+  return trimmed.length >= 1 ? trimmed : null;
+}
+
 async function resolveCvCategoryCode(rawCategory) {
   const categoryValue = String(rawCategory || '').trim();
 
@@ -149,6 +201,7 @@ export async function getCvProducts(req, res) {
     if (usesCategoryCode) {
       const rows = await query(
         `SELECT
+          p.id AS product_id,
           p.code AS id,
           p.code,
           ${hasBarcode ? "COALESCE(p.barcode, '') AS barcode," : 'NULL AS barcode,'}
@@ -186,6 +239,7 @@ export async function getCvProducts(req, res) {
 
     const rows = await query(
       `SELECT
+        p.id AS product_id,
         p.code AS id,
         p.code,
         ${hasBarcode ? "COALESCE(p.barcode, '') AS barcode," : 'NULL AS barcode,'}
@@ -483,6 +537,7 @@ export async function getCvProductByBarcode(req, res) {
 
     const rows = await query(
       `SELECT
+        id AS product_id,
         code AS id,
         code,
         COALESCE(barcode, '') AS barcode,
@@ -564,7 +619,10 @@ export async function getCvOrders(req, res) {
       'order_items',
       'product_name_snapshot'
     );
-    const orderItemsHasProductName = await hasColumn('order_items', 'product_name');
+    const orderItemsHasProductName = await hasColumn(
+      'order_items',
+      'product_name'
+    );
     const orderItemsHasPriceSnapshot = await hasColumn(
       'order_items',
       'price_snapshot'
@@ -637,7 +695,10 @@ export async function getCvOrderDetails(req, res) {
       'order_items',
       'product_name_snapshot'
     );
-    const orderItemsHasProductName = await hasColumn('order_items', 'product_name');
+    const orderItemsHasProductName = await hasColumn(
+      'order_items',
+      'product_name'
+    );
     const orderItemsHasPriceSnapshot = await hasColumn(
       'order_items',
       'price_snapshot'
@@ -734,7 +795,9 @@ export async function getCvMemberByCode(req, res) {
     }
 
     const pointsRows = await query(
-      `SELECT total_points, cashback_points
+      `SELECT 
+        COALESCE(total_points, 0) AS total_points,
+        COALESCE(cashback_points, 0) AS cashback_points
       FROM user_points
       WHERE user_id = ?
       LIMIT 1`,
@@ -743,8 +806,8 @@ export async function getCvMemberByCode(req, res) {
 
     const affiliateRows = await query(
       `SELECT 
-        total_points,
-        commission_points,
+        COALESCE(total_points, 0) AS affiliate_total_points,
+        COALESCE(commission_points, 0) AS commission_points,
         affiliate_tier,
         level
       FROM affiliate_networks
@@ -753,29 +816,56 @@ export async function getCvMemberByCode(req, res) {
       [user.user_id]
     );
 
-    return res.json({
-      success: true,
-      id: user.user_id,
-      code: user.user_id,
+    const userPoint = pointsRows[0] || {};
+    const affiliate = affiliateRows[0] || {};
+
+    const totalPoints = toNumber(userPoint.total_points || 0);
+    const cashbackPoints = toNumber(userPoint.cashback_points || 0);
+    const commissionPoints = toNumber(affiliate.commission_points || 0);
+    const affiliateTotalPoints = toNumber(affiliate.affiliate_total_points || 0);
+
+    const member = {
+      id: String(user.user_id),
+      code: String(user.user_id),
       user_id: user.user_id,
+
+      member_code: String(user.user_id),
+      member_name: user.username,
+      nama_member: user.username,
+
       name: user.username,
       username: user.username,
+
       phone: user.phone_number || null,
       phone_number: user.phone_number || null,
+
       membership_level: user.membership_level || null,
+      tier: user.membership_level || 'Silver',
+
       profile_picture: user.profile_picture || null,
-      points: toNumber(
-        affiliateRows[0]?.total_points || pointsRows?.[0]?.total_points || 0
-      ),
-      total_points: toNumber(
-        affiliateRows[0]?.total_points || pointsRows?.[0]?.total_points || 0
-      ),
-      cashbackPoints: toNumber(pointsRows?.[0]?.cashback_points || 0),
-      cashback_points: toNumber(pointsRows?.[0]?.cashback_points || 0),
-      commission_points: toNumber(affiliateRows[0]?.commission_points || 0),
-      affiliate_tier: affiliateRows[0]?.affiliate_tier || null,
-      level: affiliateRows[0]?.level || null,
+
+      // INI YANG DIPAKAI UNTUK TAMPIL DI HALAMAN MEMBERSHIP
+      // points sengaja disamakan dengan cashback_points supaya frontend lama tetap aman.
+      points: cashbackPoints,
+      cashbackPoints,
+      cashback_points: cashbackPoints,
+
+      // Ini total poin dari tabel user_points.
+      total_points: totalPoints,
+      totalPoints,
+
+      // Ini data affiliate, tidak dipakai untuk poin cashback.
+      commission_points: commissionPoints,
+      affiliate_total_points: affiliateTotalPoints,
+      affiliate_tier: affiliate.affiliate_tier || null,
+      level: affiliate.level || null,
       affiliate: affiliateRows.length ? 'Yes' : 'No',
+    };
+
+    return res.json({
+      success: true,
+      ...member,
+      member,
     });
   } catch (error) {
     return res.status(500).json({
@@ -788,7 +878,18 @@ export async function getCvMemberByCode(req, res) {
 export async function lookupCvMemberByQr(req, res) {
   try {
     const body = req.body || {};
-    const rawCode = String(body.code || body.user_id || '').trim();
+
+    const rawCode = String(
+      body.code ||
+        body.user_id ||
+        body.userId ||
+        body.member_id ||
+        body.memberId ||
+        body.member_code ||
+        body.memberCode ||
+        body.qr_code ||
+        ''
+    ).trim();
 
     if (!rawCode) {
       return res.status(400).json({
@@ -797,31 +898,7 @@ export async function lookupCvMemberByQr(req, res) {
       });
     }
 
-    let userId = null;
-
-    try {
-      const trimmed = rawCode.trim();
-      const firstBrace = trimmed.indexOf('{');
-      const lastBrace = trimmed.lastIndexOf('}');
-
-      if (firstBrace >= 0 && lastBrace > firstBrace) {
-        const jsonStr = trimmed.slice(firstBrace, lastBrace + 1);
-        const parsed = JSON.parse(jsonStr);
-
-        userId =
-          parsed.user_id ||
-          parsed.userId ||
-          parsed.user?.id ||
-          parsed.code ||
-          null;
-      }
-    } catch {
-      userId = null;
-    }
-
-    if (!userId) {
-      userId = rawCode.length >= 3 ? rawCode : null;
-    }
+    const userId = extractUserIdFromQr(rawCode);
 
     if (!userId) {
       return res.status(400).json({
@@ -882,15 +959,19 @@ export async function saveCvOrder(req, res) {
     const orderCode = buildOrderCode(
       order.order_code || order.orderCode || order.orderId
     );
+
     const serviceType = String(
       order.service_type || order.serviceType || 'Computer Vision'
     );
+
     const paymentMethod = String(
       order.payment_method || order.paymentMethod || 'QRIS'
     );
+
     const subtotal = toNumber(order.subtotal);
     const discount = toNumber(order.discount);
     const total = toNumber(order.total);
+
     const pointsEarned = toNumber(order.points_earned ?? order.pointsEarned);
     const pointsUsed = toNumber(
       order.points_used ?? order.pointsUsed ?? order.point_used
@@ -900,10 +981,15 @@ export async function saveCvOrder(req, res) {
       order.order_type || order.orderType || 'computervision'
     ).toLowerCase();
 
-    const userId = String(order.user_id || order.userId || '').trim();
     const memberCode = String(
-      order.memberCode || order.member_code || userId || ''
+      order.memberCode || order.member_code || order.user_id || order.userId || ''
     ).trim();
+
+    let userId = String(order.user_id || order.userId || '').trim();
+
+    if (!userId && memberCode) {
+      userId = memberCode;
+    }
 
     const tipePelanggan = String(
       order.tipe_pelanggan ||
@@ -988,6 +1074,7 @@ export async function saveCvOrder(req, res) {
         let productName = String(
           item.product_name_snapshot || item.product_name || item.name || ''
         ).trim();
+
         let productId = null;
 
         if (numericProductId > 0) {
@@ -1012,8 +1099,14 @@ export async function saveCvOrder(req, res) {
           }
 
           productId = Number(product.id || 0);
-          if (!productName) productName = String(product.name || 'Unknown Product');
-          if (price <= 0) price = toNumber(product.price);
+
+          if (!productName) {
+            productName = String(product.name || 'Unknown Product');
+          }
+
+          if (price <= 0) {
+            price = toNumber(product.price);
+          }
         } else if (productCodeInput) {
           const [productRows] = await connection.query(
             `SELECT id, code, name, price, product_type
@@ -1038,8 +1131,14 @@ export async function saveCvOrder(req, res) {
           }
 
           productId = Number(product.id || 0);
-          if (!productName) productName = String(product.name || 'Unknown Product');
-          if (price <= 0) price = toNumber(product.price);
+
+          if (!productName) {
+            productName = String(product.name || 'Unknown Product');
+          }
+
+          if (price <= 0) {
+            price = toNumber(product.price);
+          }
         } else {
           throw new Error('Setiap item wajib mengirim product_id atau product_code.');
         }
