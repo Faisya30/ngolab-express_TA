@@ -43,27 +43,35 @@ export class GameService {
 
     static async playGame(userId, gameId) {
         return await withTransaction(async (connection) => {
-            const queryWithConn = (sql, params) => connection.query(sql, params);
+            const queryWithConn = async (sql, params) => {
+                const [rows] = await connection.query(sql, params);
+                return rows;
+            };
             
             const game = await queryWithConn(
                 'SELECT id, type, name, cost_points, reward_points, is_active, config_data FROM Games WHERE id = ? AND is_active = TRUE LIMIT 1',
                 [gameId]
             );
             
-            if (!game[0]) {
+            if (!game || game.length === 0) {
                 throw new Error('Game tidak ditemukan atau tidak aktif');
             }
             
             const gameData = game[0];
+            console.log('gameData', gameData);
             const costPoints = gameData.cost_points || 0;
+            console.log('cost_points', costPoints);
             const baseRewardPoints = gameData.reward_points || 0;
+            console.log('reward_points', baseRewardPoints);
             
             let user = await queryWithConn(
                 'SELECT user_id, points FROM UserGamification WHERE user_id = ? FOR UPDATE',
                 [userId]
             );
             
-            if (!user[0]) {
+            console.log('user', user[0]);
+            
+            if (!user || user.length === 0) {
                 await queryWithConn(
                     'INSERT INTO UserGamification (user_id, points, memberLevel, streakCount, lastCheckIn) VALUES (?, 0, ?, 0, NULL)',
                     [userId, 'Bronze']
@@ -74,6 +82,8 @@ export class GameService {
                 );
             }
             
+            console.log('POINTS BEFORE', user[0].points);
+            
             if (user[0].points < costPoints) {
                 throw new Error(`Poin tidak cukup. Dibutuhkan ${costPoints} poin, tersedia ${user[0].points} poin`);
             }
@@ -81,8 +91,18 @@ export class GameService {
             const playId = generateId();
             
             const configData = gameData.config_data ? (typeof gameData.config_data === 'string' ? JSON.parse(gameData.config_data) : gameData.config_data) : null;
-            const prizes = configData?.prizes || [];
+            
+            // Support both direct array format and {prizes: [...]} format
+            let prizes = [];
+            if (Array.isArray(configData)) {
+                prizes = configData;
+            } else if (Array.isArray(configData?.prizes)) {
+                prizes = configData.prizes;
+            }
             const cooldownSeconds = configData?.cooldownSeconds || 0;
+            
+            console.log('GAME CONFIG', JSON.stringify(configData));
+            console.log('PRIZES', JSON.stringify(prizes));
             
             let selectedIndex = 0;
             let prizeLabel = gameData.name;
@@ -90,17 +110,41 @@ export class GameService {
             let rewardType = 'POINT';
             
             if (prizes.length > 0) {
-                const randomPrize = prizes[Math.floor(Math.random() * prizes.length)];
-                selectedIndex = prizes.indexOf(randomPrize);
-                prizeLabel = randomPrize.label || gameData.name;
-                rewardValue = Number(randomPrize.value || baseRewardPoints);
-                rewardType = (randomPrize.type || 'POINT').toUpperCase();
+                const totalProbability = prizes.reduce((sum, p) => sum + (Number(p.probability) || 0), 0);
+                
+                if (totalProbability > 0) {
+                    let random = Math.random() * totalProbability;
+                    let selectedPrize = prizes[0];
+                    
+                    for (const prize of prizes) {
+                        random -= Number(prize.probability) || 0;
+                        if (random <= 0) {
+                            selectedPrize = prize;
+                            break;
+                        }
+                    }
+                    
+                    selectedIndex = prizes.indexOf(selectedPrize);
+                    prizeLabel = selectedPrize.label || gameData.name;
+                    rewardValue = Number(selectedPrize.value || baseRewardPoints);
+                    rewardType = (selectedPrize.type || 'POINT').toUpperCase();
+                } else {
+                    const randomPrize = prizes[Math.floor(Math.random() * prizes.length)];
+                    selectedIndex = prizes.indexOf(randomPrize);
+                    prizeLabel = randomPrize.label || gameData.name;
+                    rewardValue = Number(randomPrize.value || baseRewardPoints);
+                    rewardType = (randomPrize.type || 'POINT').toUpperCase();
+                }
+                
+                console.log('SELECTED PRIZE', JSON.stringify({label: prizeLabel, value: rewardValue, type: rewardType}));
             } else {
                 selectedIndex = 0;
                 prizeLabel = gameData.name;
                 rewardValue = baseRewardPoints;
                 rewardType = 'POINT';
             }
+            
+            console.log('REWARD VALUE', rewardValue);
             
             await queryWithConn(
                 'INSERT INTO GamePlays (id, userId, gameId, gameType, costPoints, rewardPoints, prizeLabel, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
@@ -126,6 +170,8 @@ export class GameService {
                 'SELECT user_id, points, memberLevel, streakCount, lastCheckIn FROM UserGamification WHERE user_id = ? LIMIT 1',
                 [userId]
             );
+            
+            console.log('POINTS AFTER', updatedUser[0].points);
             
             const gamePlay = await queryWithConn(
                 'SELECT id, userId, gameId, gameType, costPoints, rewardPoints, prizeLabel, timestamp FROM GamePlays WHERE id = ? LIMIT 1',

@@ -10,7 +10,8 @@ export async function getGames(req, res) {
             data: games
         });
     } catch (error) {
-        return res.status(500).json({
+        const statusCode = error.message === 'Game tidak ditemukan' ? 404 : 500;
+        return res.status(statusCode).json({
             success: false,
             message: error.message
         });
@@ -43,7 +44,8 @@ export async function createGame(req, res) {
             data: game
         });
     } catch (error) {
-        return res.status(500).json({
+        const statusCode = error.message === 'Game tidak ditemukan' ? 404 : 500;
+        return res.status(statusCode).json({
             success: false,
             message: error.message
         });
@@ -70,7 +72,8 @@ export async function updateGame(req, res) {
             data: game
         });
     } catch (error) {
-        return res.status(500).json({
+        const statusCode = error.message === 'Game tidak ditemukan' ? 404 : 500;
+        return res.status(statusCode).json({
             success: false,
             message: error.message
         });
@@ -95,7 +98,8 @@ export async function deleteGame(req, res) {
             message: 'Game berhasil dihapus'
         });
     } catch (error) {
-        return res.status(500).json({
+        const statusCode = error.message === 'Game tidak ditemukan' ? 404 : 500;
+        return res.status(statusCode).json({
             success: false,
             message: error.message
         });
@@ -147,7 +151,8 @@ export async function getCooldown(req, res) {
             ...result
         });
     } catch (error) {
-        return res.status(500).json({
+        const statusCode = error.message === 'Game tidak ditemukan' ? 404 : 500;
+        return res.status(statusCode).json({
             success: false,
             message: error.message
         });

@@ -43,15 +43,22 @@ export class GameRepository {
 
     static async create(data) {
         const { id, type, name, cost_points = 0, reward_points = 0, is_active = true, config_data = null } = data;
+        const normalizedIsActive = is_active === true || is_active === 1 || is_active === '1';
+        const finalConfig = typeof config_data === 'string' ? config_data : (config_data ? JSON.stringify(config_data) : null);
         await query(
             `INSERT INTO Games (id, type, name, cost_points, reward_points, is_active, config_data) 
              VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [id, type, name, cost_points, reward_points, is_active, config_data ? JSON.stringify(config_data) : null]
+            [id, type, name, cost_points, reward_points, normalizedIsActive, finalConfig]
         );
         return await this.findById(id);
     }
 
     static async update(id, data) {
+        const existing = await this.findById(id);
+        if (!existing) {
+            throw new Error('Game tidak ditemukan');
+        }
+        
         const { type, name, cost_points, reward_points, is_active, config_data } = data;
         const fields = [];
         const values = [];
@@ -60,10 +67,18 @@ export class GameRepository {
         if (name !== undefined) { fields.push('name = ?'); values.push(name); }
         if (cost_points !== undefined) { fields.push('cost_points = ?'); values.push(cost_points); }
         if (reward_points !== undefined) { fields.push('reward_points = ?'); values.push(reward_points); }
-        if (is_active !== undefined) { fields.push('is_active = ?'); values.push(is_active); }
-        if (config_data !== undefined) { fields.push('config_data = ?'); values.push(config_data ? JSON.stringify(config_data) : null); }
+        if (is_active !== undefined) { 
+            const normalizedIsActive = is_active === true || is_active === 1 || is_active === '1';
+            fields.push('is_active = ?'); 
+            values.push(normalizedIsActive); 
+        }
+        if (config_data !== undefined) { 
+            const finalConfig = typeof config_data === 'string' ? config_data : (config_data ? JSON.stringify(config_data) : null);
+            fields.push('config_data = ?'); 
+            values.push(finalConfig); 
+        }
         
-        if (fields.length === 0) return await this.findById(id);
+        if (fields.length === 0) return existing;
         
         values.push(id);
         await query(
