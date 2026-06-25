@@ -104,10 +104,10 @@ export class GameService {
             console.log('GAME CONFIG', JSON.stringify(configData));
             console.log('PRIZES', JSON.stringify(prizes));
             
-            let selectedIndex = 0;
             let prizeLabel = gameData.name;
             let rewardValue = baseRewardPoints;
             let rewardType = 'POINT';
+            let selectedIndex = 0;
             
             if (prizes.length > 0) {
                 const totalProbability = prizes.reduce((sum, p) => sum + (Number(p.probability) || 0), 0);
@@ -115,28 +115,51 @@ export class GameService {
                 if (totalProbability > 0) {
                     let random = Math.random() * totalProbability;
                     let selectedPrize = prizes[0];
+                    let foundIndex = 0;
                     
-                    for (const prize of prizes) {
-                        random -= Number(prize.probability) || 0;
+                    for (let i = 0; i < prizes.length; i++) {
+                        random -= Number(prizes[i].probability) || 0;
                         if (random <= 0) {
-                            selectedPrize = prize;
+                            selectedPrize = prizes[i];
+                            foundIndex = i;
                             break;
                         }
                     }
                     
-                    selectedIndex = prizes.indexOf(selectedPrize);
+                    selectedIndex = foundIndex;
                     prizeLabel = selectedPrize.label || gameData.name;
-                    rewardValue = Number(selectedPrize.value || baseRewardPoints);
                     rewardType = (selectedPrize.type || 'POINT').toUpperCase();
+                    rewardValue = rewardType === 'VOUCHER' ? 0 : Number(selectedPrize.value || baseRewardPoints);
+                    console.log('VOUCHER DEBUG', {
+                        rewardType,
+                        prizeValue: selectedPrize.value,
+                        rewardValue
+                    });
                 } else {
-                    const randomPrize = prizes[Math.floor(Math.random() * prizes.length)];
-                    selectedIndex = prizes.indexOf(randomPrize);
+                    const randomIndex = Math.floor(Math.random() * prizes.length);
+                    const randomPrize = prizes[randomIndex];
+                    selectedIndex = randomIndex;
                     prizeLabel = randomPrize.label || gameData.name;
-                    rewardValue = Number(randomPrize.value || baseRewardPoints);
                     rewardType = (randomPrize.type || 'POINT').toUpperCase();
+                    rewardValue = rewardType === 'VOUCHER' ? 0 : Number(randomPrize.value || baseRewardPoints);
+                    console.log('VOUCHER DEBUG', {
+                        rewardType,
+                        prizeValue: randomPrize.value,
+                        rewardValue
+                    });
                 }
                 
-                console.log('SELECTED PRIZE', JSON.stringify({label: prizeLabel, value: rewardValue, type: rewardType}));
+                console.log('SPIN DEBUG', {
+                    selectedIndex,
+                    selectedPrize: {
+                        label: prizeLabel,
+                        value: rewardValue,
+                        type: rewardType
+                    },
+                    rewardValue,
+                    rewardType,
+                    prizeLabel
+                });
             } else {
                 selectedIndex = 0;
                 prizeLabel = gameData.name;

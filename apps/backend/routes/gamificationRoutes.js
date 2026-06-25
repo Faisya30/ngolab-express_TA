@@ -24,6 +24,7 @@ router.get('/users/:id', gamificationController.getUserById);
 router.put('/users/:id', gamificationController.updateUser);
 router.post('/users/:id/add-points', gamificationController.addPoints);
 router.post('/users/:id/checkin', gamificationController.checkin);
+router.post('/sync-transaction-points', gamificationController.syncTransactionPoints);
 
 // Mission Routes
 router.get('/missions', missionController.getMissions);
@@ -38,10 +39,10 @@ router.post('/user-missions/complete', userMissionController.completeMission);
 // Game Routes
 router.get('/games', gameController.getGames);
 router.post('/games', gameController.createGame);
+router.get('/games/cooldown', requireMembershipJwt, gameController.getCooldown);
+router.post('/games/play', requireMembershipJwt, gameController.playGame);
 router.put('/games/:id', gameController.updateGame);
 router.delete('/games/:id', gameController.deleteGame);
-router.post('/games/play', gameController.playGame);
-router.get('/games/cooldown', gameController.getCooldown);
 
 // Points History Routes
 router.get('/points-history', pointsHistoryController.getPointsHistory);

@@ -134,7 +134,7 @@ export class UserMissionService {
 
     static async _getTransactionProgress(userId) {
         const rows = await this._queryWithProgress(
-            'SELECT COUNT(*) as count FROM transactions WHERE user_id = ? AND DATE(created_at) = CURDATE()',
+            'SELECT COUNT(*) as count FROM orders WHERE user_id = ?',
             [userId]
         );
         if (!rows || rows.length === 0) return 0;
@@ -143,9 +143,9 @@ export class UserMissionService {
 
     static async _getProductPurchaseProgress(userId, productCode) {
         const rows = await this._queryWithProgress(
-            `SELECT SUM(ti.qty) as qty FROM transactions t
-             JOIN transaction_items ti ON ti.transaction_code = t.transaction_code
-             WHERE t.user_id = ? AND ti.menu_item_code = ? AND DATE(t.created_at) = CURDATE()`,
+            `SELECT SUM(oi.qty) as qty FROM orders o
+             JOIN order_items oi ON oi.order_code = o.order_code
+             WHERE o.user_id = ? AND oi.product_code = ?`,
             [userId, productCode]
         );
         if (!rows || rows.length === 0) return 0;

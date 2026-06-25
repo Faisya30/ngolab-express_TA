@@ -1998,19 +1998,24 @@ export async function createTransaction(_req, res) {
         );
       }
 
+if (userId && pointsEarned > 0) {
+        await connection.query(
+          `INSERT INTO point_logs (
+            user_id,
+            point_type,
+            points,
+            reference_type,
+            reference_id,
+            note
+          ) VALUES (?, 'cashback', ?, 'transaction', ?, 'Points earned from transaction')`,
+          [userId, pointsEarned, transactionCode]
+        );
+      }
+      
       if (userId && pointsEarned > 0) {
-await connection.query(
-      `INSERT INTO point_logs (
-        user_id,
-        point_type,
-        points,
-        reference_type,
-        reference_id,
-        note
-      ) VALUES (?, 'cashback', ?, 'transaction', ?, 'Points earned from transaction')`,
-      [userId, pointsEarned, transactionCode]
-    );
-  }
+        const { UserGamificationService } = await import('../services/UserGamificationService.js');
+        await UserGamificationService.addPoints(userId, pointsEarned, 'Point transaksi pembelian');
+      }
 
       if (userId && total > 0) {
         const [memberRows] = await connection.query(

@@ -128,3 +128,29 @@ export async function checkin(req, res) {
         });
     }
 }
+
+export async function syncTransactionPoints(req, res) {
+    try {
+        const { transaction_code } = req.body || {};
+        
+        if (!transaction_code) {
+            return res.status(400).json({
+                success: false,
+                message: 'transaction_code wajib diisi'
+            });
+        }
+        
+        const result = await UserGamificationService.syncTransactionPoints(transaction_code);
+        
+        return res.json({
+            success: true,
+            message: 'Sinkronisasi poin berhasil',
+            data: result
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+}

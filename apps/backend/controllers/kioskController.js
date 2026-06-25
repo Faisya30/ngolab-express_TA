@@ -601,6 +601,11 @@ export async function saveOrder(req, res) {
 					itemValues
 				);
 			}
+			
+			if (userId && pointsEarned > 0) {
+				const { UserGamificationService } = await import('../services/UserGamificationService.js');
+				await UserGamificationService.addPoints(userId, pointsEarned, 'Point transaksi kiosk');
+			}
 
 			return { orderCode, queueNumber };
 		});
