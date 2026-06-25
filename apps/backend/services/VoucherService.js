@@ -5,6 +5,12 @@ function generateId() {
     return randomUUID().replace(/-/g, '');
 }
 
+function calculateMemberLevel(points) {
+    if (points >= 2000) return 'Platinum';
+    if (points >= 1000) return 'Gold';
+    return 'Silver';
+}
+
 function normalizeText(value) {
     return String(value || '').trim();
 }
@@ -92,7 +98,7 @@ export class VoucherService {
             if (!pointRows[0] || pointRows[0].length === 0) {
                 await queryWithConn(
                     'INSERT INTO UserGamification (user_id, points, memberLevel, streakCount, lastCheckIn) VALUES (?, 0, ?, 0, NULL)',
-                    [userId, 'Bronze']
+                    [userId, 'Silver']
                 );
                 const newPointRows = await queryWithConn(
                     'SELECT user_id, points FROM UserGamification WHERE user_id = ? FOR UPDATE',
@@ -122,6 +128,12 @@ export class VoucherService {
             await queryWithConn(
                 'UPDATE UserGamification SET points = ? WHERE user_id = ?',
                 [nextTotalPoints, userId]
+            );
+            
+            const newMemberLevel = calculateMemberLevel(nextTotalPoints);
+            await queryWithConn(
+                'UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?',
+                [newMemberLevel, userId]
             );
 
             const redemptionId = generateId();

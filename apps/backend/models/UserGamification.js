@@ -1,5 +1,5 @@
 export class UserGamification {
-    constructor({ user_id, points = 0, memberLevel = 'Bronze', streakCount = 0, lastCheckIn = null }) {
+    constructor({ user_id, points = 0, memberLevel = 'Silver', streakCount = 0, lastCheckIn = null }) {
         this.user_id = user_id;
         this.points = points;
         this.memberLevel = memberLevel;

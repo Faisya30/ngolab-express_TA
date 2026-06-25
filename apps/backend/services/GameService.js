@@ -2,10 +2,17 @@ import { GameRepository } from '../repositories/GameRepository.js';
 import { UserGamificationRepository } from '../repositories/UserGamificationRepository.js';
 import { GamePlayRepository } from '../repositories/GamePlayRepository.js';
 import { withTransaction } from '../config/db.js';
+import { query } from '../config/db.js';
 import { randomUUID } from 'crypto';
 
 function generateId() {
     return randomUUID().replace(/-/g, '');
+}
+
+function calculateMemberLevel(points) {
+    if (points >= 2000) return 'Platinum';
+    if (points >= 1000) return 'Gold';
+    return 'Silver';
 }
 
 export class GameService {
@@ -74,7 +81,7 @@ export class GameService {
             if (!user || user.length === 0) {
                 await queryWithConn(
                     'INSERT INTO UserGamification (user_id, points, memberLevel, streakCount, lastCheckIn) VALUES (?, 0, ?, 0, NULL)',
-                    [userId, 'Bronze']
+                    [userId, 'Silver']
                 );
                 user = await queryWithConn(
                     'SELECT user_id, points FROM UserGamification WHERE user_id = ? FOR UPDATE',
@@ -187,6 +194,16 @@ export class GameService {
             await queryWithConn(
                 'UPDATE UserGamification SET points = points - ? + ? WHERE user_id = ?',
                 [costPoints, rewardValue, userId]
+            );
+            
+            const updatedForUserLevel = await queryWithConn(
+                'SELECT points FROM UserGamification WHERE user_id = ? LIMIT 1',
+                [userId]
+            );
+            const newMemberLevel = calculateMemberLevel(Number(updatedForUserLevel[0]?.points || 0));
+            await queryWithConn(
+                'UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?',
+                [newMemberLevel, userId]
             );
             
             const updatedUser = await queryWithConn(
