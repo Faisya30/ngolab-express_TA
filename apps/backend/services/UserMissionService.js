@@ -7,6 +7,12 @@ function generateId() {
     return randomUUID().replace(/-/g, '');
 }
 
+function calculateMemberLevel(points) {
+    if (points >= 2000) return 'Platinum';
+    if (points >= 1000) return 'Gold';
+    return 'Silver';
+}
+
 export class UserMissionService {
     static async getAllUserMissions() {
         return await UserMissionRepository.findAll();
@@ -83,6 +89,22 @@ export class UserMissionService {
         }
 
         console.log('DEBUG missionsWithStatus before return:', JSON.stringify(missionsWithStatus, null, 2));
+        
+        console.log('================ MISSION STREAK DEBUG ================');
+        missionsWithStatus
+          .filter(m => m.missionType === 'STREAK')
+          .forEach(m => {
+            console.log({
+              missionId: m.missionId,
+              missionType: m.missionType,
+              progress: m.progress,
+              target: m.target,
+              status: m.status,
+              rewardPoints: m.rewardPoints
+            });
+          });
+        console.log('=====================================================');
+        
         return missionsWithStatus;
     }
 
@@ -134,7 +156,7 @@ export class UserMissionService {
 
     static async _getTransactionProgress(userId) {
         const rows = await this._queryWithProgress(
-            'SELECT COUNT(*) as count FROM transactions WHERE user_id = ? AND DATE(created_at) = CURDATE()',
+            'SELECT COUNT(*) as count FROM orders WHERE user_id = ?',
             [userId]
         );
         if (!rows || rows.length === 0) return 0;
@@ -143,9 +165,9 @@ export class UserMissionService {
 
     static async _getProductPurchaseProgress(userId, productCode) {
         const rows = await this._queryWithProgress(
-            `SELECT SUM(ti.qty) as qty FROM transactions t
-             JOIN transaction_items ti ON ti.transaction_code = t.transaction_code
-             WHERE t.user_id = ? AND ti.menu_item_code = ? AND DATE(t.created_at) = CURDATE()`,
+            `SELECT SUM(oi.qty) as qty FROM orders o
+             JOIN order_items oi ON oi.order_code = o.order_code
+             WHERE o.user_id = ? AND oi.product_code = ?`,
             [userId, productCode]
         );
         if (!rows || rows.length === 0) return 0;
@@ -222,7 +244,7 @@ export class UserMissionService {
             if (!userCheck || userCheck.length === 0) {
                 await queryWithConn(
                     'INSERT INTO UserGamification (user_id, points, memberLevel, streakCount, lastCheckIn) VALUES (?, ?, ?, ?, NULL)',
-                    [userId, 0, 'Bronze', 0]
+                    [userId, 0, 'Silver', 0]
                 );
             }
 
@@ -235,6 +257,16 @@ export class UserMissionService {
             await queryWithConn(
                 'UPDATE UserGamification SET points = points + ? WHERE user_id = ?',
                 [rewardPoints, userId]
+            );
+            
+            const updatedForUserLevel = await queryWithConn(
+                'SELECT points FROM UserGamification WHERE user_id = ? LIMIT 1',
+                [userId]
+            );
+            const newMemberLevel = calculateMemberLevel(Number(updatedForUserLevel[0]?.points || 0));
+            await queryWithConn(
+                'UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?',
+                [newMemberLevel, userId]
             );
 
             const updatedUser = await queryWithConn(

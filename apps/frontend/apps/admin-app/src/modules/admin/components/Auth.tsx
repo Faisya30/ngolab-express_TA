@@ -53,7 +53,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         localStorage.setItem('current_admin', JSON.stringify(userData));
         onLogin(userData);
       } else {
-        setError(payload?.error || 'Username atau password yang Anda masukkan salah.');
+        setError('Username atau password yang Anda masukkan salah.');
       }
     } catch (_error) {
       setError(

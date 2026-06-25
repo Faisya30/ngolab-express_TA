@@ -17,7 +17,7 @@ export class UserGamificationRepository {
     }
 
     static async create(user_id, data = {}) {
-        const { points = 0, memberLevel = 'Bronze', streakCount = 0, lastCheckIn = null } = data;
+        const { points = 0, memberLevel = 'Silver', streakCount = 0, lastCheckIn = null } = data;
         await query(
             `INSERT INTO UserGamification (user_id, points, memberLevel, streakCount, lastCheckIn) 
              VALUES (?, ?, ?, ?, ?)`,
@@ -59,7 +59,7 @@ export class UserGamificationRepository {
         if (!existing) {
             await query(
                 'INSERT INTO UserGamification (user_id, points, memberLevel, streakCount, lastCheckIn) VALUES (?, 0, ?, 0, NULL)',
-                [user_id, 'Bronze']
+                [user_id, 'Silver']
             );
         }
     }

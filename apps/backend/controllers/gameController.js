@@ -10,7 +10,8 @@ export async function getGames(req, res) {
             data: games
         });
     } catch (error) {
-        return res.status(500).json({
+        const statusCode = error.message === 'Game tidak ditemukan' ? 404 : 500;
+        return res.status(statusCode).json({
             success: false,
             message: error.message
         });
@@ -43,7 +44,8 @@ export async function createGame(req, res) {
             data: game
         });
     } catch (error) {
-        return res.status(500).json({
+        const statusCode = error.message === 'Game tidak ditemukan' ? 404 : 500;
+        return res.status(statusCode).json({
             success: false,
             message: error.message
         });
@@ -70,7 +72,8 @@ export async function updateGame(req, res) {
             data: game
         });
     } catch (error) {
-        return res.status(500).json({
+        const statusCode = error.message === 'Game tidak ditemukan' ? 404 : 500;
+        return res.status(statusCode).json({
             success: false,
             message: error.message
         });
@@ -95,7 +98,8 @@ export async function deleteGame(req, res) {
             message: 'Game berhasil dihapus'
         });
     } catch (error) {
-        return res.status(500).json({
+        const statusCode = error.message === 'Game tidak ditemukan' ? 404 : 500;
+        return res.status(statusCode).json({
             success: false,
             message: error.message
         });
@@ -103,8 +107,17 @@ export async function deleteGame(req, res) {
 }
 
 export async function playGame(req, res) {
+    console.log('🔥 BACKEND PUSAT PLAYGAME HIT 🔥');
+    console.log('REQUEST URL:', req.originalUrl);
+    console.log('REQUEST BODY:', req.body);
     try {
-        const { userId, gameId } = req.body || {};
+        console.log('SCRATCH BODY', req.body);
+        console.log('SCRATCH QUERY', req.query);
+        console.log('SCRATCH PARAMS', req.params);
+        console.log('SCRATCH MEMBERSHIP AUTH', req.membershipAuth);
+        
+        const userId = req.body?.userId || req.query?.userId || req.membershipAuth?.user_id || req.membershipAuth?.sub;
+        const gameId = req.body?.gameId || req.query?.gameId;
         
         if (!userId || !gameId) {
             return res.status(400).json({
@@ -129,9 +142,12 @@ export async function playGame(req, res) {
 }
 
 export async function getCooldown(req, res) {
+    console.log('GET COOLDOWN HIT');
+    console.log('QUERY:', req.query);
+    console.log('BODY:', req.body);
     try {
-        const userId = String(req.query.userId || '').trim();
-        const gameId = String(req.query.gameId || '').trim();
+        const userId = String(req.query.userId || req.body?.userId || '').trim();
+        const gameId = String(req.query.gameId || req.body?.gameId || '').trim();
         
         if (!userId || !gameId) {
             return res.status(400).json({
@@ -147,7 +163,8 @@ export async function getCooldown(req, res) {
             ...result
         });
     } catch (error) {
-        return res.status(500).json({
+        const statusCode = error.message === 'Game tidak ditemukan' ? 404 : 500;
+        return res.status(statusCode).json({
             success: false,
             message: error.message
         });
