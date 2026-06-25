@@ -422,6 +422,68 @@ export async function lookupMemberByQr(req, res) {
   }
 }
 
+export async function getMemberVouchers(req, res) {
+  try {
+    const userId = String(req.params?.user_id || '').trim();
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'user_id wajib diisi.',
+      });
+    }
+
+    const rows = await query(
+      `SELECT
+        uv.id,
+        uv.user_id,
+        uv.voucher_code,
+        uv.status,
+        uv.claimed_at,
+        v.voucher_name,
+        v.description,
+        v.voucher_type,
+        v.value_amount,
+        v.min_purchase,
+        v.max_discount,
+        v.image_url
+      FROM user_voucher uv
+      JOIN vouchers v
+        ON uv.voucher_code = v.voucher_code
+      WHERE uv.user_id = ?
+        AND uv.status = 'ACTIVE'
+        AND v.is_active = 1
+      ORDER BY uv.claimed_at DESC`,
+      [userId]
+    );
+
+    const vouchers = rows.map((v) => ({
+      id: String(v.voucher_code),
+      title: String(v.voucher_name || 'Voucher'),
+      description: String(v.description || ''),
+      discount: Number(v.value_amount || 0),
+      type: String(v.voucher_type || '').toLowerCase() === 'discount'
+        ? 'PERCENT'
+        : 'FIXED',
+      min_purchase: Number(v.min_purchase || 0),
+      max_discount: Number(v.max_discount || 0),
+      status: v.status,
+      image_url: v.image_url || null,
+    }));
+
+    return res.json({
+      success: true,
+      vouchers,
+    });
+  } catch (error) {
+    console.error('Gagal mengambil voucher member:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+}
+
 export const getOrderHistoryByUserId = async (req, res) => {
 	try {
 		const { user_id } = req.params;
@@ -489,7 +551,7 @@ export async function saveOrder(req, res) {
 		const subtotal = toNumber(order.subtotal);
 		const discount = toNumber(order.discount);
 		const total = toNumber(order.total);
-		const pointsEarned = toNumber(order.pointsEarned);
+		let calculatedPointsEarned = 0;
 		const pointsUsed = toNumber(order.pointsUsed);
 		const orderType = String(order.order_type || order.orderType || 'kiosk').toLowerCase();
 
@@ -529,7 +591,7 @@ export async function saveOrder(req, res) {
 		const result = await withTransaction(async (connection) => {
 			const queueNumber = await allocateKioskQueueNumber(connection);
 			const orderColumns = ['order_code', 'service_type', 'subtotal', 'discount', 'total', 'payment_method', 'points_earned', 'points_used'];
-			const orderValues = [orderCode, serviceType, subtotal, discount, total, paymentMethod, pointsEarned, pointsUsed];
+			const orderValues = [orderCode, serviceType, subtotal, discount, total, paymentMethod, 0, pointsUsed];
 
 			if (hasUserId) {
 				orderColumns.push('user_id');
@@ -576,13 +638,16 @@ export async function saveOrder(req, res) {
 				const itemSubtotal = toNumber(item.subtotal) || price * qty;
 				const productCode = String(item.id || item.code || '').trim();
 				const [productRows] = await connection.query(
-					`SELECT id FROM products 
+  `SELECT id, cashback_reward FROM products 
    WHERE code = ? 
       AND (product_type = 'kiosk' OR product_type IS NULL OR product_type = '')
    LIMIT 1`,
-					[productCode]
-				);
+  [productCode]
+);
 				const productId = productRows[0]?.id ?? null;
+        if (userId) {
+  calculatedPointsEarned += toNumber(productRows[0]?.cashback_reward) * qty;
+}
 
 				if (!productId) {
 					throw new Error(`Produk kiosk dengan kode ${productCode} tidak ditemukan atau bukan produk kiosk.`);
@@ -617,13 +682,42 @@ export async function saveOrder(req, res) {
 					`INSERT INTO order_items (${itemColumns.join(', ')}) VALUES (${itemColumns.map(() => '?').join(', ')})`,
 					itemValues
 				);
-			}
-			
-			if (userId && pointsEarned > 0) {
-				const { UserGamificationService } = await import('../services/UserGamificationService.js');
-				await UserGamificationService.addPoints(userId, pointsEarned, 'Point transaksi kiosk');
-			}
+			} 
+			await connection.query(
+  `UPDATE orders SET points_earned = ? WHERE id = ?`,
+  [calculatedPointsEarned, orderId]
+);
+			if (userId && calculatedPointsEarned > 0) {
+  const { UserGamificationService } = await import('../services/UserGamificationService.js');
 
+  await UserGamificationService.addPoints(
+    userId,
+    calculatedPointsEarned,
+    'Cashback transaksi kiosk'
+  );
+
+  await connection.query(
+    `INSERT INTO user_points (user_id, total_points, cashback_points)
+     VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       total_points = total_points + VALUES(total_points),
+       cashback_points = cashback_points + VALUES(cashback_points)`,
+    [userId, calculatedPointsEarned, calculatedPointsEarned]
+  );
+}
+
+const voucherCode = String(order.voucher_code || order.voucherCode || '').trim();
+
+if (userId && voucherCode) {
+  await connection.query(
+    `UPDATE user_voucher
+     SET status = 'USED'
+     WHERE user_id = ?
+       AND voucher_code = ?
+       AND status = 'ACTIVE'`,
+    [userId, voucherCode]
+  );
+}
 			return { orderCode, queueNumber };
 		});
 		if (userId) {

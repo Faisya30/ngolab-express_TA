@@ -39,6 +39,7 @@ export interface CartItem extends Product {
 
 export interface Voucher {
   id: string;
+  voucher_code?: string;
   title: string;
   description: string;
   discount: number;

@@ -21,6 +21,7 @@ import SuccessScreen from './components/screens/SuccessScreen';
 import HandTracking from './components/HandTracking';
 import { fetchFromSheet } from '@ngolab/shared-lib';
 
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000').replace(/\/$/, '');
 const UserKiosk: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<Screen>(Screen.WELCOME);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -33,7 +34,9 @@ const UserKiosk: React.FC = () => {
   const [memberError, setMemberError] = useState<string | null>(null);
   const [appliedVoucher, setAppliedVoucher] = useState<Voucher | null>(null);
   const [useKoin, setUseKoin] = useState(false);
-  const [orderId, setOrderId] = useState(() => Math.floor(1000 + Math.random() * 9000).toString());
+ const generateOrderId = () => `${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+const [orderId, setOrderId] = useState(() => generateOrderId());
   const [queueNumber, setQueueNumber] = useState<number | null>(null);
   const [handTrackingEnabled, setHandTrackingEnabled] = useState(false);
   const [virtualCursor, setVirtualCursor] = useState<{ x: number; y: number; pinching: boolean } | null>(null);
@@ -448,6 +451,7 @@ const UserKiosk: React.FC = () => {
         memberCode: member ? member.code : '-',
         isAffiliate: member?.isAffiliate ? 'Yes' : 'No',
         voucher: appliedVoucher ? appliedVoucher.title : '-',
+        voucher_code: appliedVoucher ? appliedVoucher.id : null,
         pointsEarned,
         pointsUsed: koinDiscount,
         user_id: member ? member.code : null,
@@ -477,12 +481,29 @@ const UserKiosk: React.FC = () => {
     setServiceType(null);
     setMember(null);
     setAppliedVoucher(null);
+    setVouchers([]);
     setUseKoin(false);
     setQueueNumber(null);
-    setOrderId(Math.floor(1000 + Math.random() * 9000).toString());
+setOrderId(generateOrderId());
     setCurrentScreen(Screen.WELCOME);
     refreshKioskData();
   };
+
+const loadMemberVouchers = async (userId: string) => {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/kiosk/members/${userId}/vouchers`);
+    const data = await response.json();
+
+    if (data?.success && Array.isArray(data.vouchers)) {
+      setVouchers(data.vouchers);
+    } else {
+      setVouchers([]);
+    }
+  } catch (error) {
+    console.error('Gagal mengambil voucher member:', error);
+    setVouchers([]);
+  }
+};
 
   const buildMemberData = (u: any): Member => {
     const pointValue = getMemberPoints(u);
@@ -634,12 +655,13 @@ const UserKiosk: React.FC = () => {
                 console.log('[QR-LOOKUP] fetchFromSheet response:', data);
 
                 if (data?.success && data?.user_id && data?.username) {
-                  const memberData = buildMemberData(data);
+  const memberData = buildMemberData(data);
 
-                  console.log('[QR-LOOKUP] Member data set:', memberData);
-                  setMemberError(null);
-                  setMember(memberData);
-                } else {
+  console.log('[QR-LOOKUP] Member data set:', memberData);
+  setMemberError(null);
+  setMember(memberData);
+  await loadMemberVouchers(memberData.code);
+} else {
                   setMember(null);
                   setMemberError('Member tidak ditemukan atau QR tidak valid.');
                 }
@@ -661,12 +683,13 @@ const UserKiosk: React.FC = () => {
                   console.log('[QR-LOOKUP] fallback API response:', fallbackData);
 
                   if (fallbackData?.success && fallbackData?.user_id) {
-                    const memberData = buildMemberData(fallbackData);
+  const memberData = buildMemberData(fallbackData);
 
-                    console.log('[QR-LOOKUP] Member data set (fallback):', memberData);
-                    setMemberError(null);
-                    setMember(memberData);
-                  } else {
+  console.log('[QR-LOOKUP] Member data set (fallback):', memberData);
+  setMemberError(null);
+  setMember(memberData);
+  await loadMemberVouchers(memberData.code);
+} else {
                     setMember(null);
                     setMemberError('Member tidak ditemukan atau QR tidak valid.');
                   }

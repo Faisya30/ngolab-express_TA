@@ -10,6 +10,8 @@ import {
   saveCategory,
   saveProduct,
   uploadProductImage,
+  adminLogin,
+  getAdminMe,
 } from '../controllers/adminController.js';
 import { uploadVoucherImage } from '../controllers/voucherImageController.js';
 import {
@@ -49,5 +51,7 @@ router.post('/vouchers', createVoucher);
 router.put('/vouchers/:id', updateVoucher);
 router.delete('/vouchers/:id', deleteVoucher);
 router.post('/vouchers/upload-image', upload.single('image'), uploadVoucherImage);
+router.post('/login', adminLogin);
+router.get('/me', getAdminMe);
 
 export default router;

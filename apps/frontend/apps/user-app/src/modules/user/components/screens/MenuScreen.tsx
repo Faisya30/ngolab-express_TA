@@ -322,6 +322,12 @@ const MenuScreen: React.FC<Props> = ({
                       Rp {Number(product.price).toLocaleString()}
                     </p>
 
+                    {Number((product as any).cashbackReward ?? (product as any).cashback_reward ?? 0) > 0 && (
+  <div className="mt-2 inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase text-emerald-600">
+    Cashback {(product as any).cashbackReward ?? (product as any).cashback_reward} Poin
+  </div>
+)}
+
                     {isSelected ? (
                       <div
                         onClick={(e) => e.stopPropagation()}

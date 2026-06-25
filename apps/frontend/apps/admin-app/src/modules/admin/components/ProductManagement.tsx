@@ -10,6 +10,8 @@ type ProductWithType = Product & {
   product_type?: 'kiosk' | 'cv' | string;
   image_url?: string;
   category_id?: string | number;
+  cashbackReward?: number;
+  cashback_reward?: number;
 };
 
 type CategoryWithType = Category & {
@@ -533,12 +535,16 @@ const ProductManagement: React.FC<Props> = ({
                 Poin Cashback
               </label>
               <input
-                name="cashbackReward"
-                type="number"
-                defaultValue={editingProduct?.cashbackReward || 0}
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-emerald-600 outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-600/10"
-                placeholder="0"
-              />
+  name="cashbackReward"
+  type="number"
+  defaultValue={
+    editingProduct?.cashbackReward ??
+    editingProduct?.cashback_reward ??
+    0
+  }
+  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-emerald-600 outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-600/10"
+  placeholder="0"
+/>
             </div>
           </div>
 

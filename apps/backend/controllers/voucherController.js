@@ -16,7 +16,7 @@ export async function getVouchers(req, res) {
         });
     }
 }
-
+       
 export async function claimVoucher(req, res) {
     try {
         const { voucherCode } = req.body || {};

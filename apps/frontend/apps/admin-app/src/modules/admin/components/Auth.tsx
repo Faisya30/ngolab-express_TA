@@ -17,7 +17,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     setLoading(true);
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+      const response = await fetch(`${BACKEND_URL}/api/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -28,8 +28,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
       const payload = await response.json().catch(() => ({}));
 
-      if (response.ok && payload?.success && payload?.user) {
-        const role = String(payload.user.role || '').toLowerCase();
+      if (response.ok && payload?.success && payload?.data?.token && payload?.data?.admin) {
+        const admin = payload.data.admin;
+        const role = String(admin.role || '').toLowerCase();
 
         if (role === 'super_admin') {
           setError(
@@ -46,14 +47,17 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         }
 
         const userData = {
-          username: payload.user.username,
-          role: payload.user.role,
+          id: admin.id,
+          username: admin.username,
+          role: admin.role,
+          token: payload.data.token,
         };
 
         localStorage.setItem('current_admin', JSON.stringify(userData));
+        localStorage.setItem('admin_token', payload.data.token);
         onLogin(userData);
       } else {
-        setError('Username atau password yang Anda masukkan salah.');
+        setError(payload?.error || 'Username atau password yang Anda masukkan salah.');
       }
     } catch (_error) {
       setError(

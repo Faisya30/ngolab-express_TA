@@ -48,3 +48,32 @@ export function verifyMembershipToken(token) {
   const { secret } = getJwtConfig();
   return jwt.verify(token, secret);
 }
+
+export function createAdminToken(admin) {
+  const { secret, expiresIn } = getJwtConfig();
+
+  if (!secret) {
+    throw new Error('JWT_SECRET tidak terdefinisi.');
+  }
+
+  const payload = {
+    type: 'admin',
+    sub: String(admin?.id || ''),
+    id: admin?.id || null,
+    username: String(admin?.username || ''),
+    role: String(admin?.role || ''),
+  };
+
+  try {
+    const token = jwt.sign(payload, secret, { expiresIn });
+    return { token, expiresIn };
+  } catch (error) {
+    console.error('[JWT] Error creating admin token:', error);
+    throw error;
+  }
+}
+
+export function verifyAdminToken(token) {
+  const { secret } = getJwtConfig();
+  return jwt.verify(token, secret);
+}

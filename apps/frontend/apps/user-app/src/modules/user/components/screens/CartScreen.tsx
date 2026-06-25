@@ -188,6 +188,20 @@ const CartScreen: React.FC<Props> = ({
                           Qty {item.quantity}
                         </p>
 
+                        {Number(item.cashbackReward || 0) > 0 && (
+  <div className="mt-2 rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2">
+    {member ? (
+      <p className="text-[10px] font-black text-emerald-600">
+        🎁 Kamu akan mendapatkan {Number(item.cashbackReward) * item.quantity} poin cashback
+      </p>
+    ) : (
+      <p className="text-[10px] font-black text-orange-500">
+        🎁 Cashback {Number(item.cashbackReward) * item.quantity} poin tersedia. Scan membership agar poin masuk.
+      </p>
+    )}
+  </div>
+)}
+
                         <div className="mt-3 flex items-center gap-2">
                           <button
                             onClick={() => onUpdateQty(item.id, -1)}

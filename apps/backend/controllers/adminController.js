@@ -2,6 +2,8 @@ import { query } from '../config/db.js';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import { createAdminToken, verifyAdminToken } from '../config/jwt.js';
 
 const tableColumnsCache = new Map();
 
@@ -522,6 +524,144 @@ export async function uploadProductImage(req, res) {
     res.json({ success: true, imageUrl: `/uploads/products/${filename}` });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+export async function adminLogin(req, res) {
+  const { username, password } = req.body || {};
+  console.log('[ADMIN LOGIN] Body:', { username });
+
+  if (!username || !password) {
+    return res.status(400).json({
+      success: false,
+      error: 'Username dan password wajib diisi.',
+    });
+  }
+
+  try {
+    const rows = await query(
+      `SELECT id, username, password_hash, role
+       FROM admins
+       WHERE LOWER(username) = LOWER(?)
+       LIMIT 1`,
+      [String(username)]
+    );
+
+    console.log('[ADMIN LOGIN] Query result:', rows.length, 'rows');
+
+    if (!rows.length) {
+      return res.status(401).json({
+        success: false,
+        error: 'Username atau password tidak valid.',
+      });
+    }
+
+    const admin = rows[0];
+    const hash = String(admin.password_hash || '');
+    const validPassword = await bcrypt.compare(String(password), hash);
+
+    if (!validPassword) {
+      return res.status(401).json({
+        success: false,
+        error: 'Username atau password tidak valid.',
+      });
+    }
+
+    const { token } = createAdminToken(admin);
+
+    res.json({
+      success: true,
+      message: 'Login admin berhasil',
+      data: {
+        token,
+        admin: {
+          id: admin.id,
+          username: admin.username,
+          role: admin.role,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('[ADMIN LOGIN] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Terjadi kesalahan pada server. Silakan coba lagi nanti.',
+    });
+  }
+}
+
+export async function getAdminMe(req, res) {
+  try {
+    const authHeader = req.headers.authorization || '';
+    const match = authHeader.match(/^Bearer\s+(.+)$/i);
+
+    if (!match) {
+      return res.status(401).json({
+        success: false,
+        error: 'Token otorisasi diperlukan.',
+      });
+    }
+
+    const token = match[1];
+    let decoded;
+
+    try {
+      decoded = verifyAdminToken(token);
+    } catch (err) {
+      return res.status(401).json({
+        success: false,
+        error: 'Token tidak valid atau sudah kadaluarsa.',
+      });
+    }
+
+    if (decoded?.type !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Token bukan token admin.',
+      });
+    }
+
+    const adminId = decoded?.sub || decoded?.id;
+    if (!adminId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Token tidak mengandung data admin.',
+      });
+    }
+
+    const rows = await query(
+      `SELECT id, username, role, created_at
+       FROM admins
+       WHERE id = ?
+       LIMIT 1`,
+      [adminId]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({
+        success: false,
+        error: 'Admin tidak ditemukan.',
+      });
+    }
+
+    const admin = rows[0];
+
+    res.json({
+      success: true,
+      data: {
+        admin: {
+          id: admin.id,
+          username: admin.username,
+          role: admin.role,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('[ADMIN ME] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Terjadi kesalahan pada server.',
+    });
   }
 }
 

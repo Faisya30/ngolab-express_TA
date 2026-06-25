@@ -9,6 +9,7 @@ import {
   getKioskProducts,
   getOrderHistoryByUserId,
   getAdminDashboard,
+  getMemberVouchers,
 } from '../controllers/kioskController.js';
 
 import { getAiRecommendation } from '../controllers/recommendationController.js';
@@ -22,6 +23,8 @@ router.get('/products', getKioskProducts);
 router.get('/member/:code', getMember);
 
 router.get('/members/:user_id', getMemberByUserId);
+
+router.get('/members/:user_id/vouchers', getMemberVouchers);
 
 router.post('/members/qr-lookup', lookupMemberByQr);
 
