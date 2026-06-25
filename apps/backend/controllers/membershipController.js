@@ -251,14 +251,12 @@ function buildPublicUser(row) {
     nim: row.nim || null,
     role: row.role,
     status: row.status,
-    membership_level: row.membership_level,
+    membership_level: row.membership_level || 'Silver',
     referred_by: row.referred_by,
     affiliate_upline: row.affiliate_upline || null,
     created_at: row.created_at,
     phone_number: row.phone_number,
     profile_picture: row.profile_picture,
-    ktm_picture: row.ktm_picture,
-    is_ktm: Boolean(row.is_ktm),
   };
 }
 
@@ -280,7 +278,7 @@ function buildMembershipPointsPayload(membershipPointsRow, gamificationPoints) {
 async function fetchGamificationPoints(userId) {
   const rows = await query(
     `SELECT COALESCE(ug.points, 0) AS points
-    FROM UserGamification ug
+    FROM usergamification ug
     WHERE ug.user_id = ?
     LIMIT 1`,
     [userId]
@@ -291,14 +289,14 @@ async function fetchGamificationPoints(userId) {
 
 async function fetchUserGamificationLevel(userId) {
   const rows = await query(
-    `SELECT COALESCE(memberLevel, 'SILVER') AS memberLevel
-    FROM UserGamification
+    `SELECT memberLevel
+    FROM usergamification
     WHERE user_id = ?
     LIMIT 1`,
     [userId]
   );
 
-  return rows[0]?.memberLevel || 'SILVER';
+  return rows[0]?.memberLevel || 'Silver';
 }
 
 async function fetchCashbackPoints(userId) {
@@ -464,7 +462,6 @@ export async function register(req, res) {
     const email = normalizeEmail(body.email);
     const password = normalizeText(body.password);
     const profilePicture = normalizeText(body.profile_picture || body.photo_url || body.profilePicture);
-    const ktmPicture = normalizeText(body.ktm_picture || body.ktm_url || body.ktmPicture);
     const nim = normalizeText(body.nim || body.nim_number || body.nimNumber || body.student_id || body.studentId);
     const referredByInput = normalizeText(body.referred_by || body.referral_code || body.referredBy);
     const phoneNumber = normalizeText(body.phone_number || body.phoneNumber || body.phone);
@@ -497,7 +494,7 @@ export async function register(req, res) {
     const result = await withTransaction(async (connection) => {
       console.log('[REGISTER] START TRANSACTION - inserting user values', { userId, username, email, referredBy, affiliateUpline });
 
-      const insertUserSql = `INSERT INTO users (
+const insertUserSql = `INSERT INTO users (
           user_id,
           username,
           email,
@@ -509,13 +506,11 @@ export async function register(req, res) {
           affiliate_upline,
           phone_number,
           nim,
-          profile_picture,
-          ktm_picture,
-          is_ktm
-        ) VALUES (?, ?, ?, ?, 'MEMBER', 'ACTIVE', 'Silver', ?, ?, ?, ?, ?, ?, 0)`;
+          profile_picture
+        ) VALUES (?, ?, ?, ?, 'MEMBER', 'ACTIVE', 'Silver', ?, ?, ?, ?, ?)`;
 
-      console.log('[REGISTER] QUERY -> insert user');
-      await connection.query(insertUserSql, [userId, username, email, passwordHash, referredBy, affiliateUpline, phoneNumber || null, nim || null, profilePicture || null, ktmPicture || null]);
+    console.log('[REGISTER] QUERY -> insert user');
+    await connection.query(insertUserSql, [userId, username, email, passwordHash, referredBy, affiliateUpline, phoneNumber || null, nim || null, profilePicture || null]);
       console.log('[REGISTER] INSERTED user', { userId });
 
       const referralCode = await ensureUniqueReferralCode(connection);
@@ -608,7 +603,7 @@ console.log('[REGISTER] QUERY -> insert user_points');
     });
 
     const createdRows = await query(
-      `SELECT user_id, username, email, role, status, membership_level, referred_by, affiliate_upline, created_at, phone_number, profile_picture, ktm_picture, is_ktm
+      `SELECT user_id, username, email, role, status, membership_level, referred_by, affiliate_upline, created_at, phone_number, profile_picture
       FROM users
       WHERE user_id = ?
       LIMIT 1`,
@@ -652,7 +647,7 @@ export async function login(req, res) {
     console.log('[LOGIN] Starting login query for identifier:', identifier);
     const queryStart = Date.now();
     const rows = await query(
-      `SELECT user_id, username, email, password, role, status, membership_level, referred_by, affiliate_upline, created_at, phone_number, profile_picture, ktm_picture, is_ktm
+      `SELECT user_id, username, email, password, role, status, membership_level, referred_by, affiliate_upline, created_at, phone_number, profile_picture
       FROM users
       WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)
       LIMIT 1`,
@@ -704,14 +699,14 @@ const referralCode = isAffiliate ? affiliateRow?.referral_code || null : null;
     const publicUser = buildPublicUser(user);
     publicUser.referral_code = referralCode;
 
-    console.log('[LOGIN] Fetching points for user:', user.user_id);
-    let pointsPayload = { total_points: 0, poin_gamification: 0, cashback_points: 0, commission_points: 0, memberLevel: 'SILVER' };
+console.log('[LOGIN] Fetching points for user:', user.user_id);
+    let pointsPayload = { total_points: 0, poin_gamification: 0, cashback_points: 0, commission_points: 0, memberLevel: 'Silver' };
     try {
       pointsPayload = await buildPointsPayload(user.user_id);
       console.log('[LOGIN] Points fetched:', pointsPayload);
     } catch (pointsError) {
       console.warn('[LOGIN] Warning: Failed to fetch user points, using null:', pointsError?.message);
-      pointsPayload = { total_points: 0, poin_gamification: 0, cashback_points: 0, commission_points: 0, memberLevel: 'SILVER' };
+      pointsPayload = { total_points: 0, poin_gamification: 0, cashback_points: 0, commission_points: 0, memberLevel: 'Silver' };
     }
 
     let tokenResult = null;
@@ -752,7 +747,7 @@ export async function getUserProfile(_req, res) {
     }
 
     const users = await query(
-      `SELECT user_id, username, email, nim, role, status, membership_level, referred_by, affiliate_upline, created_at, phone_number, profile_picture, ktm_picture, is_ktm
+      `SELECT user_id, username, email, nim, role, status, referred_by, affiliate_upline, created_at, phone_number, profile_picture
       FROM users
       WHERE user_id = ?
       LIMIT 1`,
@@ -763,7 +758,7 @@ export async function getUserProfile(_req, res) {
       return res.status(404).json({ success: false, error: 'User tidak ditemukan.' });
     }
 
-const affiliateRow = await fetchAffiliateNetworkRow(userId);
+    const affiliateRow = await fetchAffiliateNetworkRow(userId);
 
     const pointsPayload = await buildPointsPayload(userId);
 
@@ -780,10 +775,17 @@ const affiliateRow = await fetchAffiliateNetworkRow(userId);
       ? buildAffiliateNetwork(affiliateRow)
       : null;
 
+    const userRow = users[0];
+    const user = {
+      ...buildPublicUser(userRow),
+      membership_level: pointsPayload.memberLevel,
+      memberLevel: pointsPayload.memberLevel,
+    };
+
     return res.json({
       success: true,
       data: {
-        user: buildPublicUser(users[0]),
+        user,
         affiliate_network: affiliateNetwork,
         referralCode: affiliateNetwork?.referralCode || affiliateRow?.referral_code || null,
         points: pointsPayload,
@@ -836,7 +838,7 @@ export async function updateProfile(_req, res) {
     }
 
     const existingRows = await query(
-      `SELECT user_id, username, email, nim, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm
+      `SELECT user_id, username, email, nim, role, status, membership_level, referred_by, created_at, phone_number, profile_picture
       FROM users
       WHERE user_id = ?
       LIMIT 1`,
@@ -852,7 +854,6 @@ export async function updateProfile(_req, res) {
     const nextEmail = normalizeEmail(body.email);
     const nextPhoneNumber = normalizeText(body.phone_number ?? body.phoneNumber);
     let nextProfilePicture = normalizeText(body.profile_picture ?? body.photo_url ?? body.profilePicture);
-    const nextKtmPicture = normalizeText(body.ktm_picture ?? body.ktm_url ?? body.ktmPicture);
     const nextNim = normalizeText(body.nim ?? body.nim_number ?? body.nimNumber ?? body.student_id ?? body.studentId);
 
     if (nextUsername && nextUsername.toLowerCase() !== String(currentUser.username || '').toLowerCase()) {
@@ -921,11 +922,6 @@ export async function updateProfile(_req, res) {
       updateValues.push(nextNim || null);
     }
 
-    if (body.ktm_picture !== undefined || body.ktm_url !== undefined || body.ktmPicture !== undefined) {
-      updateFields.push('ktm_picture = ?');
-      updateValues.push(nextKtmPicture || null);
-    }
-
     updateValues.push(userId);
 
     if (updateFields.length) {
@@ -938,7 +934,7 @@ export async function updateProfile(_req, res) {
     }
 
     const updatedRows = await query(
-      `SELECT user_id, username, email, nim, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm
+      `SELECT user_id, username, email, nim, role, status, membership_level, referred_by, created_at, phone_number, profile_picture
       FROM users
       WHERE user_id = ?
       LIMIT 1`,
@@ -979,7 +975,7 @@ export async function verifyAffiliateByBarcode(req, res) {
     }
 
     const userRows = await query(
-      `SELECT user_id, username, email, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm, nim
+      `SELECT user_id, username, email, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, nim
        FROM users
        WHERE user_id = ?
        LIMIT 1`,
@@ -1083,7 +1079,7 @@ const result = await withTransaction(async (connection) => {
     });
 
     const updatedUserRows = await query(
-      `SELECT user_id, username, email, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, ktm_picture, is_ktm, nim
+      `SELECT user_id, username, email, role, status, membership_level, referred_by, created_at, phone_number, profile_picture, nim
        FROM users
        WHERE user_id = ?
        LIMIT 1`,
@@ -1246,14 +1242,11 @@ export async function getAllMembers(_req, res) {
         u.email,
         u.role,
         u.status,
-        u.membership_level,
         u.referred_by,
         u.affiliate_upline,
         u.created_at,
         u.phone_number,
         u.profile_picture,
-        u.ktm_picture,
-        u.is_ktm,
         an.referral_code,
         an.affiliate_tier,
         an.total_referrals
@@ -1268,7 +1261,7 @@ export async function getAllMembers(_req, res) {
     return res.json({
       success: true,
       data: userRows.map((row) => {
-        const pts = pointsMap.get(row.user_id) || { total_points: 0, poin_gamification: 0, cashback_points: 0, commission_points: 0, memberLevel: 'SILVER' };
+        const pts = pointsMap.get(row.user_id) || { total_points: 0, poin_gamification: 0, cashback_points: 0, commission_points: 0, memberLevel: 'Silver' };
         return {
           ...buildPublicUser(row),
           total_points: pts.total_points,
@@ -1276,6 +1269,8 @@ export async function getAllMembers(_req, res) {
           mission_points: 0,
           cashback_points: pts.cashback_points,
           voucher_points: 0,
+          membership_level: pts.memberLevel,
+          memberLevel: pts.memberLevel,
           referral_code: row.referral_code || null,
           affiliate_tier: row.affiliate_tier || null,
           total_referrals: Number(row.total_referrals || 0),
@@ -1325,7 +1320,7 @@ export async function getAdminAiInsights(_req, res) {
     );
 
     const ordersTodayRows = await query(
-      `SELECT COUNT(*) AS total_orders, SUM(total) AS total_revenue
+      `SELECT COUNT(*) AS total_orders
        FROM orders
        WHERE DATE(created_at) = ?`,
       [todayStr]
@@ -1341,59 +1336,21 @@ export async function getAdminAiInsights(_req, res) {
       [todayStr]
     );
 
-    const activityRows = await query(
-      `SELECT DAYNAME(created_at) AS day_name, DATE(created_at) AS order_date,
-               ${usesUserColumn ? 'COUNT(DISTINCT o.user_id)' : 'COUNT(DISTINCT o.member_code)'} AS unique_users, COUNT(*) AS order_count
-       FROM orders o
-       WHERE DATE(created_at) >= DATE_SUB(?, INTERVAL 6 DAY)
-       GROUP BY DATE(created_at)
-       ORDER BY order_date`,
-      [todayStr]
-    );
-
     const topProductToday = todayProductRows[0]?.product_name_snapshot || null;
     const topProductMonth = monthProductRows[0]?.product_name_snapshot || null;
     const peakHour = hourRows?.[0]?.hour != null
       ? `${String(hourRows[0].hour).padStart(2, '0')}:00 - ${String(hourRows[0].hour + 1).padStart(2, '0')}:00`
       : null;
 
-    const totalOrdersToday = Number(ordersTodayRows?.[0]?.total_orders || 0);
-    const totalRevenueToday = Number(ordersTodayRows?.[0]?.total_revenue || 0);
-    const averageOrderValue = totalOrdersToday > 0 ? Math.round(totalRevenueToday / totalOrdersToday) : 0;
-
-    const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
-    const activityChart = activityRows.map((row) => {
-      const date = new Date(row.order_date);
-      const idx = date.getDay();
-      return {
-        label: dayNames[idx],
-        users: Number(row.unique_users || 0),
-        orders: Number(row.order_count || 0),
-      };
-    });
-
-    let recommendation = '';
-    if (topProductToday && peakHour) {
-      recommendation = `${topProductToday} menjadi produk terlaris hari ini. Siapkan stok tambahan untuk jam makan siang karena transaksi paling ramai terjadi pukul ${peakHour}.`;
-    } else if (topProductToday) {
-      recommendation = `${topProductToday} menjadi produk terlaris hari ini.`;
-    } else if (peakHour) {
-      recommendation = `Jam paling ramai terjadi pukul ${peakHour}.`;
-    } else {
-      recommendation = 'Belum ada data insight untuk hari ini.';
-    }
+    const ordersToday = Number(ordersTodayRows?.[0]?.total_orders || 0);
 
     return res.json({
       success: true,
       data: {
-        top_product_today: topProductToday,
-        top_product_month: topProductMonth,
-        peak_hour: peakHour,
-        total_orders_today: totalOrdersToday,
-        total_revenue_today: totalRevenueToday,
-        average_order_value: averageOrderValue,
-        recommendation,
-        activity_chart: activityChart,
+        best_selling_today: topProductToday || '-',
+        best_selling_month: topProductMonth || '-',
+        peak_hour: peakHour || '-',
+        orders_today: ordersToday,
       },
     });
   } catch (error) {
@@ -1515,15 +1472,21 @@ export async function getAllAffiliates(_req, res) {
         u.email,
         u.role,
         u.status,
-        u.membership_level,
         u.phone_number,
-        u.profile_picture,
-        u.ktm_picture,
-        u.is_ktm
+        u.profile_picture
       FROM affiliate_networks an
       INNER JOIN users u ON u.user_id = an.user_id
       ORDER BY an.created_at DESC`
     );
+
+    let gamificationMap = new Map();
+    if (rows.length > 0) {
+      const gamificationRows = await query(
+        `SELECT user_id, memberLevel FROM usergamification WHERE user_id IN (${rows.map(() => '?').join(',')})`,
+        rows.map(r => r.user_id)
+      );
+      gamificationMap = new Map(gamificationRows.map(r => [r.user_id, r.memberLevel || 'Silver']));
+    }
 
     return res.json({
       success: true,
@@ -1535,11 +1498,10 @@ export async function getAllAffiliates(_req, res) {
         email: row.email,
         role: row.role,
         status: row.status,
-        membership_level: row.membership_level,
+        membership_level: gamificationMap.get(row.user_id) || 'Silver',
+        memberLevel: gamificationMap.get(row.user_id) || 'Silver',
         phone_number: row.phone_number,
         profile_picture: row.profile_picture,
-        ktm_picture: row.ktm_picture,
-        is_ktm: Boolean(row.is_ktm),
         referral_code: row.referral_code,
         affiliate_tier: row.affiliate_tier,
         total_referrals: Number(row.total_referrals || 0),
@@ -2366,7 +2328,7 @@ export async function lookupMember(req, res) {
     }
 
     const [rows] = await query(
-      `SELECT user_id, username, phone_number, email, membership_level, status, created_at
+      `SELECT user_id, username, phone_number, email, status, created_at
       FROM users
       WHERE user_id = ? OR phone_number = ? OR username = ?
       LIMIT 1`,
@@ -2377,7 +2339,7 @@ export async function lookupMember(req, res) {
       return res.status(404).json({ success: false, error: 'User tidak ditemukan.' });
     }
 
-const userRow = rows[0];
+    const userRow = rows[0];
 
     const pointsPayload = await buildPointsPayload(userRow.user_id);
 
@@ -2385,6 +2347,8 @@ const userRow = rows[0];
       success: true,
       user: {
         ...buildPublicUser(userRow),
+        membership_level: pointsPayload.memberLevel,
+        memberLevel: pointsPayload.memberLevel,
         points: pointsPayload,
       },
     });

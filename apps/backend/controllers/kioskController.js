@@ -3,6 +3,17 @@ import { generateAiRecommendation } from '../services/geminiService.js';
 
 const tableColumnsCache = new Map();
 
+async function getUserGamificationLevel(userId) {
+  const rows = await query(
+    `SELECT memberLevel
+    FROM usergamification
+    WHERE user_id = ?
+    LIMIT 1`,
+    [userId]
+  );
+  return rows[0]?.memberLevel || 'Silver';
+}
+
 async function getTableColumns(tableName) {
 	if (tableColumnsCache.has(tableName)) return tableColumnsCache.get(tableName);
 	const rows = await query(`SHOW COLUMNS FROM ${tableName}`);
@@ -22,9 +33,6 @@ function toNumber(value) {
 	const cleaned = String(value).replace(/[^0-9.-]/g, '');
 	return Number(cleaned) || 0;
 }
-
-
-
 
 
 function parseCart(rawCartData) {
@@ -205,204 +213,213 @@ export async function getKioskProducts(req, res) {
 }
 
 export async function getMember(req, res) {
-	try {
-		const code = String(req.params?.code || '').trim();
-		if (!code) return res.status(400).json({ success: false, error: 'code wajib diisi.' });
+  try {
+    const code = String(req.params?.code || '').trim();
+    if (!code) return res.status(400).json({ success: false, error: 'code wajib diisi.' });
 
-		const rows = await query(
-			`SELECT user_id, username, phone_number, membership_level, profile_picture, status
-			FROM users
-			WHERE user_id = ? OR username = ? OR phone_number = ?
-			LIMIT 1`,
-			[code, code, code]
-		);
+    const rows = await query(
+      `SELECT user_id, username, phone_number, profile_picture, status
+      FROM users
+      WHERE user_id = ? OR username = ? OR phone_number = ?
+      LIMIT 1`,
+      [code, code, code]
+    );
 
-		if (!rows.length) {
-			return res.status(404).json({ success: false, error: 'User tidak ditemukan.' });
-		}
+    if (!rows.length) {
+      return res.status(404).json({ success: false, error: 'User tidak ditemukan.' });
+    }
 
-		const user = rows[0];
+    const user = rows[0];
 
-		if (user.status === 'INACTIVE' || user.status === 'SUSPENDED') {
-			return res.status(403).json({ success: false, error: 'Akun member tidak aktif.' });
-		}
+    if (user.status === 'INACTIVE' || user.status === 'SUSPENDED') {
+      return res.status(403).json({ success: false, error: 'Akun member tidak aktif.' });
+    }
 
-		const pointsRows = await query(
-			`SELECT total_points, cashback_points
-			FROM user_points
-			WHERE user_id = ?
-			LIMIT 1`,
-			[user.user_id]
-		);
+    const pointsRows = await query(
+      `SELECT total_points, cashback_points
+      FROM user_points
+      WHERE user_id = ?
+      LIMIT 1`,
+      [user.user_id]
+    );
 
-		const affiliateRows = await query(
-			`SELECT total_points, commission_points, referral_code, affiliate_tier, level
-			FROM affiliate_networks
-			WHERE user_id = ?
-			LIMIT 1`,
-			[user.user_id]
-		);
+    const affiliateRows = await query(
+      `SELECT total_points, commission_points, referral_code, affiliate_tier, level
+      FROM affiliate_networks
+      WHERE user_id = ?
+      LIMIT 1`,
+      [user.user_id]
+    );
 
-		return res.json({
-			success: true,
-			code: user.user_id,
-			name: user.username,
-			phone: user.phone_number || null,
-			membership_level: user.membership_level || null,
-			profile_picture: user.profile_picture || null,
-			total_points: toNumber(affiliateRows[0]?.total_points || pointsRows?.[0]?.total_points || 0),
-			cashbackPoints: toNumber(pointsRows?.[0]?.cashback_points || 0),
-			commission_points: toNumber(affiliateRows[0]?.commission_points || 0),
-			affiliate_tier: affiliateRows[0]?.affiliate_tier || null,
-			level: affiliateRows[0]?.level || null,
-			affiliate: affiliateRows.length ? 'Yes' : 'No',
-		});
-	} catch (error) {
-		return res.status(500).json({ success: false, error: error.message });
-	}
+    const gamificationLevel = await getUserGamificationLevel(user.user_id);
+
+    return res.json({
+      success: true,
+      code: user.user_id,
+      name: user.username,
+      phone: user.phone_number || null,
+      membership_level: gamificationLevel,
+      memberLevel: gamificationLevel,
+      profile_picture: user.profile_picture || null,
+      total_points: toNumber(affiliateRows[0]?.total_points || pointsRows?.[0]?.total_points || 0),
+      cashbackPoints: toNumber(pointsRows?.[0]?.cashback_points || 0),
+      commission_points: toNumber(affiliateRows[0]?.commission_points || 0),
+      affiliate_tier: affiliateRows[0]?.affiliate_tier || null,
+      level: affiliateRows[0]?.level || null,
+      affiliate: affiliateRows.length ? 'Yes' : 'No',
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
 }
 
 export async function getMemberByUserId(req, res) {
-	try {
-		const userId = String(req.params?.user_id || '').trim();
-		if (!userId) return res.status(400).json({ success: false, error: 'user_id wajib diisi.' });
+  try {
+    const userId = String(req.params?.user_id || '').trim();
+    if (!userId) return res.status(400).json({ success: false, error: 'user_id wajib diisi.' });
 
-		const rows = await query(
-			`SELECT user_id, username, phone_number, membership_level, profile_picture, status
-			FROM users
-			WHERE user_id = ?
-			LIMIT 1`,
-			[userId]
-		);
+    const rows = await query(
+      `SELECT user_id, username, phone_number, profile_picture, status
+      FROM users
+      WHERE user_id = ?
+      LIMIT 1`,
+      [userId]
+    );
 
-		if (!rows.length) {
-			return res.status(404).json({ success: false, error: 'Member tidak ditemukan.' });
-		}
+    if (!rows.length) {
+      return res.status(404).json({ success: false, error: 'Member tidak ditemukan.' });
+    }
 
-		const user = rows[0];
+    const user = rows[0];
 
-		if (user.status === 'INACTIVE' || user.status === 'SUSPENDED') {
-			return res.status(403).json({ success: false, error: 'Akun member tidak aktif.' });
-		}
+    if (user.status === 'INACTIVE' || user.status === 'SUSPENDED') {
+      return res.status(403).json({ success: false, error: 'Akun member tidak aktif.' });
+    }
 
-		const pointsRows = await query(
-			`SELECT total_points, cashback_points
-			FROM user_points
-			WHERE user_id = ?
-			LIMIT 1`,
-			[user.user_id]
-		);
+    const pointsRows = await query(
+      `SELECT total_points, cashback_points
+      FROM user_points
+      WHERE user_id = ?
+      LIMIT 1`,
+      [user.user_id]
+    );
 
-		const affiliateRows = await query(
-			`SELECT total_points, commission_points, affiliate_tier, level
-			FROM affiliate_networks
-			WHERE user_id = ?
-			LIMIT 1`,
-			[user.user_id]
-		);
+    const affiliateRows = await query(
+      `SELECT total_points, commission_points, affiliate_tier, level
+      FROM affiliate_networks
+      WHERE user_id = ?
+      LIMIT 1`,
+      [user.user_id]
+    );
 
-		return res.json({
-			success: true,
-			user_id: user.user_id,
-			username: user.username,
-			membership_level: user.membership_level || null,
-			phone_number: user.phone_number || null,
-			profile_picture: user.profile_picture || null,
-			total_points: toNumber(affiliateRows[0]?.total_points || pointsRows?.[0]?.total_points || 0),
-			cashback_points: toNumber(pointsRows?.[0]?.cashback_points || 0),
-			commission_points: toNumber(affiliateRows[0]?.commission_points || 0),
-			affiliate_tier: affiliateRows[0]?.affiliate_tier || null,
-			level: affiliateRows[0]?.level || null,
-			affiliate: affiliateRows.length ? 'Yes' : 'No',
-		});
-	} catch (error) {
-		return res.status(500).json({ success: false, error: error.message });
-	}
+    const gamificationLevel = await getUserGamificationLevel(user.user_id);
+
+    return res.json({
+      success: true,
+      user_id: user.user_id,
+      username: user.username,
+      membership_level: gamificationLevel,
+      memberLevel: gamificationLevel,
+      phone_number: user.phone_number || null,
+      profile_picture: user.profile_picture || null,
+      total_points: toNumber(affiliateRows[0]?.total_points || pointsRows?.[0]?.total_points || 0),
+      cashback_points: toNumber(pointsRows?.[0]?.cashback_points || 0),
+      commission_points: toNumber(affiliateRows[0]?.commission_points || 0),
+      affiliate_tier: affiliateRows[0]?.affiliate_tier || null,
+      level: affiliateRows[0]?.level || null,
+      affiliate: affiliateRows.length ? 'Yes' : 'No',
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
 }
 
 export async function lookupMemberByQr(req, res) {
-	try {
-		const body = req.body || {};
-		const rawCode = String(body.code || body.user_id || '').trim();
+  try {
+    const body = req.body || {};
+    const rawCode = String(body.code || body.user_id || '').trim();
 
-		if (!rawCode) {
-			return res.status(400).json({ success: false, error: 'QR code tidak valid.' });
-		}
+    if (!rawCode) {
+      return res.status(400).json({ success: false, error: 'QR code tidak valid.' });
+    }
 
-		let userId = null;
-		try {
-			const trimmed = rawCode.trim();
-			const firstBrace = trimmed.indexOf('{');
-			const lastBrace = trimmed.lastIndexOf('}');
-			if (firstBrace >= 0 && lastBrace > firstBrace) {
-				const jsonStr = trimmed.slice(firstBrace, lastBrace + 1);
-				const parsed = JSON.parse(jsonStr);
-				userId = parsed.user_id || parsed.userId || parsed.user?.id || null;
-				if (!userId && parsed.code) userId = String(parsed.code);
-			}
-		} catch {
-			userId = null;
-		}
+    let userId = null;
+    try {
+      const trimmed = rawCode.trim();
+      const firstBrace = trimmed.indexOf('{');
+      const lastBrace = trimmed.lastIndexOf('}');
+      if (firstBrace >= 0 && lastBrace > firstBrace) {
+        const jsonStr = trimmed.slice(firstBrace, lastBrace + 1);
+        const parsed = JSON.parse(jsonStr);
+        userId = parsed.user_id || parsed.userId || parsed.user?.id || null;
+        if (!userId && parsed.code) userId = String(parsed.code);
+      }
+    } catch {
+      userId = null;
+    }
 
-		if (!userId) {
-			userId = rawCode.length >= 3 ? rawCode : null;
-		}
+    if (!userId) {
+      userId = rawCode.length >= 3 ? rawCode : null;
+    }
 
-		if (!userId) {
-			return res.status(400).json({ success: false, error: 'QR code tidak berisi user_id yang valid.' });
-		}
+    if (!userId) {
+      return res.status(400).json({ success: false, error: 'QR code tidak berisi user_id yang valid.' });
+    }
 
-		const userRows = await query(
-			`SELECT user_id, username, phone_number, membership_level, profile_picture, status
-			FROM users
-			WHERE user_id = ?
-			LIMIT 1`,
-			[userId]
-		);
+    const userRows = await query(
+      `SELECT user_id, username, phone_number, profile_picture, status
+      FROM users
+      WHERE user_id = ?
+      LIMIT 1`,
+      [userId]
+    );
 
-		if (!userRows.length) {
-			return res.status(404).json({ success: false, error: 'Member tidak ditemukan.' });
-		}
+    if (!userRows.length) {
+      return res.status(404).json({ success: false, error: 'Member tidak ditemukan.' });
+    }
 
-		const user = userRows[0];
+    const user = userRows[0];
 
-		if (user.status === 'INACTIVE' || user.status === 'SUSPENDED') {
-			return res.status(403).json({ success: false, error: 'Akun member tidak aktif.' });
-		}
+    if (user.status === 'INACTIVE' || user.status === 'SUSPENDED') {
+      return res.status(403).json({ success: false, error: 'Akun member tidak aktif.' });
+    }
 
-		const pointsRows = await query(
-			`SELECT total_points, cashback_points
-			FROM user_points
-			WHERE user_id = ?
-			LIMIT 1`,
-			[user.user_id]
-		);
+    const pointsRows = await query(
+      `SELECT total_points, cashback_points
+      FROM user_points
+      WHERE user_id = ?
+      LIMIT 1`,
+      [user.user_id]
+    );
 
-		const affiliateRows = await query(
-			`SELECT total_points, commission_points, affiliate_tier, level
-			FROM affiliate_networks
-			WHERE user_id = ?
-			LIMIT 1`,
-			[user.user_id]
-		);
+    const affiliateRows = await query(
+      `SELECT total_points, commission_points, affiliate_tier, level
+      FROM affiliate_networks
+      WHERE user_id = ?
+      LIMIT 1`,
+      [user.user_id]
+    );
 
-		return res.json({
-			success: true,
-			user_id: user.user_id,
-			username: user.username,
-			membership_level: user.membership_level || null,
-			phone_number: user.phone_number || null,
-			profile_picture: user.profile_picture || null,
-			total_points: toNumber(affiliateRows[0]?.total_points || pointsRows?.[0]?.total_points || 0),
-			cashback_points: toNumber(pointsRows?.[0]?.cashback_points || 0),
-			commission_points: toNumber(affiliateRows[0]?.commission_points || 0),
-			affiliate_tier: affiliateRows[0]?.affiliate_tier || null,
-			level: affiliateRows[0]?.level || null,
-			affiliate: affiliateRows.length ? 'Yes' : 'No',
-		});
-	} catch (error) {
-		return res.status(500).json({ success: false, error: error.message });
-	}
+    const gamificationLevel = await getUserGamificationLevel(user.user_id);
+
+    return res.json({
+      success: true,
+      user_id: user.user_id,
+      username: user.username,
+      membership_level: gamificationLevel,
+      memberLevel: gamificationLevel,
+      phone_number: user.phone_number || null,
+      profile_picture: user.profile_picture || null,
+      total_points: toNumber(affiliateRows[0]?.total_points || pointsRows?.[0]?.total_points || 0),
+      cashback_points: toNumber(pointsRows?.[0]?.cashback_points || 0),
+      commission_points: toNumber(affiliateRows[0]?.commission_points || 0),
+      affiliate_tier: affiliateRows[0]?.affiliate_tier || null,
+      level: affiliateRows[0]?.level || null,
+      affiliate: affiliateRows.length ? 'Yes' : 'No',
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
 }
 
 export const getOrderHistoryByUserId = async (req, res) => {
@@ -561,7 +578,7 @@ export async function saveOrder(req, res) {
 				const [productRows] = await connection.query(
 					`SELECT id FROM products 
    WHERE code = ? 
-     AND (product_type = 'kiosk' OR product_type IS NULL OR product_type = '')
+      AND (product_type = 'kiosk' OR product_type IS NULL OR product_type = '')
    LIMIT 1`,
 					[productCode]
 				);

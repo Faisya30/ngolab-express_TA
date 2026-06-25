@@ -32,12 +32,16 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         const role = String(payload.user.role || '').toLowerCase();
 
         if (role === 'super_admin') {
-          setError('Super Admin hanya bisa login di Super Admin App.');
+          setError(
+            'Akun Super Admin tidak dapat digunakan pada aplikasi Admin. Silakan login melalui Super Admin App.'
+          );
           return;
         }
 
         if (role !== 'kiosk_admin' && role !== 'cv_admin') {
-          setError(`Role ${payload.user.role} tidak diizinkan di Admin App.`);
+          setError(
+            'Akun Anda tidak memiliki hak akses ke halaman Admin.'
+          );
           return;
         }
 
@@ -49,10 +53,12 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         localStorage.setItem('current_admin', JSON.stringify(userData));
         onLogin(userData);
       } else {
-        setError(payload?.error || 'Invalid credentials.');
+        setError('Username atau password yang Anda masukkan salah.');
       }
     } catch (_error) {
-      setError('Gagal terhubung ke backend. Pastikan server backend berjalan.');
+      setError(
+        'Tidak dapat terhubung ke server. Silakan coba beberapa saat lagi.'
+      );
     } finally {
       setLoading(false);
     }

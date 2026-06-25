@@ -170,7 +170,7 @@ const HandTracking = ({ onLandmarks }) => {
             const dy = indexTip.y - thumbTip.y;
             const dz = indexTip.z - thumbTip.z;
             pinchDistance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-            pinch = pinchDistance < 0.06;
+            pinch = pinchDistance < 0.09;
           }
 
           onLandmarks({

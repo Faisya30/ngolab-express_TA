@@ -1,62 +1,31 @@
 @startuml
+title Sequence Diagram Pembayaran QRIS
+
 actor Customer
-participant "Kiosk App" as Kiosk
-participant "Computer Vision" as CV
-participant "Menu Service" as Menu
-participant "Order Service" as Order
-participant "Membership Service" as Member
-participant "Payment Service" as Payment
-participant Kasir
+participant "Kiosk UI" as KioskUI
+actor Kasir
+participant "Backend API" as Backend
+database "Database" as DB
 
-Customer -> Kiosk : Membuka welcome screen
-Customer -> CV : Gesture lanjut
-CV -> Kiosk : Perintah pindah halaman
+Customer -> KioskUI : Memilih metode pembayaran QRIS
+KioskUI -> Backend : Mengirim pilihan pembayaran QRIS
 
-Customer -> Kiosk : Pilih Dine In / Take Away
-Kiosk -> Order : Simpan tipe pesanan
+Backend -> DB : Menyimpan data pembayaran QRIS
+DB --> Backend : Data pembayaran tersimpan
 
-Kiosk -> Menu : Request daftar menu
-Menu --> Kiosk : Data menu
-Kiosk --> Customer : Tampilkan katalog menu
+Backend --> KioskUI : Mengirim data QRIS statis dan timer
+KioskUI --> Customer : Menampilkan QRIS dan timer pembayaran
 
-Customer -> CV : Gesture pilih menu
-CV -> Kiosk : Pilih item menu
-Kiosk -> Order : Tambah item ke keranjang
+Customer -> KioskUI : Melakukan pembayaran QRIS
+Customer -> Kasir : Menunjukkan bukti pembayaran QRIS
 
-Customer -> Kiosk : Klik Bayar
-Kiosk -> Order : Buat ringkasan pesanan
-Order --> Kiosk : Data ringkasan pesanan
-Kiosk --> Customer : Tampilkan ringkasan pesanan
+Kasir -> Backend : Konfirmasi pembayaran QRIS
+Backend -> DB : Update status pembayaran
+Backend -> DB : Menyimpan data order
+Backend -> DB : Menyimpan detail order
+DB --> Backend : Data order tersimpan
 
-alt Customer punya membership
-  Customer -> Kiosk : Scan QR Membership
-  Kiosk -> Member : Validasi QR Membership
-  Member --> Kiosk : Data member valid
-
-  Customer -> Kiosk : Aktifkan poin
-  Kiosk -> Order : Terapkan poin
-
-  Customer -> Kiosk : Pilih voucher
-  Kiosk -> Order : Terapkan voucher
-end
-
-Customer -> Kiosk : Pilih metode pembayaran
-
-alt QRIS
-  Kiosk -> Payment : Generate QRIS
-  Payment --> Kiosk : QRIS
-  Kiosk --> Customer : Tampilkan QRIS
-  Customer -> Payment : Melakukan pembayaran
-  Payment --> Kiosk : Pembayaran berhasil
-else Cash
-  Kiosk --> Customer : Tampilkan arahan ke kasir
-  Kiosk -> Kasir : Kirim / cetak struk pesanan
-  Customer -> Kasir : Bayar cash
-  Kasir --> Kiosk : Konfirmasi pembayaran
-end
-
-Kiosk -> Order : Finalisasi pesanan
-Order --> Kiosk : Nomor antrian dan detail pesanan
-Kiosk --> Customer : Tampilkan pesanan sukses
+Backend --> KioskUI : Mengirim detail pesanan dan nomor antrean
+KioskUI --> Customer : Menampilkan pesanan berhasil
 
 @enduml
