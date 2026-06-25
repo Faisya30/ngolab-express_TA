@@ -77,14 +77,17 @@ export class VoucherService {
         const pointsCost = Number(voucher.pointsCost || 0);
 
         return await withTransaction(async (connection) => {
-            const queryWithConn = (sql, params) => connection.query(sql, params);
+            const queryWithConn = async (sql, params) => {
+                const [rows] = await connection.query(sql, params);
+                return rows;
+            };
 
             const existingClaim = await queryWithConn(
                 'SELECT id FROM user_voucher WHERE user_id = ? AND voucher_code = ? AND status = ? LIMIT 1',
                 [userId, voucherCode, 'ACTIVE']
             );
 
-            if (existingClaim[0] && existingClaim[0].length > 0) {
+            if (existingClaim && existingClaim.length > 0) {
                 throw new Error('Voucher ini sudah ada di koleksi Anda. Gunakan voucher yang tersedia terlebih dahulu atau pilih voucher lainnya.');
             }
 
@@ -95,7 +98,7 @@ export class VoucherService {
 
             let currentPoints = 0;
 
-            if (!pointRows[0] || pointRows[0].length === 0) {
+            if (!pointRows || pointRows.length === 0) {
                 await queryWithConn(
                     'INSERT INTO UserGamification (user_id, points, memberLevel, streakCount, lastCheckIn) VALUES (?, 0, ?, 0, NULL)',
                     [userId, 'Silver']
@@ -104,9 +107,9 @@ export class VoucherService {
                     'SELECT user_id, points FROM UserGamification WHERE user_id = ? FOR UPDATE',
                     [userId]
                 );
-                currentPoints = Number(newPointRows[0][0]?.points || 0);
+                currentPoints = Number(newPointRows[0]?.points || 0);
             } else {
-                currentPoints = Number(pointRows[0][0].points || 0);
+                currentPoints = Number(pointRows[0].points || 0);
             }
 
             if (currentPoints < pointsCost) {
@@ -118,7 +121,7 @@ export class VoucherService {
                 [voucherCode]
             );
 
-            const currentStock = Number(voucherStockRows[0][0]?.stock || 0);
+            const currentStock = Number(voucherStockRows[0]?.stock || 0);
             if (currentStock <= 0) {
                 throw new Error('Voucher sudah habis. Silakan coba voucher lainnya atau tunggu stok tersedia kembali.');
             }
