@@ -251,7 +251,7 @@ function buildPublicUser(row) {
     nim: row.nim || null,
     role: row.role,
     status: row.status,
-    membership_level: row.membership_level,
+    membership_level: row.membership_level || 'Silver',
     referred_by: row.referred_by,
     affiliate_upline: row.affiliate_upline || null,
     created_at: row.created_at,
@@ -278,7 +278,7 @@ function buildMembershipPointsPayload(membershipPointsRow, gamificationPoints) {
 async function fetchGamificationPoints(userId) {
   const rows = await query(
     `SELECT COALESCE(ug.points, 0) AS points
-    FROM UserGamification ug
+    FROM usergamification ug
     WHERE ug.user_id = ?
     LIMIT 1`,
     [userId]
@@ -289,14 +289,14 @@ async function fetchGamificationPoints(userId) {
 
 async function fetchUserGamificationLevel(userId) {
   const rows = await query(
-    `SELECT COALESCE(memberLevel, 'SILVER') AS memberLevel
-    FROM UserGamification
+    `SELECT memberLevel
+    FROM usergamification
     WHERE user_id = ?
     LIMIT 1`,
     [userId]
   );
 
-  return rows[0]?.memberLevel || 'SILVER';
+  return rows[0]?.memberLevel || 'Silver';
 }
 
 async function fetchCashbackPoints(userId) {
@@ -699,14 +699,14 @@ const referralCode = isAffiliate ? affiliateRow?.referral_code || null : null;
     const publicUser = buildPublicUser(user);
     publicUser.referral_code = referralCode;
 
-    console.log('[LOGIN] Fetching points for user:', user.user_id);
-    let pointsPayload = { total_points: 0, poin_gamification: 0, cashback_points: 0, commission_points: 0, memberLevel: 'SILVER' };
+console.log('[LOGIN] Fetching points for user:', user.user_id);
+    let pointsPayload = { total_points: 0, poin_gamification: 0, cashback_points: 0, commission_points: 0, memberLevel: 'Silver' };
     try {
       pointsPayload = await buildPointsPayload(user.user_id);
       console.log('[LOGIN] Points fetched:', pointsPayload);
     } catch (pointsError) {
       console.warn('[LOGIN] Warning: Failed to fetch user points, using null:', pointsError?.message);
-      pointsPayload = { total_points: 0, poin_gamification: 0, cashback_points: 0, commission_points: 0, memberLevel: 'SILVER' };
+      pointsPayload = { total_points: 0, poin_gamification: 0, cashback_points: 0, commission_points: 0, memberLevel: 'Silver' };
     }
 
     let tokenResult = null;
@@ -747,7 +747,7 @@ export async function getUserProfile(_req, res) {
     }
 
     const users = await query(
-      `SELECT user_id, username, email, nim, role, status, membership_level, referred_by, affiliate_upline, created_at, phone_number, profile_picture
+      `SELECT user_id, username, email, nim, role, status, referred_by, affiliate_upline, created_at, phone_number, profile_picture
       FROM users
       WHERE user_id = ?
       LIMIT 1`,
@@ -758,7 +758,7 @@ export async function getUserProfile(_req, res) {
       return res.status(404).json({ success: false, error: 'User tidak ditemukan.' });
     }
 
-const affiliateRow = await fetchAffiliateNetworkRow(userId);
+    const affiliateRow = await fetchAffiliateNetworkRow(userId);
 
     const pointsPayload = await buildPointsPayload(userId);
 
@@ -775,10 +775,17 @@ const affiliateRow = await fetchAffiliateNetworkRow(userId);
       ? buildAffiliateNetwork(affiliateRow)
       : null;
 
+    const userRow = users[0];
+    const user = {
+      ...buildPublicUser(userRow),
+      membership_level: pointsPayload.memberLevel,
+      memberLevel: pointsPayload.memberLevel,
+    };
+
     return res.json({
       success: true,
       data: {
-        user: buildPublicUser(users[0]),
+        user,
         affiliate_network: affiliateNetwork,
         referralCode: affiliateNetwork?.referralCode || affiliateRow?.referral_code || null,
         points: pointsPayload,
@@ -1235,7 +1242,6 @@ export async function getAllMembers(_req, res) {
         u.email,
         u.role,
         u.status,
-        u.membership_level,
         u.referred_by,
         u.affiliate_upline,
         u.created_at,
@@ -1255,7 +1261,7 @@ export async function getAllMembers(_req, res) {
     return res.json({
       success: true,
       data: userRows.map((row) => {
-        const pts = pointsMap.get(row.user_id) || { total_points: 0, poin_gamification: 0, cashback_points: 0, commission_points: 0, memberLevel: 'SILVER' };
+        const pts = pointsMap.get(row.user_id) || { total_points: 0, poin_gamification: 0, cashback_points: 0, commission_points: 0, memberLevel: 'Silver' };
         return {
           ...buildPublicUser(row),
           total_points: pts.total_points,
@@ -1263,6 +1269,8 @@ export async function getAllMembers(_req, res) {
           mission_points: 0,
           cashback_points: pts.cashback_points,
           voucher_points: 0,
+          membership_level: pts.memberLevel,
+          memberLevel: pts.memberLevel,
           referral_code: row.referral_code || null,
           affiliate_tier: row.affiliate_tier || null,
           total_referrals: Number(row.total_referrals || 0),
@@ -1343,21 +1351,6 @@ export async function getAdminAiInsights(_req, res) {
         best_selling_month: topProductMonth || '-',
         peak_hour: peakHour || '-',
         orders_today: ordersToday,
-      },
-    });
-  } catch (error) {
-    console.error('[getAdminAiInsights] Error:', error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-}
-
-    return res.json({
-      success: true,
-      data: {
-        best_selling_today: topProductToday || '-',
-        best_selling_month: topProductMonth || '-',
-        peak_hour: peakHour || '-',
-        orders_today: totalOrdersToday,
       },
     });
   } catch (error) {
@@ -1479,13 +1472,21 @@ export async function getAllAffiliates(_req, res) {
         u.email,
         u.role,
         u.status,
-        u.membership_level,
         u.phone_number,
         u.profile_picture
       FROM affiliate_networks an
       INNER JOIN users u ON u.user_id = an.user_id
       ORDER BY an.created_at DESC`
     );
+
+    let gamificationMap = new Map();
+    if (rows.length > 0) {
+      const gamificationRows = await query(
+        `SELECT user_id, memberLevel FROM usergamification WHERE user_id IN (${rows.map(() => '?').join(',')})`,
+        rows.map(r => r.user_id)
+      );
+      gamificationMap = new Map(gamificationRows.map(r => [r.user_id, r.memberLevel || 'Silver']));
+    }
 
     return res.json({
       success: true,
@@ -1497,7 +1498,8 @@ export async function getAllAffiliates(_req, res) {
         email: row.email,
         role: row.role,
         status: row.status,
-        membership_level: row.membership_level,
+        membership_level: gamificationMap.get(row.user_id) || 'Silver',
+        memberLevel: gamificationMap.get(row.user_id) || 'Silver',
         phone_number: row.phone_number,
         profile_picture: row.profile_picture,
         referral_code: row.referral_code,
@@ -2321,7 +2323,7 @@ export async function lookupMember(req, res) {
     }
 
     const [rows] = await query(
-      `SELECT user_id, username, phone_number, email, membership_level, status, created_at
+      `SELECT user_id, username, phone_number, email, status, created_at
       FROM users
       WHERE user_id = ? OR phone_number = ? OR username = ?
       LIMIT 1`,
@@ -2332,7 +2334,7 @@ export async function lookupMember(req, res) {
       return res.status(404).json({ success: false, error: 'User tidak ditemukan.' });
     }
 
-const userRow = rows[0];
+    const userRow = rows[0];
 
     const pointsPayload = await buildPointsPayload(userRow.user_id);
 
@@ -2340,6 +2342,8 @@ const userRow = rows[0];
       success: true,
       user: {
         ...buildPublicUser(userRow),
+        membership_level: pointsPayload.memberLevel,
+        memberLevel: pointsPayload.memberLevel,
         points: pointsPayload,
       },
     });

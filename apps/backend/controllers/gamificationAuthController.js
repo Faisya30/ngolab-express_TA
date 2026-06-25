@@ -3,6 +3,17 @@ import { UserGamificationService } from '../services/UserGamificationService.js'
 
 const MEMBERSHIP_API_URL = process.env.MEMBERSHIP_API_URL || 'http://localhost:4000/api/membership';
 
+async function getUserGamificationLevel(userId) {
+  const rows = await query(
+    `SELECT memberLevel
+    FROM usergamification
+    WHERE user_id = ?
+    LIMIT 1`,
+    [userId]
+  );
+  return rows[0]?.memberLevel || 'Silver';
+}
+
 export async function gamificationLogin(req, res) {
     try {
         const { username, email, password } = req.body || {};
@@ -92,6 +103,8 @@ export async function gamificationLogin(req, res) {
             userGamification = null;
         }
 
+        const gamificationLevel = userGamification?.memberLevel || await getUserGamificationLevel(extractedUserId);
+
         return res.json({
             success: true,
             message: 'Login berhasil',
@@ -100,7 +113,8 @@ export async function gamificationLogin(req, res) {
                     user_id: extractedUserId,
                     username: memberUser.username,
                     email: memberUser.email,
-                    membership_level: memberUser.membership_level,
+                    membership_level: gamificationLevel,
+                    memberLevel: gamificationLevel,
                     role: memberUser.role,
                     status: memberUser.status,
                     referral_code: referralCode
@@ -145,6 +159,8 @@ export async function gamificationProfile(req, res) {
         const memberUser = membershipResult.data?.user || membershipResult.user?.user || membershipResult.user;
         const userGamification = await UserGamificationService.getUserById(user_id);
 
+        const gamificationLevel = userGamification?.memberLevel || await getUserGamificationLevel(user_id);
+
         // Extract user_id for response
         const responseUserId = memberUser?.user_id || memberUser?.userId || memberUser?.id;
 
@@ -156,7 +172,8 @@ export async function gamificationProfile(req, res) {
                     user_id: responseUserId || user_id,
                     username: memberUser?.username,
                     email: memberUser?.email,
-                    membership_level: memberUser?.membership_level,
+                    membership_level: gamificationLevel,
+                    memberLevel: gamificationLevel,
                     role: memberUser?.role,
                     status: memberUser?.status
                 },
@@ -204,6 +221,8 @@ export async function gamificationLookup(req, res) {
         const memberUser = membershipResult.data?.user || membershipResult.user?.user || membershipResult.user;
         const userGamification = await UserGamificationService.getUserById(user_id);
 
+        const gamificationLevel = userGamification?.memberLevel || await getUserGamificationLevel(user_id);
+
         // Extract user_id for response
         const responseUserId = memberUser?.user_id || memberUser?.userId || memberUser?.id;
 
@@ -215,7 +234,8 @@ export async function gamificationLookup(req, res) {
                     user_id: responseUserId || user_id,
                     username: memberUser?.username,
                     email: memberUser?.email,
-                    membership_level: memberUser?.membership_level,
+                    membership_level: gamificationLevel,
+                    memberLevel: gamificationLevel,
                     role: memberUser?.role,
                     status: memberUser?.status
                 },
