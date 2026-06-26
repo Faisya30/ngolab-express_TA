@@ -31,17 +31,26 @@ async function tableExists(tableName) {
   return Number(rows[0]?.total || 0) > 0;
 }
 
-function pickColumn(columns, candidates) {
-  for (const candidate of candidates) {
-    if (columns.has(candidate)) return candidate;
+async function getUserGamificationLevel(userId) {
+  try {
+    const hasGamificationTable = await tableExists('usergamification');
+
+    if (!hasGamificationTable) {
+      return 'Silver';
+    }
+
+    const rows = await query(
+      `SELECT memberLevel
+      FROM usergamification
+      WHERE user_id = ?
+      LIMIT 1`,
+      [userId]
+    );
+
+    return rows[0]?.memberLevel || 'Silver';
+  } catch {
+    return 'Silver';
   }
-
-  return null;
-}
-
-function selectColumn(alias, columnName, outputName, fallback = 'NULL') {
-  if (!columnName) return `${fallback} AS ${outputName}`;
-  return `${alias}.\`${columnName}\` AS ${outputName}`;
 }
 
 function toNumber(value) {
@@ -141,7 +150,7 @@ function extractUserIdFromQr(rawCode) {
       if (value) return String(value).trim();
     }
   } catch {
-    // Bukan JSON, lanjut cek format URL/kode biasa.
+    // Bukan JSON.
   }
 
   try {
@@ -159,7 +168,7 @@ function extractUserIdFromQr(rawCode) {
 
     if (value) return String(value).trim();
   } catch {
-    // Bukan URL, berarti dianggap kode biasa.
+    // Bukan URL.
   }
 
   return trimmed.length >= 1 ? trimmed : null;
@@ -625,11 +634,16 @@ export async function getCvOrders(req, res) {
     const hasMemberCode = await hasColumn('orders', 'member_code');
     const hasPointsEarned = await hasColumn('orders', 'points_earned');
     const hasPointsUsed = await hasColumn('orders', 'points_used');
+    const hasVoucherCode = await hasColumn('orders', 'voucher_code');
 
     const userIdSelect = hasUserId ? 'o.user_id AS user_id,' : 'NULL AS user_id,';
     const memberCodeSelect = hasMemberCode
       ? 'o.member_code AS member_code,'
       : 'NULL AS member_code,';
+
+    const voucherCodeSelect = hasVoucherCode
+      ? 'o.voucher_code AS voucher_code,'
+      : 'NULL AS voucher_code,';
 
     const pointsEarnedSelect = hasPointsEarned
       ? 'COALESCE(o.points_earned, 0)'
@@ -665,6 +679,7 @@ export async function getCvOrders(req, res) {
 
         ${userIdSelect}
         ${memberCodeSelect}
+        ${voucherCodeSelect}
 
         COALESCE(o.tipe_pelanggan, 'GUEST') AS customerType,
         COALESCE(o.nama_pelanggan, 'Guest') AS member,
@@ -867,7 +882,6 @@ export async function getCvMemberByCode(req, res) {
         user_id,
         username,
         phone_number,
-        membership_level,
         profile_picture,
         status
       FROM users
@@ -896,8 +910,8 @@ export async function getCvMemberByCode(req, res) {
 
     const pointsRows = await query(
       `SELECT 
-        COALESCE(total_points, 0) AS total_points,
-        COALESCE(cashback_points, 0) AS cashback_points
+        total_points,
+        cashback_points
       FROM user_points
       WHERE user_id = ?
       LIMIT 1`,
@@ -906,8 +920,8 @@ export async function getCvMemberByCode(req, res) {
 
     const affiliateRows = await query(
       `SELECT 
-        COALESCE(total_points, 0) AS affiliate_total_points,
-        COALESCE(commission_points, 0) AS commission_points,
+        total_points,
+        commission_points,
         affiliate_tier,
         level
       FROM affiliate_networks
@@ -916,13 +930,16 @@ export async function getCvMemberByCode(req, res) {
       [user.user_id]
     );
 
-    const userPoint = pointsRows[0] || {};
-    const affiliate = affiliateRows[0] || {};
+    const gamificationLevel = await getUserGamificationLevel(user.user_id);
 
-    const totalPoints = toNumber(userPoint.total_points || 0);
-    const cashbackPoints = toNumber(userPoint.cashback_points || 0);
-    const commissionPoints = toNumber(affiliate.commission_points || 0);
-    const affiliateTotalPoints = toNumber(affiliate.affiliate_total_points || 0);
+    const totalPoints = toNumber(
+      pointsRows?.[0]?.total_points ??
+        affiliateRows?.[0]?.total_points ??
+        0
+    );
+
+    const cashbackPoints = toNumber(pointsRows?.[0]?.cashback_points ?? 0);
+    const commissionPoints = toNumber(affiliateRows?.[0]?.commission_points ?? 0);
 
     const member = {
       id: String(user.user_id),
@@ -939,8 +956,9 @@ export async function getCvMemberByCode(req, res) {
       phone: user.phone_number || null,
       phone_number: user.phone_number || null,
 
-      membership_level: user.membership_level || null,
-      tier: user.membership_level || 'Silver',
+      membership_level: gamificationLevel,
+      memberLevel: gamificationLevel,
+      tier: gamificationLevel,
 
       profile_picture: user.profile_picture || null,
 
@@ -952,9 +970,8 @@ export async function getCvMemberByCode(req, res) {
       totalPoints,
 
       commission_points: commissionPoints,
-      affiliate_total_points: affiliateTotalPoints,
-      affiliate_tier: affiliate.affiliate_tier || null,
-      level: affiliate.level || null,
+      affiliate_tier: affiliateRows?.[0]?.affiliate_tier || null,
+      level: affiliateRows?.[0]?.level || null,
       affiliate: affiliateRows.length ? 'Yes' : 'No',
     };
 
@@ -984,253 +1001,86 @@ export async function getCvMemberVouchers(req, res) {
     if (!userId) {
       return res.status(400).json({
         success: false,
-        error: 'User ID member wajib diisi.',
+        error: 'user_id wajib diisi.',
       });
     }
 
-    const hasUserVouchersTable = await tableExists('user_vouchers');
+    const hasUserVoucherTable = await tableExists('user_voucher');
     const hasVouchersTable = await tableExists('vouchers');
 
-    if (!hasUserVouchersTable || !hasVouchersTable) {
+    if (!hasUserVoucherTable || !hasVouchersTable) {
       return res.status(500).json({
         success: false,
         error:
-          'Tabel voucher gamifikasi belum ditemukan. Pastikan tabel user_vouchers dan vouchers tersedia di database.',
+          'Tabel voucher belum ditemukan. Pastikan tabel user_voucher dan vouchers tersedia di database.',
       });
     }
-
-    const userVoucherColumns = await getTableColumns('user_vouchers');
-    const voucherColumns = await getTableColumns('vouchers');
-
-    const uvIdCol = pickColumn(userVoucherColumns, [
-      'id',
-      'user_voucher_id',
-      'userVoucherId',
-    ]);
-
-    const uvUserIdCol = pickColumn(userVoucherColumns, [
-      'user_id',
-      'userId',
-      'member_id',
-      'memberId',
-      'member_code',
-      'memberCode',
-    ]);
-
-    const uvVoucherIdCol = pickColumn(userVoucherColumns, [
-      'voucher_id',
-      'voucherId',
-      'id_voucher',
-    ]);
-
-    const uvStatusCol = pickColumn(userVoucherColumns, [
-      'status',
-      'voucher_status',
-    ]);
-
-    const uvIsUsedCol = pickColumn(userVoucherColumns, [
-      'is_used',
-      'used',
-      'isUsed',
-    ]);
-
-    const uvUsedAtCol = pickColumn(userVoucherColumns, [
-      'used_at',
-      'usedAt',
-    ]);
-
-    const uvExpiredAtCol = pickColumn(userVoucherColumns, [
-      'expired_at',
-      'expires_at',
-      'valid_until',
-      'end_date',
-    ]);
-
-    const uvClaimedAtCol = pickColumn(userVoucherColumns, [
-      'claimed_at',
-      'created_at',
-    ]);
-
-    const voucherIdCol = pickColumn(voucherColumns, [
-      'id',
-      'voucher_id',
-    ]);
-
-    const voucherCodeCol = pickColumn(voucherColumns, [
-      'code',
-      'voucher_code',
-      'voucherCode',
-    ]);
-
-    const voucherNameCol = pickColumn(voucherColumns, [
-      'name',
-      'voucher_name',
-      'title',
-      'voucher_title',
-    ]);
-
-    const voucherDescriptionCol = pickColumn(voucherColumns, [
-      'description',
-      'desc',
-      'detail',
-    ]);
-
-    const discountTypeCol = pickColumn(voucherColumns, [
-      'discount_type',
-      'type',
-      'voucher_type',
-    ]);
-
-    const discountValueCol = pickColumn(voucherColumns, [
-      'discount_value',
-      'discount',
-      'nominal',
-      'amount',
-      'value',
-    ]);
-
-    const minTransactionCol = pickColumn(voucherColumns, [
-      'min_transaction',
-      'minimum_transaction',
-      'minimum_purchase',
-      'min_purchase',
-    ]);
-
-    const maxDiscountCol = pickColumn(voucherColumns, [
-      'max_discount',
-      'maximum_discount',
-    ]);
-
-    const voucherStatusCol = pickColumn(voucherColumns, [
-      'status',
-      'voucher_status',
-    ]);
-
-    const voucherIsActiveCol = pickColumn(voucherColumns, [
-      'is_active',
-      'active',
-    ]);
-
-    const voucherExpiredAtCol = pickColumn(voucherColumns, [
-      'expired_at',
-      'expires_at',
-      'valid_until',
-      'end_date',
-    ]);
-
-    if (!uvUserIdCol || !uvVoucherIdCol || !voucherIdCol) {
-      return res.status(500).json({
-        success: false,
-        error:
-          'Struktur tabel voucher tidak sesuai. Pastikan user_vouchers memiliki user_id dan voucher_id, serta vouchers memiliki id.',
-      });
-    }
-
-    const filters = [`uv.\`${uvUserIdCol}\` = ?`];
-
-    if (uvStatusCol) {
-      filters.push(
-        `UPPER(COALESCE(uv.\`${uvStatusCol}\`, 'ACTIVE')) NOT IN ('USED', 'EXPIRED', 'INACTIVE', 'CANCELLED', 'DELETED')`
-      );
-    }
-
-    if (uvIsUsedCol) {
-      filters.push(`COALESCE(uv.\`${uvIsUsedCol}\`, 0) = 0`);
-    }
-
-    if (uvUsedAtCol) {
-      filters.push(`uv.\`${uvUsedAtCol}\` IS NULL`);
-    }
-
-    if (uvExpiredAtCol) {
-      filters.push(
-        `(uv.\`${uvExpiredAtCol}\` IS NULL OR uv.\`${uvExpiredAtCol}\` >= NOW())`
-      );
-    }
-
-    if (voucherStatusCol) {
-      filters.push(
-        `UPPER(COALESCE(v.\`${voucherStatusCol}\`, 'ACTIVE')) NOT IN ('EXPIRED', 'INACTIVE', 'CANCELLED', 'DELETED')`
-      );
-    }
-
-    if (voucherIsActiveCol) {
-      filters.push(`COALESCE(v.\`${voucherIsActiveCol}\`, 1) = 1`);
-    }
-
-    if (voucherExpiredAtCol) {
-      filters.push(
-        `(v.\`${voucherExpiredAtCol}\` IS NULL OR v.\`${voucherExpiredAtCol}\` >= NOW())`
-      );
-    }
-
-    const orderByCol = uvClaimedAtCol
-      ? `uv.\`${uvClaimedAtCol}\` DESC`
-      : `uv.\`${uvVoucherIdCol}\` DESC`;
 
     const rows = await query(
       `SELECT
-        ${uvIdCol ? `uv.\`${uvIdCol}\`` : `uv.\`${uvVoucherIdCol}\``} AS userVoucherId,
-        uv.\`${uvUserIdCol}\` AS user_id,
-        uv.\`${uvVoucherIdCol}\` AS voucher_id,
+        uv.id,
+        uv.user_id,
+        uv.voucher_code,
+        uv.status,
+        uv.claimed_at,
 
-        ${selectColumn('v', voucherIdCol, 'id')},
-        ${selectColumn('v', voucherCodeCol, 'code', "''")},
-        ${selectColumn('v', voucherNameCol, 'name', "'Voucher'")},
-        ${selectColumn('v', voucherDescriptionCol, 'description', "''")},
-        ${selectColumn('v', discountTypeCol, 'discountType', "'fixed'")},
-        ${selectColumn('v', discountValueCol, 'discountValue', '0')},
-        ${selectColumn('v', minTransactionCol, 'minTransaction', '0')},
-        ${selectColumn('v', maxDiscountCol, 'maxDiscount', '0')},
-        ${selectColumn('v', voucherStatusCol, 'status', "'ACTIVE'")},
-        ${selectColumn('v', voucherExpiredAtCol, 'expiredAt')},
-        ${selectColumn('uv', uvExpiredAtCol, 'userVoucherExpiredAt')},
-        ${selectColumn('uv', uvClaimedAtCol, 'claimedAt')}
-
-      FROM user_vouchers uv
-      INNER JOIN vouchers v
-        ON v.\`${voucherIdCol}\` = uv.\`${uvVoucherIdCol}\`
-      WHERE ${filters.join(' AND ')}
-      ORDER BY ${orderByCol}`,
+        v.voucher_name,
+        v.description,
+        v.voucher_type,
+        v.value_amount,
+        v.min_purchase,
+        v.max_discount,
+        v.image_url
+      FROM user_voucher uv
+      JOIN vouchers v
+        ON uv.voucher_code = v.voucher_code
+      WHERE uv.user_id = ?
+        AND uv.status = 'ACTIVE'
+        AND v.is_active = 1
+      ORDER BY uv.claimed_at DESC`,
       [userId]
     );
 
-    const vouchers = rows.map((row) => {
-      const expiredAt = row.userVoucherExpiredAt || row.expiredAt || null;
+    const vouchers = rows.map((v) => {
+      const rawType = String(v.voucher_type || '').toLowerCase();
 
       return {
-        id: String(row.id ?? row.voucher_id),
-        voucher_id: row.voucher_id,
-        userVoucherId: row.userVoucherId,
-        user_voucher_id: row.userVoucherId,
+        id: String(v.voucher_code),
+        code: String(v.voucher_code),
+        voucher_code: String(v.voucher_code),
 
-        code: row.code || '',
-        voucher_code: row.code || '',
+        title: String(v.voucher_name || 'Voucher'),
+        name: String(v.voucher_name || 'Voucher'),
+        voucher_name: String(v.voucher_name || 'Voucher'),
 
-        name: row.name || 'Voucher',
-        title: row.name || 'Voucher',
+        description: String(v.description || ''),
 
-        description: row.description || '',
+        discount: toNumber(v.value_amount),
+        discountValue: toNumber(v.value_amount),
+        discount_value: toNumber(v.value_amount),
+        value_amount: toNumber(v.value_amount),
 
-        discountType: row.discountType || 'fixed',
-        discount_type: row.discountType || 'fixed',
+        type:
+          rawType === 'discount' ||
+          rawType === 'percent' ||
+          rawType === 'percentage'
+            ? 'PERCENT'
+            : 'FIXED',
 
-        discountValue: toNumber(row.discountValue),
-        discount_value: toNumber(row.discountValue),
+        voucher_type: v.voucher_type,
 
-        minTransaction: toNumber(row.minTransaction),
-        min_transaction: toNumber(row.minTransaction),
+        min_purchase: toNumber(v.min_purchase),
+        minPurchase: toNumber(v.min_purchase),
 
-        maxDiscount: toNumber(row.maxDiscount),
-        max_discount: toNumber(row.maxDiscount),
+        max_discount: toNumber(v.max_discount),
+        maxDiscount: toNumber(v.max_discount),
 
-        status: row.status || 'ACTIVE',
+        status: v.status,
 
-        expiredAt,
-        expired_at: expiredAt,
+        image_url: v.image_url || null,
 
-        claimedAt: row.claimedAt || null,
-        claimed_at: row.claimedAt || null,
+        claimed_at: v.claimed_at || null,
+        claimedAt: v.claimed_at || null,
 
         isAvailable: true,
         is_available: true,
@@ -1243,6 +1093,8 @@ export async function getCvMemberVouchers(req, res) {
       vouchers,
     });
   } catch (error) {
+    console.error('Gagal mengambil voucher member:', error);
+
     return res.status(500).json({
       success: false,
       error: error.message,
@@ -1318,19 +1170,28 @@ export async function saveCvOrder(req, res) {
     const hasNamaPelanggan = await hasColumn('orders', 'nama_pelanggan');
     const hasUserId = await hasColumn('orders', 'user_id');
     const hasMemberCode = await hasColumn('orders', 'member_code');
+    const hasVoucherCode = await hasColumn('orders', 'voucher_code');
 
     const orderItemsUsesOrderId = await hasColumn('order_items', 'order_id');
     const orderItemsUsesProductId = await hasColumn('order_items', 'product_id');
     const hasOrderItemType = await hasColumn('order_items', 'order_item_type');
 
-    const userPointsHasCreatedAt = await hasColumn('user_points', 'created_at');
-    const userPointsHasUpdatedAt = await hasColumn('user_points', 'updated_at');
+    const hasUserPointsTable = await tableExists('user_points');
+    const hasUserVoucherTable = await tableExists('user_voucher');
+
+    const userPointsHasCreatedAt = hasUserPointsTable
+      ? await hasColumn('user_points', 'created_at')
+      : false;
+
+    const userPointsHasUpdatedAt = hasUserPointsTable
+      ? await hasColumn('user_points', 'updated_at')
+      : false;
 
     if (!hasOrderCode || !orderItemsUsesOrderId || !orderItemsUsesProductId) {
       return res.status(500).json({
         success: false,
         error:
-          'Skema order_items tidak sesuai backend pusat (wajib relasi order dan product).',
+          'Skema order_items tidak sesuai backend pusat. Wajib memiliki order_id dan product_id.',
       });
     }
 
@@ -1339,11 +1200,11 @@ export async function saveCvOrder(req, res) {
     );
 
     const serviceType = String(
-      order.service_type || order.serviceType || 'Computer Vision'
+      order.service_type || order.serviceType || order.service || 'Computer Vision'
     );
 
     const paymentMethod = String(
-      order.payment_method || order.paymentMethod || 'QRIS'
+      order.payment_method || order.paymentMethod || order.payment || 'QRIS'
     );
 
     const subtotal = toNumber(order.subtotal);
@@ -1377,6 +1238,13 @@ export async function saveCvOrder(req, res) {
 
     const pointChange = pointsEarned - pointsUsed;
 
+    const voucherCode = String(
+      order.voucher_code ||
+        order.voucherCode ||
+        order.voucher ||
+        ''
+    ).trim();
+
     const orderTypeValue = String(
       order.order_type || order.orderType || 'computervision'
     ).toLowerCase();
@@ -1393,17 +1261,73 @@ export async function saveCvOrder(req, res) {
 
     const pointUserId = userId || memberCode;
 
+    let finalNamaPelanggan = String(
+      order.nama_pelanggan ||
+        order.namaPelanggan ||
+        order.member_name ||
+        order.memberName ||
+        order.username ||
+        ''
+    ).trim();
+
+    if (pointUserId && !finalNamaPelanggan) {
+      const userRows = await query(
+        `SELECT username
+        FROM users
+        WHERE user_id = ?
+        LIMIT 1`,
+        [pointUserId]
+      );
+
+      finalNamaPelanggan = userRows[0]?.username || 'Member';
+    }
+
+    if (!finalNamaPelanggan) {
+      finalNamaPelanggan = 'Guest';
+    }
+
     const tipePelanggan = String(
       order.tipe_pelanggan ||
         order.tipePelanggan ||
-        (userId || memberCode ? 'MEMBER' : 'GUEST')
+        (pointUserId ? 'MEMBER' : 'GUEST')
     ).toUpperCase();
 
-    const namaPelanggan = String(
-      order.nama_pelanggan || order.namaPelanggan || 'Guest'
-    );
-
     const result = await withTransaction(async (connection) => {
+      if (voucherCode) {
+        if (!pointUserId) {
+          throw new Error('Voucher hanya bisa digunakan oleh member.');
+        }
+
+        if (!hasUserVoucherTable) {
+          throw new Error('Tabel user_voucher tidak ditemukan.');
+        }
+
+        const [voucherRows] = await connection.query(
+          `SELECT
+            uv.id,
+            uv.user_id,
+            uv.voucher_code,
+            uv.status,
+            v.voucher_name,
+            v.is_active
+          FROM user_voucher uv
+          JOIN vouchers v
+            ON uv.voucher_code = v.voucher_code
+          WHERE uv.user_id = ?
+            AND uv.voucher_code = ?
+            AND uv.status = 'ACTIVE'
+            AND v.is_active = 1
+          LIMIT 1`,
+          [pointUserId, voucherCode]
+        );
+
+        if (!voucherRows.length) {
+          throw new Error(
+            'Voucher tidak valid, sudah digunakan, tidak aktif, atau bukan milik member ini.'
+          );
+        }
+      }
+
       const orderColumns = [
         'order_code',
         'service_type',
@@ -1438,7 +1362,7 @@ export async function saveCvOrder(req, res) {
 
       if (hasNamaPelanggan) {
         orderColumns.push('nama_pelanggan');
-        orderValues.push(namaPelanggan);
+        orderValues.push(finalNamaPelanggan);
       }
 
       if (hasUserId) {
@@ -1448,7 +1372,12 @@ export async function saveCvOrder(req, res) {
 
       if (hasMemberCode) {
         orderColumns.push('member_code');
-        orderValues.push(memberCode || null);
+        orderValues.push(memberCode || pointUserId || null);
+      }
+
+      if (hasVoucherCode) {
+        orderColumns.push('voucher_code');
+        orderValues.push(voucherCode || null);
       }
 
       const placeholders = orderColumns.map(() => '?').join(', ');
@@ -1579,7 +1508,7 @@ export async function saveCvOrder(req, res) {
         );
       }
 
-      if (pointUserId && (pointsEarned > 0 || pointsUsed > 0)) {
+      if (pointUserId && hasUserPointsTable && (pointsEarned > 0 || pointsUsed > 0)) {
         const updateSet = [
           'total_points = GREATEST(COALESCE(total_points, 0) + ?, 0)',
           'cashback_points = GREATEST(COALESCE(cashback_points, 0) + ?, 0)',
@@ -1633,23 +1562,47 @@ export async function saveCvOrder(req, res) {
         }
       }
 
+      if (voucherCode) {
+        const [voucherUpdateResult] = await connection.query(
+          `UPDATE user_voucher
+          SET status = 'USED'
+          WHERE user_id = ?
+            AND voucher_code = ?
+            AND status = 'ACTIVE'`,
+          [pointUserId, voucherCode]
+        );
+
+        if (!voucherUpdateResult.affectedRows) {
+          throw new Error(
+            'Voucher gagal digunakan. Voucher tidak valid atau sudah dipakai.'
+          );
+        }
+      }
+
       return {
         orderCode,
         pointsEarned,
         pointsUsed,
         pointChange,
+        voucherCode,
       };
     });
 
     return res.json({
       success: true,
       orderCode: result.orderCode,
+
       pointsEarned: result.pointsEarned,
       points_earned: result.pointsEarned,
+
       pointsUsed: result.pointsUsed,
       points_used: result.pointsUsed,
+
       pointChange: result.pointChange,
       point_change: result.pointChange,
+
+      voucherCode: result.voucherCode,
+      voucher_code: result.voucherCode,
     });
   } catch (error) {
     return res.status(500).json({
