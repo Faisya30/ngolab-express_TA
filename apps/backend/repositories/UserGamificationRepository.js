@@ -3,7 +3,17 @@ import { query } from '../config/db.js';
 export class UserGamificationRepository {
     static async findById(user_id) {
         const rows = await query(
-            'SELECT user_id, points, memberLevel, streakCount, lastCheckIn FROM UserGamification WHERE user_id = ? LIMIT 1',
+            `SELECT 
+                u.user_id,
+                u.username,
+                COALESCE(up.total_points, 0) AS points,
+                COALESCE(ug.memberLevel, 'Silver') AS memberLevel,
+                COALESCE(ug.streakCount, 0) AS streakCount,
+                ug.lastCheckIn
+             FROM users u
+             LEFT JOIN user_points up ON up.user_id = u.user_id
+             LEFT JOIN usergamification ug ON ug.user_id = u.user_id
+             WHERE u.user_id = ? LIMIT 1`,
             [user_id]
         );
         if (!rows || rows.length === 0) return null;
@@ -12,7 +22,17 @@ export class UserGamificationRepository {
 
     static async findAll() {
         return await query(
-            'SELECT user_id, points, memberLevel, streakCount, lastCheckIn FROM UserGamification ORDER BY points DESC'
+            `SELECT 
+                u.user_id,
+                u.username,
+                COALESCE(up.total_points, 0) AS points,
+                COALESCE(ug.memberLevel, 'Silver') AS memberLevel,
+                COALESCE(ug.streakCount, 0) AS streakCount,
+                ug.lastCheckIn
+             FROM users u
+             LEFT JOIN user_points up ON up.user_id = u.user_id
+             LEFT JOIN usergamification ug ON ug.user_id = u.user_id
+             ORDER BY points DESC`
         );
     }
 

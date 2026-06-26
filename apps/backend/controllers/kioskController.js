@@ -621,7 +621,7 @@ export async function saveOrder(req, res) {
 			
 			if (userId && pointsEarned > 0) {
 				const { UserGamificationService } = await import('../services/UserGamificationService.js');
-				await UserGamificationService.addPoints(userId, pointsEarned, 'Point transaksi kiosk');
+				await UserGamificationService.addPoints(userId, pointsEarned, 'Point transaksi kiosk', 'cashback');
 			}
 
 			return { orderCode, queueNumber };

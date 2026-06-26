@@ -15,6 +15,25 @@ function normalizeText(value) {
     return String(value || '').trim();
 }
 
+async function syncMemberLevelFromUserPoints(connection, userId) {
+    const [rows] = await connection.query(
+        `SELECT total_points FROM user_points WHERE user_id = ? LIMIT 1`,
+        [userId]
+    );
+    const totalPoints = Number(rows?.[0]?.total_points || 0);
+    const level = calculateMemberLevel(totalPoints);
+
+    await connection.query(
+        `UPDATE users SET membership_level = ? WHERE user_id = ?`,
+        [level, userId]
+    );
+
+    await connection.query(
+        `UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?`,
+        [level, userId]
+    );
+}
+
 export class VoucherService {
     static async getAllVouchers() {
         const rows = await query(
@@ -128,16 +147,61 @@ export class VoucherService {
 
             const nextTotalPoints = currentPoints - pointsCost;
 
+            const existingUserPoints = await queryWithConn(
+                'SELECT user_id FROM user_points WHERE user_id = ? LIMIT 1',
+                [userId]
+            );
+
+            if (!existingUserPoints || existingUserPoints.length === 0) {
+                await queryWithConn(
+                    'INSERT INTO user_points (user_id, total_points, mission_points, voucher_points, cashback_points, commission_points) VALUES (?, ?, ?, 0, 0, 0)',
+                    [userId, currentPoints, currentPoints]
+                );
+            }
+
             await queryWithConn(
                 'UPDATE UserGamification SET points = ? WHERE user_id = ?',
                 [nextTotalPoints, userId]
             );
-            
-            const newMemberLevel = calculateMemberLevel(nextTotalPoints);
-            await queryWithConn(
-                'UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?',
-                [newMemberLevel, userId]
-            );
+
+            if (pointsCost > 0) {
+                const [pointRows] = await connection.query(
+                    `SELECT total_points, mission_points, voucher_points, cashback_points, commission_points
+                     FROM user_points
+                     WHERE user_id = ?`,
+                    [userId]
+                );
+
+                const current = pointRows[0] || {};
+                const nextMission = Number(current.mission_points || 0);
+                const nextVoucher = Number(current.voucher_points || 0);
+                const nextCashback = Number(current.cashback_points || 0);
+                const nextCommission = Number(current.commission_points || 0);
+                const nextTotalPoints = Number(current.total_points || 0) - pointsCost;
+
+                await connection.query(
+                    `UPDATE user_points
+                     SET total_points = ?,
+                         mission_points = ?,
+                         voucher_points = ?,
+                         cashback_points = ?,
+                         commission_points = ?
+                     WHERE user_id = ?`,
+                    [nextTotalPoints, nextMission, nextVoucher, nextCashback, nextCommission, userId]
+                );
+
+                await connection.query(
+                    `UPDATE users SET membership_level = ? WHERE user_id = ?`,
+                    [calculateMemberLevel(nextTotalPoints), userId]
+                );
+
+                await connection.query(
+                    `UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?`,
+                    [calculateMemberLevel(nextTotalPoints), userId]
+                );
+            } else {
+                await syncMemberLevelFromUserPoints(connection, userId);
+            }
 
             const redemptionId = generateId();
             await queryWithConn(
@@ -238,9 +302,9 @@ export class VoucherService {
                 stock ?? 0,
                 expiry_days ?? null,
                 image_url ?? null,
-                max_discount ?? null,
-                min_purchase ?? null,
-                cashier_instruction ?? null,
+                max_discount || null,
+                min_purchase || null,
+                cashier_instruction || null,
                 is_active !== false ? 1 : 0,
                 voucherCode
             ]

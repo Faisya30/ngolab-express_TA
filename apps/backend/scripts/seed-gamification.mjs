@@ -15,10 +15,16 @@ async function seed() {
         : ['user-001', 'user-002', 'user-003'];
     
     for (const userId of userIds) {
+        const points = Math.floor(Math.random() * 100) + 50;
         await query(
             `INSERT IGNORE INTO UserGamification (user_id, points, memberLevel, streakCount, lastCheckIn) 
              VALUES (?, ?, ?, ?, ?)`,
-            [userId, Math.floor(Math.random() * 100) + 50, 'Bronze', 0, null]
+            [userId, points, 'Bronze', 0, null]
+        );
+        await query(
+            `INSERT IGNORE INTO user_points (user_id, total_points, mission_points, voucher_points, cashback_points, commission_points)
+             VALUES (?, ?, ?, 0, 0, 0)`,
+            [userId, points, points]
         );
     }
     console.log(`Seeded ${userIds.length} users`);

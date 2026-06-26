@@ -13,6 +13,25 @@ function calculateMemberLevel(points) {
     return 'Silver';
 }
 
+async function syncMemberLevelFromUserPoints(connection, userId) {
+    const [rows] = await connection.query(
+        `SELECT total_points FROM user_points WHERE user_id = ? LIMIT 1`,
+        [userId]
+    );
+    const totalPoints = Number(rows?.[0]?.total_points || 0);
+    const level = calculateMemberLevel(totalPoints);
+
+    await connection.query(
+        `UPDATE users SET membership_level = ? WHERE user_id = ?`,
+        [level, userId]
+    );
+
+    await connection.query(
+        `UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?`,
+        [level, userId]
+    );
+}
+
 export class UserGamificationService {
     static async getUserById(user_id) {
         let user = await UserGamificationRepository.findById(user_id);
@@ -43,7 +62,7 @@ export class UserGamificationService {
         return await UserGamificationRepository.update(user_id, data);
     }
 
-    static async addPoints(user_id, points, description) {
+    static async addPoints(user_id, points, description, category = 'mission') {
         return await withTransaction(async (connection) => {
             const queryWithConn = async (sql, params) => {
                 const [rows] = await connection.query(sql, params);
@@ -67,6 +86,76 @@ export class UserGamificationService {
                 'INSERT INTO PointsHistory (id, userId, points, description, createdAt) VALUES (?, ?, ?, ?, NOW())',
                 [historyId, user_id, points, description]
             );
+
+            const [pointRows] = await connection.query(
+                `SELECT user_id, total_points, mission_points, voucher_points, cashback_points, commission_points
+                 FROM user_points
+                 WHERE user_id = ?`,
+                [user_id]
+            );
+
+            if (!pointRows || pointRows.length === 0) {
+                let existingGamificationPoints = 0;
+                try {
+                    const userGamificationRows = await connection.query(
+                        `SELECT points FROM UserGamification WHERE user_id = ? LIMIT 1`,
+                        [user_id]
+                    );
+                    existingGamificationPoints = Number(userGamificationRows[0]?.points || 0);
+                } catch {
+                    existingGamificationPoints = 0;
+                }
+
+                await connection.query(
+                    `INSERT INTO user_points (user_id, total_points, mission_points, voucher_points, cashback_points, commission_points)
+                     VALUES (?, ?, ?, 0, 0, 0)`,
+                    [user_id, existingGamificationPoints, existingGamificationPoints]
+                );
+            }
+
+            const current = pointRows[0] || {};
+            const currentMission = Number(current.mission_points || 0);
+            const currentVoucher = Number(current.voucher_points || 0);
+            const currentCashback = Number(current.cashback_points || 0);
+            const currentCommission = Number(current.commission_points || 0);
+
+            let nextMission = currentMission;
+            let nextVoucher = currentVoucher;
+            let nextCashback = currentCashback;
+            let nextCommission = currentCommission;
+
+            if (category === 'mission') {
+                nextMission = currentMission + points;
+            } else if (category === 'voucher') {
+                nextVoucher = currentVoucher + points;
+            } else if (category === 'cashback') {
+                nextCashback = currentCashback + points;
+            } else if (category === 'commission') {
+                nextCommission = currentCommission + points;
+            }
+
+            const nextTotal = nextMission + nextVoucher + nextCashback + nextCommission;
+
+            await connection.query(
+                `UPDATE user_points
+                 SET total_points = ?,
+                     mission_points = ?,
+                     voucher_points = ?,
+                     cashback_points = ?,
+                     commission_points = ?
+                 WHERE user_id = ?`,
+                [nextTotal, nextMission, nextVoucher, nextCashback, nextCommission, user_id]
+            );
+
+            await connection.query(
+                `UPDATE users SET membership_level = ? WHERE user_id = ?`,
+                [calculateMemberLevel(nextTotal), user_id]
+            );
+
+            await connection.query(
+                `UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?`,
+                [calculateMemberLevel(nextTotal), user_id]
+            );
             
             await queryWithConn(
                 'UPDATE UserGamification SET points = points + ? WHERE user_id = ?',
@@ -78,15 +167,7 @@ export class UserGamificationService {
                 [user_id]
             );
             
-            const newMemberLevel = calculateMemberLevel(updatedUser[0].points);
-            if (newMemberLevel !== updatedUser[0].memberLevel) {
-                await queryWithConn(
-                    'UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?',
-                    [newMemberLevel, user_id]
-                );
-            }
-            
-            return { ...updatedUser[0], memberLevel: newMemberLevel };
+            return { ...updatedUser[0], memberLevel: calculateMemberLevel(nextTotal) };
         });
     }
 
@@ -117,29 +198,40 @@ export class UserGamificationService {
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             const lastCheckIn = user[0].lastCheckIn ? new Date(user[0].lastCheckIn) : null;
             const lastDate = lastCheckIn ? new Date(lastCheckIn.getFullYear(), lastCheckIn.getMonth(), lastCheckIn.getDate()) : null;
-            
-            let newStreakCount = user[0].streakCount || 0;
-            const checkinPoints = 10;
+
+            const MAX_STREAK_DAYS = 7;
+            const POINTS_PER_STREAK = 5;
+
+            let currentStreak = user[0].streakCount || 0;
+            let newStreakCount = currentStreak;
+            let checkinPoints = 0;
+
+            if (lastDate && today.getTime() === lastDate.getTime()) {
+                return { ...user[0], points: user[0].points, streakCount: currentStreak, checkinPoints: 0 };
+            }
+
+            if (!lastDate) {
+                newStreakCount = 1;
+            } else {
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                if (lastDate.getTime() === yesterday.getTime()) {
+                    newStreakCount = Math.min(currentStreak + 1, MAX_STREAK_DAYS);
+                } else {
+                    newStreakCount = 1;
+                }
+            }
+
+            checkinPoints = newStreakCount * POINTS_PER_STREAK;
 
             console.log('================ DAILY STREAK DEBUG ==================');
             console.log('user_id:', user_id);
             console.log('lastCheckIn dari database:', user[0].lastCheckIn);
             console.log('lastDate:', lastDate);
             console.log('today:', today);
-            console.log('lastDate.getTime():', lastDate ? lastDate.getTime() : null);
-            console.log('today.getTime():', today.getTime());
-            console.log('existing streakCount:', user[0].streakCount || 0);
-            console.log('newStreakCount sebelum increment:', newStreakCount);
-
-            const conditionResult = !lastDate || today.getTime() !== lastDate.getTime();
-            console.log('hasil evaluasi:');
-            console.log('today.getTime() !== lastDate.getTime():', conditionResult);
-
-            if (!lastDate || today.getTime() !== lastDate.getTime()) {
-                newStreakCount += 1;
-            }
-
-            console.log('newStreakCount setelah increment:', newStreakCount);
+            console.log('currentStreak (before):', currentStreak);
+            console.log('newStreakCount (after):', newStreakCount);
+            console.log('checkinPoints calculated:', checkinPoints);
 
             const historyId = generateId();
 
@@ -159,6 +251,65 @@ export class UserGamificationService {
                 [checkinPoints, newStreakCount, now, user_id]
             );
 
+            const [pointRows] = await connection.query(
+                `SELECT user_id, total_points, mission_points, voucher_points, cashback_points, commission_points
+                 FROM user_points
+                 WHERE user_id = ?`,
+                [user_id]
+            );
+
+            if (!pointRows || pointRows.length === 0) {
+                let existingGamificationPoints = 0;
+                try {
+                    const userGamificationRows = await connection.query(
+                        `SELECT points FROM UserGamification WHERE user_id = ? LIMIT 1`,
+                        [user_id]
+                    );
+                    existingGamificationPoints = Number(userGamificationRows[0]?.points || 0);
+                } catch {
+                    existingGamificationPoints = 0;
+                }
+
+                await connection.query(
+                    `INSERT INTO user_points (user_id, total_points, mission_points, voucher_points, cashback_points, commission_points)
+                     VALUES (?, ?, ?, 0, 0, 0)`,
+                    [user_id, existingGamificationPoints, existingGamificationPoints]
+                );
+            }
+
+            const current = pointRows[0] || {};
+            const currentMission = Number(current.mission_points || 0);
+            const currentVoucher = Number(current.voucher_points || 0);
+            const currentCashback = Number(current.cashback_points || 0);
+            const currentCommission = Number(current.commission_points || 0);
+
+            const nextMission = currentMission + checkinPoints;
+            const nextVoucher = currentVoucher;
+            const nextCashback = currentCashback;
+            const nextCommission = currentCommission;
+            const nextTotal = nextMission + nextVoucher + nextCashback + nextCommission;
+
+            await connection.query(
+                `UPDATE user_points
+                 SET total_points = ?,
+                     mission_points = ?,
+                     voucher_points = ?,
+                     cashback_points = ?,
+                     commission_points = ?
+                 WHERE user_id = ?`,
+                [nextTotal, nextMission, nextVoucher, nextCashback, nextCommission, user_id]
+            );
+
+            await connection.query(
+                `UPDATE users SET membership_level = ? WHERE user_id = ?`,
+                [calculateMemberLevel(nextTotal), user_id]
+            );
+
+            await connection.query(
+                `UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?`,
+                [calculateMemberLevel(nextTotal), user_id]
+            );
+
             const updatedUser = await queryWithConn(
                 'SELECT user_id, points, memberLevel, streakCount, lastCheckIn FROM UserGamification WHERE user_id = ? LIMIT 1',
                 [user_id]
@@ -168,15 +319,7 @@ export class UserGamificationService {
             console.log('updated lastCheckIn:', updatedUser[0].lastCheckIn);
             console.log('====================================================');
             
-            const newMemberLevel = calculateMemberLevel(updatedUser[0].points);
-            if (newMemberLevel !== updatedUser[0].memberLevel) {
-                await queryWithConn(
-                    'UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?',
-                    [newMemberLevel, user_id]
-                );
-            }
-
-            return { ...updatedUser[0], memberLevel: newMemberLevel };
+            return { ...updatedUser[0], memberLevel: calculateMemberLevel(nextTotal) };
         });
     }
 
@@ -236,7 +379,6 @@ export class UserGamificationService {
 
             const currentPoints = Number(user[0]?.points || 0);
             const newTotalPoints = currentPoints + points;
-            const newMemberLevel = calculateMemberLevel(newTotalPoints);
 
             if (points > 0) {
                 const historyId = generateId();
@@ -245,9 +387,57 @@ export class UserGamificationService {
                     [historyId, user_id, points, `Sinkronisasi poin dari transaksi ${transactionCode}`]
                 );
                 
+                const [pointRows] = await connection.query(
+                    `SELECT user_id, total_points, mission_points, voucher_points, cashback_points, commission_points
+                     FROM user_points
+                     WHERE user_id = ?`,
+                    [user_id]
+                );
+
+                if (!pointRows || pointRows.length === 0) {
+                    await connection.query(
+                        `INSERT INTO user_points (user_id, total_points, mission_points, voucher_points, cashback_points, commission_points)
+                         VALUES (?, ?, ?, 0, 0, 0)`,
+                        [user_id, newTotalPoints, newTotalPoints]
+                    );
+                }
+
+                const current = pointRows[0] || {};
+                const currentMission = Number(current.mission_points || 0);
+                const currentVoucher = Number(current.voucher_points || 0);
+                const currentCashback = Number(current.cashback_points || 0);
+                const currentCommission = Number(current.commission_points || 0);
+
+                const nextMission = currentMission;
+                const nextVoucher = currentVoucher;
+                const nextCashback = currentCashback + points;
+                const nextCommission = currentCommission;
+                const nextTotal = nextMission + nextVoucher + nextCashback + nextCommission;
+
+                await connection.query(
+                    `UPDATE user_points
+                     SET total_points = ?,
+                         mission_points = ?,
+                         voucher_points = ?,
+                         cashback_points = ?,
+                         commission_points = ?
+                     WHERE user_id = ?`,
+                    [nextTotal, nextMission, nextVoucher, nextCashback, nextCommission, user_id]
+                );
+
+                await connection.query(
+                    `UPDATE users SET membership_level = ? WHERE user_id = ?`,
+                    [calculateMemberLevel(nextTotal), user_id]
+                );
+
+                await connection.query(
+                    `UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?`,
+                    [calculateMemberLevel(nextTotal), user_id]
+                );
+
                 await queryWithConn(
-                    'UPDATE UserGamification SET points = ?, memberLevel = ? WHERE user_id = ?',
-                    [newTotalPoints, newMemberLevel, user_id]
+                    'UPDATE UserGamification SET points = ? WHERE user_id = ?',
+                    [nextTotal, user_id]
                 );
             }
             
