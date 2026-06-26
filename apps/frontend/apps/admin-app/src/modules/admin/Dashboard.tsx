@@ -51,7 +51,7 @@ const AdminDashboard: React.FC = () => {
 
   const loadDashboardData = useCallback(async () => {
     try {
-      const res = await fetch(`http://localhost:4000/api/kiosk/admin/dashboard?period=${period}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/kiosk/admin/dashboard?period=day`)
       const data = await res.json();
 
       if (!data.success) {
