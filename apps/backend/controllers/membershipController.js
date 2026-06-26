@@ -5,6 +5,12 @@ import path from 'path';
 import { query, withTransaction } from '../config/db.js';
 import { createMembershipToken } from '../config/jwt.js';
 
+function calculateMemberLevel(points) {
+  if (points >= 2000) return 'Platinum';
+  if (points >= 1000) return 'Gold';
+  return 'Silver';
+}
+
 const tableColumnsCache = new Map();
 
 async function getTableColumns(tableName) {
@@ -275,19 +281,97 @@ function buildMembershipPointsPayload(membershipPointsRow, gamificationPoints) {
   };
 }
 
-async function fetchGamificationPoints(userId) {
-  const rows = await query(
-    `SELECT COALESCE(ug.points, 0) AS points
-    FROM usergamification ug
-    WHERE ug.user_id = ?
-    LIMIT 1`,
-    [userId]
-  );
+async function fetchVoucherPoints(userId) {
+   const rows = await query(
+     `SELECT COALESCE(voucher_points, 0) AS voucher_points
+     FROM user_points
+     WHERE user_id = ?
+     LIMIT 1`,
+     [userId]
+   );
 
-  return toNumber(rows[0]?.points, 0);
-}
+   return toNumber(rows[0]?.voucher_points, 0);
+ }
 
-async function fetchUserGamificationLevel(userId) {
+    async function updateUserPointsCategory(userId, pointType, points, connection = null) {
+      const useConnection = connection || query;
+      const category = pointType === 'voucher' ? 'voucher' : 'mission';
+
+      const [pointRows] = await useConnection(
+        `SELECT user_id, total_points, mission_points, voucher_points, cashback_points, commission_points
+         FROM user_points
+         WHERE user_id = ?`,
+        [userId]
+      );
+
+      if (!pointRows || pointRows.length === 0) {
+        let existingGamificationPoints = 0;
+        try {
+          const userGamificationRows = await useConnection(
+            `SELECT points FROM UserGamification WHERE user_id = ? LIMIT 1`,
+            [userId]
+          );
+          existingGamificationPoints = Number(userGamificationRows[0]?.points || 0);
+        } catch {
+          existingGamificationPoints = 0;
+        }
+
+        await useConnection(
+          `INSERT INTO user_points (user_id, total_points, mission_points, voucher_points, cashback_points, commission_points)
+           VALUES (?, ?, ?, 0, 0, 0)`,
+          [userId, existingGamificationPoints, existingGamificationPoints]
+        );
+      }
+
+      const current = pointRows[0] || {};
+      const currentMission = Number(current.mission_points || 0);
+      const currentVoucher = Number(current.voucher_points || 0);
+      const currentCashback = Number(current.cashback_points || 0);
+      const currentCommission = Number(current.commission_points || 0);
+
+      let nextMission = currentMission;
+      let nextVoucher = currentVoucher;
+      let nextCashback = currentCashback;
+      let nextCommission = currentCommission;
+
+      if (category === 'mission') {
+        nextMission = currentMission + points;
+      } else if (category === 'voucher') {
+        nextVoucher = currentVoucher + points;
+      } else if (category === 'cashback') {
+        nextCashback = currentCashback + points;
+      } else if (category === 'commission') {
+        nextCommission = currentCommission + points;
+      }
+
+      const nextTotal = nextMission + nextVoucher + nextCashback + nextCommission;
+
+      await useConnection(
+        `UPDATE user_points
+         SET total_points = ?,
+             mission_points = ?,
+             voucher_points = ?,
+             cashback_points = ?,
+             commission_points = ?
+         WHERE user_id = ?`,
+        [nextTotal, nextMission, nextVoucher, nextCashback, nextCommission, userId]
+      );
+
+      const level = calculateMemberLevel(nextTotal);
+      await useConnection(
+        `UPDATE users SET membership_level = ? WHERE user_id = ?`,
+        [level, userId]
+      );
+
+      await useConnection(
+        `UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?`,
+        [level, userId]
+      );
+
+      return { total_points: nextTotal, memberLevel: level };
+    }
+
+  async function fetchUserGamificationLevel(userId) {
   const rows = await query(
     `SELECT memberLevel
     FROM usergamification
@@ -323,47 +407,65 @@ async function fetchCommissionPoints(userId) {
 }
 
 async function buildPointsPayload(userId) {
-  const [gamificationPoints, cashbackPoints, commissionPoints, memberLevel] = await Promise.all([
-    fetchGamificationPoints(userId),
-    fetchCashbackPoints(userId),
-    fetchCommissionPoints(userId),
-    fetchUserGamificationLevel(userId),
-  ]);
+   const pointRows = await query(
+     `SELECT mission_points, voucher_points, cashback_points, commission_points
+      FROM user_points
+      WHERE user_id = ?
+      LIMIT 1`,
+     [userId]
+   );
 
-  const totalPoints = gamificationPoints + cashbackPoints + commissionPoints;
+   const row = pointRows[0] || {};
+   const missionPoints = toNumber(row.mission_points || 0, 0);
+   const voucherPoints = toNumber(row.voucher_points || 0, 0);
+   const cashbackPoints = toNumber(row.cashback_points || 0, 0);
+   const commissionPoints = toNumber(row.commission_points || 0, 0);
+   const totalPoints = missionPoints + voucherPoints + cashbackPoints + commissionPoints;
+   const memberLevel = calculateMemberLevel(totalPoints);
 
-  return {
-    total_points: totalPoints,
-    poin_gamification: gamificationPoints,
-    cashback_points: cashbackPoints,
-    commission_points: commissionPoints,
-    memberLevel,
-  };
-}
+   return {
+     total_points: totalPoints,
+     poin_gamification: missionPoints,
+     mission_points: missionPoints,
+     voucher_points: voucherPoints,
+     cashback_points: cashbackPoints,
+     commission_points: commissionPoints,
+     memberLevel,
+   };
+ }
 
 async function upsertUserPoints(userId) {
-  const [gamificationPoints, cashbackPoints, commissionPoints] = await Promise.all([
-    fetchGamificationPoints(userId),
-    fetchCashbackPoints(userId),
-    fetchCommissionPoints(userId),
-  ]);
+   const pointRows = await query(
+     `SELECT mission_points, voucher_points, cashback_points, commission_points
+      FROM user_points
+      WHERE user_id = ?
+      LIMIT 1`,
+     [userId]
+   );
 
-  const totalPoints = gamificationPoints + cashbackPoints + commissionPoints;
+   const row = pointRows[0] || {};
+   const missionPoints = toNumber(row.mission_points || 0, 0);
+   const voucherPoints = toNumber(row.voucher_points || 0, 0);
+   const cashbackPoints = toNumber(row.cashback_points || 0, 0);
+   const commissionPoints = toNumber(row.commission_points || 0, 0);
+   const totalPoints = missionPoints + voucherPoints + cashbackPoints + commissionPoints;
 
-  await query(
-    `INSERT INTO user_points (user_id, total_points, poin_gamification, cashback_points, commission_points)
-    VALUES (?, ?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE
-      total_points = VALUES(total_points),
-      poin_gamification = VALUES(poin_gamification),
-      cashback_points = VALUES(cashback_points),
-      commission_points = VALUES(commission_points),
-      updated_at = CURRENT_TIMESTAMP`,
-    [userId, totalPoints, gamificationPoints, cashbackPoints, commissionPoints]
-  );
+   await query(
+     `INSERT INTO user_points (user_id, total_points, poin_gamification, mission_points, voucher_points, cashback_points, commission_points)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       total_points = VALUES(total_points),
+       poin_gamification = VALUES(poin_gamification),
+       mission_points = VALUES(mission_points),
+       voucher_points = VALUES(voucher_points),
+       cashback_points = VALUES(cashback_points),
+       commission_points = VALUES(commission_points),
+       updated_at = CURRENT_TIMESTAMP`,
+     [userId, totalPoints, missionPoints, missionPoints, voucherPoints, cashbackPoints, commissionPoints]
+   );
 
-  return { totalPoints, gamificationPoints, cashbackPoints, commissionPoints };
-}
+   return { totalPoints, missionPoints, voucherPoints, cashbackPoints, commissionPoints };
+ }
 
 function buildVerificationPayload(row) {
   if (!row) return null;
@@ -1758,6 +1860,7 @@ export async function redeemPoints(_req, res) {
     }
 
 const result = await withTransaction(async (connection) => {
+      let currentPoints = 0;
       const [pointRows] = await connection.query(
         `SELECT total_points
         FROM user_points
@@ -1767,22 +1870,56 @@ const result = await withTransaction(async (connection) => {
         [userId]
       );
 
-      if (!pointRows.length) {
-        throw new Error('Data poin user tidak ditemukan.');
+      if (pointRows.length) {
+        currentPoints = Number(pointRows[0].total_points || 0);
+      } else {
+        const [gamificationRows] = await connection.query(
+          `SELECT points FROM UserGamification WHERE user_id = ? LIMIT 1 FOR UPDATE`,
+          [userId]
+        );
+        currentPoints = Number(gamificationRows[0]?.points || 0);
       }
 
-      const currentPoints = Number(pointRows[0].total_points || 0);
       if (currentPoints < pointsUsed) {
         throw new Error('Poin user tidak mencukupi.');
       }
 
-      const nextTotalPoints = currentPoints - pointsUsed;
+      const [pointRowsForUpdate] = await connection.query(
+        `SELECT total_points, mission_points, voucher_points, cashback_points, commission_points
+         FROM user_points
+         WHERE user_id = ?
+         LIMIT 1
+         FOR UPDATE`,
+        [userId]
+      );
+
+      const current = pointRowsForUpdate[0] || {};
+      const nextMission = Number(current.mission_points || 0);
+      const nextVoucher = Number(current.voucher_points || 0);
+      const nextCashback = Number(current.cashback_points || 0);
+      const nextCommission = Number(current.commission_points || 0);
+      const nextTotalPoints = Number(current.total_points || 0) - pointsUsed;
 
       await connection.query(
         `UPDATE user_points
-        SET total_points = ?
-        WHERE user_id = ?`,
-        [nextTotalPoints, userId]
+         SET total_points = ?,
+             mission_points = ?,
+             voucher_points = ?,
+             cashback_points = ?,
+             commission_points = ?
+         WHERE user_id = ?`,
+        [nextTotalPoints, nextMission, nextVoucher, nextCashback, nextCommission, userId]
+      );
+
+      const level = calculateMemberLevel(nextTotalPoints);
+      await connection.query(
+        `UPDATE users SET membership_level = ? WHERE user_id = ?`,
+        [level, userId]
+      );
+
+      await connection.query(
+        `UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?`,
+        [level, userId]
       );
 
       await connection.query(
@@ -1976,7 +2113,7 @@ if (userId && pointsEarned > 0) {
       
       if (userId && pointsEarned > 0) {
         const { UserGamificationService } = await import('../services/UserGamificationService.js');
-        await UserGamificationService.addPoints(userId, pointsEarned, 'Point transaksi pembelian');
+        await UserGamificationService.addPoints(userId, pointsEarned, 'Point transaksi pembelian', 'cashback');
       }
 
       if (userId && total > 0) {
@@ -2144,10 +2281,10 @@ export async function earnPoints(_req, res) {
     const result = await withTransaction(async (connection) => {
       const [pointRows] = await connection.query(
         `SELECT total_points, commission_points, cashback_points
-        FROM user_points
-        WHERE user_id = ?
-        LIMIT 1
-        FOR UPDATE`,
+         FROM user_points
+         WHERE user_id = ?
+         LIMIT 1
+         FOR UPDATE`,
         [userId]
       );
 
@@ -2162,11 +2299,22 @@ export async function earnPoints(_req, res) {
 
       await connection.query(
         `UPDATE user_points
-        SET total_points = ?,
-            commission_points = ?,
-            cashback_points = ?
-        WHERE user_id = ?`,
+         SET total_points = ?,
+             commission_points = ?,
+             cashback_points = ?
+         WHERE user_id = ?`,
         [nextTotal, nextCommission, nextCashback, userId]
+      );
+
+      const level = calculateMemberLevel(nextTotal);
+      await connection.query(
+        `UPDATE users SET membership_level = ? WHERE user_id = ?`,
+        [level, userId]
+      );
+
+      await connection.query(
+        `UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?`,
+        [level, userId]
       );
 
       await connection.query(

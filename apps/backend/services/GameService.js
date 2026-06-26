@@ -15,6 +15,25 @@ function calculateMemberLevel(points) {
     return 'Silver';
 }
 
+async function syncMemberLevelFromUserPoints(connection, userId) {
+    const [rows] = await connection.query(
+        `SELECT total_points FROM user_points WHERE user_id = ? LIMIT 1`,
+        [userId]
+    );
+    const totalPoints = Number(rows?.[0]?.total_points || 0);
+    const level = calculateMemberLevel(totalPoints);
+
+    await connection.query(
+        `UPDATE users SET membership_level = ? WHERE user_id = ?`,
+        [level, userId]
+    );
+
+    await connection.query(
+        `UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?`,
+        [level, userId]
+    );
+}
+
 export class GameService {
     static async getAllGames() {
         return await GameRepository.findAll();
@@ -99,7 +118,6 @@ export class GameService {
             
             const configData = gameData.config_data ? (typeof gameData.config_data === 'string' ? JSON.parse(gameData.config_data) : gameData.config_data) : null;
             
-            // Support both direct array format and {prizes: [...]} format
             let prizes = [];
             if (Array.isArray(configData)) {
                 prizes = configData;
@@ -183,27 +201,80 @@ export class GameService {
             
             const historyId = generateId();
             const netPoints = rewardValue - costPoints;
-            
+
             if (netPoints !== 0) {
                 await queryWithConn(
                     'INSERT INTO PointsHistory (id, userId, points, description, createdAt) VALUES (?, ?, ?, ?, NOW())',
                     [historyId, userId, netPoints, `Bermain game: ${gameData.name} - ${prizeLabel}`]
                 );
             }
+
+            if (rewardType === 'POINT') {
+                const [pointRows] = await connection.query(
+                    `SELECT user_id, total_points, mission_points, voucher_points, cashback_points, commission_points
+                     FROM user_points
+                     WHERE user_id = ?`,
+                    [userId]
+                );
+
+                if (!pointRows || pointRows.length === 0) {
+                    let existingGamificationPoints = 0;
+                    try {
+                        const userGamificationRows = await connection.query(
+                            `SELECT points FROM UserGamification WHERE user_id = ? LIMIT 1`,
+                            [userId]
+                        );
+                        existingGamificationPoints = Number(userGamificationRows[0]?.points || 0);
+                    } catch {
+                        existingGamificationPoints = 0;
+                    }
+
+                    await connection.query(
+                        `INSERT INTO user_points (user_id, total_points, mission_points, voucher_points, cashback_points, commission_points)
+                         VALUES (?, ?, ?, 0, 0, 0)`,
+                        [userId, existingGamificationPoints, existingGamificationPoints]
+                    );
+                }
+
+                const current = pointRows[0] || {};
+                const currentMission = Number(current.mission_points || 0);
+                const currentVoucher = Number(current.voucher_points || 0);
+                const currentCashback = Number(current.cashback_points || 0);
+                const currentCommission = Number(current.commission_points || 0);
+
+                const nextMission = currentMission + netPoints;
+                const nextVoucher = currentVoucher;
+                const nextCashback = currentCashback;
+                const nextCommission = currentCommission;
+                const nextTotal = nextMission + nextVoucher + nextCashback + nextCommission;
+
+                await connection.query(
+                    `UPDATE user_points
+                     SET total_points = ?,
+                         mission_points = ?,
+                         voucher_points = ?,
+                         cashback_points = ?,
+                         commission_points = ?
+                     WHERE user_id = ?`,
+                    [nextTotal, nextMission, nextVoucher, nextCashback, nextCommission, userId]
+                );
+
+                await connection.query(
+                    `UPDATE users SET membership_level = ? WHERE user_id = ?`,
+                    [calculateMemberLevel(nextTotal), userId]
+                );
+
+                await connection.query(
+                    `UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?`,
+                    [calculateMemberLevel(nextTotal), userId]
+                );
+            } else {
+                await syncMemberLevelFromUserPoints(connection, userId);
+            }
             
             await queryWithConn(
                 'UPDATE UserGamification SET points = points - ? + ? WHERE user_id = ?',
                 [costPoints, rewardValue, userId]
-            );
-            
-            const updatedForUserLevel = await queryWithConn(
-                'SELECT points FROM UserGamification WHERE user_id = ? LIMIT 1',
-                [userId]
-            );
-            const newMemberLevel = calculateMemberLevel(Number(updatedForUserLevel[0]?.points || 0));
-            await queryWithConn(
-                'UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?',
-                [newMemberLevel, userId]
             );
             
             const updatedUser = await queryWithConn(
