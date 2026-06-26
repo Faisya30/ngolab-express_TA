@@ -211,7 +211,7 @@ export class GameService {
 
             if (rewardType === 'POINT') {
                 const [pointRows] = await connection.query(
-                    `SELECT user_id, total_points, mission_points, voucher_points, cashback_points, commission_points
+                    `SELECT user_id, total_points, poin_gamification, cashback_points, commission_points
                      FROM user_points
                      WHERE user_id = ?`,
                     [userId]
@@ -230,33 +230,30 @@ export class GameService {
                     }
 
                     await connection.query(
-                        `INSERT INTO user_points (user_id, total_points, mission_points, voucher_points, cashback_points, commission_points)
-                         VALUES (?, ?, ?, 0, 0, 0)`,
+                        `INSERT INTO user_points (user_id, total_points, poin_gamification, cashback_points, commission_points)
+                         VALUES (?, ?, ?, 0, 0)`,
                         [userId, existingGamificationPoints, existingGamificationPoints]
                     );
                 }
 
                 const current = pointRows[0] || {};
-                const currentMission = Number(current.mission_points || 0);
-                const currentVoucher = Number(current.voucher_points || 0);
+                const currentGamification = Number(current.poin_gamification || 0);
                 const currentCashback = Number(current.cashback_points || 0);
                 const currentCommission = Number(current.commission_points || 0);
 
-                const nextMission = currentMission + netPoints;
-                const nextVoucher = currentVoucher;
+                const nextGamification = currentGamification + netPoints;
                 const nextCashback = currentCashback;
                 const nextCommission = currentCommission;
-                const nextTotal = nextMission + nextVoucher + nextCashback + nextCommission;
+                const nextTotal = nextGamification + nextCashback + nextCommission;
 
                 await connection.query(
                     `UPDATE user_points
                      SET total_points = ?,
-                         mission_points = ?,
-                         voucher_points = ?,
+                         poin_gamification = ?,
                          cashback_points = ?,
                          commission_points = ?
                      WHERE user_id = ?`,
-                    [nextTotal, nextMission, nextVoucher, nextCashback, nextCommission, userId]
+                    [nextTotal, nextGamification, nextCashback, nextCommission, userId]
                 );
 
                 await connection.query(

@@ -22,8 +22,8 @@ async function seed() {
             [userId, points, 'Bronze', 0, null]
         );
         await query(
-            `INSERT IGNORE INTO user_points (user_id, total_points, mission_points, voucher_points, cashback_points, commission_points)
-             VALUES (?, ?, ?, 0, 0, 0)`,
+            `INSERT IGNORE INTO user_points (user_id, total_points, poin_gamification, cashback_points, commission_points)
+             VALUES (?, ?, ?, 0, 0)`,
             [userId, points, points]
         );
     }

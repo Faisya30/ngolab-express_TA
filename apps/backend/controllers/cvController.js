@@ -19,6 +19,31 @@ async function hasColumn(tableName, columnName) {
   return cols.has(columnName);
 }
 
+async function tableExists(tableName) {
+  const rows = await query(
+    `SELECT COUNT(*) AS total
+    FROM information_schema.tables
+    WHERE table_schema = DATABASE()
+      AND table_name = ?`,
+    [tableName]
+  );
+
+  return Number(rows[0]?.total || 0) > 0;
+}
+
+function pickColumn(columns, candidates) {
+  for (const candidate of candidates) {
+    if (columns.has(candidate)) return candidate;
+  }
+
+  return null;
+}
+
+function selectColumn(alias, columnName, outputName, fallback = 'NULL') {
+  if (!columnName) return `${fallback} AS ${outputName}`;
+  return `${alias}.\`${columnName}\` AS ${outputName}`;
+}
+
 function toNumber(value) {
   if (value === undefined || value === null || value === '') return 0;
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
@@ -596,22 +621,69 @@ export async function getCvOrders(req, res) {
       });
     }
 
+    const hasUserId = await hasColumn('orders', 'user_id');
+    const hasMemberCode = await hasColumn('orders', 'member_code');
+    const hasPointsEarned = await hasColumn('orders', 'points_earned');
+    const hasPointsUsed = await hasColumn('orders', 'points_used');
+
+    const userIdSelect = hasUserId ? 'o.user_id AS user_id,' : 'NULL AS user_id,';
+    const memberCodeSelect = hasMemberCode
+      ? 'o.member_code AS member_code,'
+      : 'NULL AS member_code,';
+
+    const pointsEarnedSelect = hasPointsEarned
+      ? 'COALESCE(o.points_earned, 0)'
+      : '0';
+
+    const pointsUsedSelect = hasPointsUsed
+      ? 'COALESCE(o.points_used, 0)'
+      : '0';
+
+    let userPointJoin = 'LEFT JOIN user_points up ON 1 = 0';
+
+    if (hasUserId && hasMemberCode) {
+      userPointJoin = `
+        LEFT JOIN user_points up 
+          ON up.user_id = COALESCE(NULLIF(o.user_id, ''), NULLIF(o.member_code, ''))
+      `;
+    } else if (hasUserId) {
+      userPointJoin = 'LEFT JOIN user_points up ON up.user_id = o.user_id';
+    } else if (hasMemberCode) {
+      userPointJoin = 'LEFT JOIN user_points up ON up.user_id = o.member_code';
+    }
+
     const orders = await query(
       `SELECT
-        id,
-        order_code,
-        created_at,
-        service_type AS service,
-        subtotal,
-        discount,
-        total,
-        payment_method AS payment,
-        COALESCE(tipe_pelanggan, 'GUEST') AS customerType,
-        COALESCE(nama_pelanggan, 'Guest') AS member,
-        order_type AS orderType
-      FROM orders
-      WHERE order_type IN ('cv', 'computervision')
-      ORDER BY created_at DESC`
+        o.id,
+        o.order_code,
+        o.created_at,
+        o.service_type AS service,
+        o.subtotal,
+        o.discount,
+        o.total,
+        o.payment_method AS payment,
+
+        ${userIdSelect}
+        ${memberCodeSelect}
+
+        COALESCE(o.tipe_pelanggan, 'GUEST') AS customerType,
+        COALESCE(o.nama_pelanggan, 'Guest') AS member,
+
+        ${pointsEarnedSelect} AS pointsEarned,
+        ${pointsEarnedSelect} AS points_earned,
+        ${pointsUsedSelect} AS pointsUsed,
+        ${pointsUsedSelect} AS points_used,
+
+        COALESCE(up.cashback_points, 0) AS cashbackPoints,
+        COALESCE(up.cashback_points, 0) AS cashback_points,
+        COALESCE(up.total_points, 0) AS totalPoints,
+        COALESCE(up.total_points, 0) AS total_points,
+
+        o.order_type AS orderType
+      FROM orders o
+      ${userPointJoin}
+      WHERE o.order_type IN ('cv', 'computervision')
+      ORDER BY o.created_at DESC`
     );
 
     const orderItemsUsesOrderId = await hasColumn('order_items', 'order_id');
@@ -627,6 +699,10 @@ export async function getCvOrders(req, res) {
       'order_items',
       'price_snapshot'
     );
+    const orderItemsHasOrderItemType = await hasColumn(
+      'order_items',
+      'order_item_type'
+    );
 
     for (const o of orders) {
       const productNameCol = orderItemsHasProductNameSnapshot
@@ -636,6 +712,10 @@ export async function getCvOrders(req, res) {
           : "''";
 
       const priceCol = orderItemsHasPriceSnapshot ? 'price_snapshot' : 'price';
+
+      const orderItemTypeFilter = orderItemsHasOrderItemType
+        ? `AND COALESCE(order_item_type, 'computervision') IN ('cv', 'computervision')`
+        : '';
 
       const items = await query(
         orderItemsUsesOrderId
@@ -649,7 +729,7 @@ export async function getCvOrders(req, res) {
               subtotal
             FROM order_items
             WHERE order_id = ?
-              AND COALESCE(order_item_type, 'computervision') IN ('cv', 'computervision')
+              ${orderItemTypeFilter}
             ORDER BY id ASC`
           : `SELECT
               id,
@@ -670,10 +750,25 @@ export async function getCvOrders(req, res) {
         product_code: it.product_code ?? it.product_id ?? null,
         product_name_snapshot: it.product_name_snapshot ?? '',
         productName: it.product_name_snapshot ?? '',
-        price: it.price ?? 0,
-        qty: it.qty ?? 0,
-        subtotal: it.subtotal ?? 0,
+        price: toNumber(it.price),
+        qty: toNumber(it.qty),
+        subtotal: toNumber(it.subtotal),
       }));
+
+      o.subtotal = toNumber(o.subtotal);
+      o.discount = toNumber(o.discount);
+      o.total = toNumber(o.total);
+
+      o.pointsEarned = toNumber(o.pointsEarned);
+      o.points_earned = toNumber(o.points_earned);
+      o.pointsUsed = toNumber(o.pointsUsed);
+      o.points_used = toNumber(o.points_used);
+
+      o.cashbackPoints = toNumber(o.cashbackPoints);
+      o.cashback_points = toNumber(o.cashback_points);
+
+      o.totalPoints = toNumber(o.totalPoints);
+      o.total_points = toNumber(o.total_points);
     }
 
     return res.json({
@@ -741,7 +836,12 @@ export async function getCvOrderDetails(req, res) {
 
     return res.json({
       success: true,
-      orderDetails: rows,
+      orderDetails: rows.map((row) => ({
+        ...row,
+        qty: toNumber(row.qty),
+        price: toNumber(row.price),
+        subtotal: toNumber(row.subtotal),
+      })),
     });
   } catch (error) {
     return res.status(500).json({
@@ -844,17 +944,13 @@ export async function getCvMemberByCode(req, res) {
 
       profile_picture: user.profile_picture || null,
 
-      // INI YANG DIPAKAI UNTUK TAMPIL DI HALAMAN MEMBERSHIP
-      // points sengaja disamakan dengan cashback_points supaya frontend lama tetap aman.
       points: cashbackPoints,
       cashbackPoints,
       cashback_points: cashbackPoints,
 
-      // Ini total poin dari tabel user_points.
       total_points: totalPoints,
       totalPoints,
 
-      // Ini data affiliate, tidak dipakai untuk poin cashback.
       commission_points: commissionPoints,
       affiliate_total_points: affiliateTotalPoints,
       affiliate_tier: affiliate.affiliate_tier || null,
@@ -866,6 +962,285 @@ export async function getCvMemberByCode(req, res) {
       success: true,
       ...member,
       member,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+}
+
+export async function getCvMemberVouchers(req, res) {
+  try {
+    const userId = String(
+      req.params?.user_id ||
+        req.params?.code ||
+        req.query?.user_id ||
+        req.query?.member_code ||
+        ''
+    ).trim();
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID member wajib diisi.',
+      });
+    }
+
+    const hasUserVouchersTable = await tableExists('user_vouchers');
+    const hasVouchersTable = await tableExists('vouchers');
+
+    if (!hasUserVouchersTable || !hasVouchersTable) {
+      return res.status(500).json({
+        success: false,
+        error:
+          'Tabel voucher gamifikasi belum ditemukan. Pastikan tabel user_vouchers dan vouchers tersedia di database.',
+      });
+    }
+
+    const userVoucherColumns = await getTableColumns('user_vouchers');
+    const voucherColumns = await getTableColumns('vouchers');
+
+    const uvIdCol = pickColumn(userVoucherColumns, [
+      'id',
+      'user_voucher_id',
+      'userVoucherId',
+    ]);
+
+    const uvUserIdCol = pickColumn(userVoucherColumns, [
+      'user_id',
+      'userId',
+      'member_id',
+      'memberId',
+      'member_code',
+      'memberCode',
+    ]);
+
+    const uvVoucherIdCol = pickColumn(userVoucherColumns, [
+      'voucher_id',
+      'voucherId',
+      'id_voucher',
+    ]);
+
+    const uvStatusCol = pickColumn(userVoucherColumns, [
+      'status',
+      'voucher_status',
+    ]);
+
+    const uvIsUsedCol = pickColumn(userVoucherColumns, [
+      'is_used',
+      'used',
+      'isUsed',
+    ]);
+
+    const uvUsedAtCol = pickColumn(userVoucherColumns, [
+      'used_at',
+      'usedAt',
+    ]);
+
+    const uvExpiredAtCol = pickColumn(userVoucherColumns, [
+      'expired_at',
+      'expires_at',
+      'valid_until',
+      'end_date',
+    ]);
+
+    const uvClaimedAtCol = pickColumn(userVoucherColumns, [
+      'claimed_at',
+      'created_at',
+    ]);
+
+    const voucherIdCol = pickColumn(voucherColumns, [
+      'id',
+      'voucher_id',
+    ]);
+
+    const voucherCodeCol = pickColumn(voucherColumns, [
+      'code',
+      'voucher_code',
+      'voucherCode',
+    ]);
+
+    const voucherNameCol = pickColumn(voucherColumns, [
+      'name',
+      'voucher_name',
+      'title',
+      'voucher_title',
+    ]);
+
+    const voucherDescriptionCol = pickColumn(voucherColumns, [
+      'description',
+      'desc',
+      'detail',
+    ]);
+
+    const discountTypeCol = pickColumn(voucherColumns, [
+      'discount_type',
+      'type',
+      'voucher_type',
+    ]);
+
+    const discountValueCol = pickColumn(voucherColumns, [
+      'discount_value',
+      'discount',
+      'nominal',
+      'amount',
+      'value',
+    ]);
+
+    const minTransactionCol = pickColumn(voucherColumns, [
+      'min_transaction',
+      'minimum_transaction',
+      'minimum_purchase',
+      'min_purchase',
+    ]);
+
+    const maxDiscountCol = pickColumn(voucherColumns, [
+      'max_discount',
+      'maximum_discount',
+    ]);
+
+    const voucherStatusCol = pickColumn(voucherColumns, [
+      'status',
+      'voucher_status',
+    ]);
+
+    const voucherIsActiveCol = pickColumn(voucherColumns, [
+      'is_active',
+      'active',
+    ]);
+
+    const voucherExpiredAtCol = pickColumn(voucherColumns, [
+      'expired_at',
+      'expires_at',
+      'valid_until',
+      'end_date',
+    ]);
+
+    if (!uvUserIdCol || !uvVoucherIdCol || !voucherIdCol) {
+      return res.status(500).json({
+        success: false,
+        error:
+          'Struktur tabel voucher tidak sesuai. Pastikan user_vouchers memiliki user_id dan voucher_id, serta vouchers memiliki id.',
+      });
+    }
+
+    const filters = [`uv.\`${uvUserIdCol}\` = ?`];
+
+    if (uvStatusCol) {
+      filters.push(
+        `UPPER(COALESCE(uv.\`${uvStatusCol}\`, 'ACTIVE')) NOT IN ('USED', 'EXPIRED', 'INACTIVE', 'CANCELLED', 'DELETED')`
+      );
+    }
+
+    if (uvIsUsedCol) {
+      filters.push(`COALESCE(uv.\`${uvIsUsedCol}\`, 0) = 0`);
+    }
+
+    if (uvUsedAtCol) {
+      filters.push(`uv.\`${uvUsedAtCol}\` IS NULL`);
+    }
+
+    if (uvExpiredAtCol) {
+      filters.push(
+        `(uv.\`${uvExpiredAtCol}\` IS NULL OR uv.\`${uvExpiredAtCol}\` >= NOW())`
+      );
+    }
+
+    if (voucherStatusCol) {
+      filters.push(
+        `UPPER(COALESCE(v.\`${voucherStatusCol}\`, 'ACTIVE')) NOT IN ('EXPIRED', 'INACTIVE', 'CANCELLED', 'DELETED')`
+      );
+    }
+
+    if (voucherIsActiveCol) {
+      filters.push(`COALESCE(v.\`${voucherIsActiveCol}\`, 1) = 1`);
+    }
+
+    if (voucherExpiredAtCol) {
+      filters.push(
+        `(v.\`${voucherExpiredAtCol}\` IS NULL OR v.\`${voucherExpiredAtCol}\` >= NOW())`
+      );
+    }
+
+    const orderByCol = uvClaimedAtCol
+      ? `uv.\`${uvClaimedAtCol}\` DESC`
+      : `uv.\`${uvVoucherIdCol}\` DESC`;
+
+    const rows = await query(
+      `SELECT
+        ${uvIdCol ? `uv.\`${uvIdCol}\`` : `uv.\`${uvVoucherIdCol}\``} AS userVoucherId,
+        uv.\`${uvUserIdCol}\` AS user_id,
+        uv.\`${uvVoucherIdCol}\` AS voucher_id,
+
+        ${selectColumn('v', voucherIdCol, 'id')},
+        ${selectColumn('v', voucherCodeCol, 'code', "''")},
+        ${selectColumn('v', voucherNameCol, 'name', "'Voucher'")},
+        ${selectColumn('v', voucherDescriptionCol, 'description', "''")},
+        ${selectColumn('v', discountTypeCol, 'discountType', "'fixed'")},
+        ${selectColumn('v', discountValueCol, 'discountValue', '0')},
+        ${selectColumn('v', minTransactionCol, 'minTransaction', '0')},
+        ${selectColumn('v', maxDiscountCol, 'maxDiscount', '0')},
+        ${selectColumn('v', voucherStatusCol, 'status', "'ACTIVE'")},
+        ${selectColumn('v', voucherExpiredAtCol, 'expiredAt')},
+        ${selectColumn('uv', uvExpiredAtCol, 'userVoucherExpiredAt')},
+        ${selectColumn('uv', uvClaimedAtCol, 'claimedAt')}
+
+      FROM user_vouchers uv
+      INNER JOIN vouchers v
+        ON v.\`${voucherIdCol}\` = uv.\`${uvVoucherIdCol}\`
+      WHERE ${filters.join(' AND ')}
+      ORDER BY ${orderByCol}`,
+      [userId]
+    );
+
+    const vouchers = rows.map((row) => {
+      const expiredAt = row.userVoucherExpiredAt || row.expiredAt || null;
+
+      return {
+        id: String(row.id ?? row.voucher_id),
+        voucher_id: row.voucher_id,
+        userVoucherId: row.userVoucherId,
+        user_voucher_id: row.userVoucherId,
+
+        code: row.code || '',
+        voucher_code: row.code || '',
+
+        name: row.name || 'Voucher',
+        title: row.name || 'Voucher',
+
+        description: row.description || '',
+
+        discountType: row.discountType || 'fixed',
+        discount_type: row.discountType || 'fixed',
+
+        discountValue: toNumber(row.discountValue),
+        discount_value: toNumber(row.discountValue),
+
+        minTransaction: toNumber(row.minTransaction),
+        min_transaction: toNumber(row.minTransaction),
+
+        maxDiscount: toNumber(row.maxDiscount),
+        max_discount: toNumber(row.maxDiscount),
+
+        status: row.status || 'ACTIVE',
+
+        expiredAt,
+        expired_at: expiredAt,
+
+        claimedAt: row.claimedAt || null,
+        claimed_at: row.claimedAt || null,
+
+        isAvailable: true,
+        is_available: true,
+      };
+    });
+
+    return res.json({
+      success: true,
+      user_id: userId,
+      vouchers,
     });
   } catch (error) {
     return res.status(500).json({
@@ -948,6 +1323,9 @@ export async function saveCvOrder(req, res) {
     const orderItemsUsesProductId = await hasColumn('order_items', 'product_id');
     const hasOrderItemType = await hasColumn('order_items', 'order_item_type');
 
+    const userPointsHasCreatedAt = await hasColumn('user_points', 'created_at');
+    const userPointsHasUpdatedAt = await hasColumn('user_points', 'updated_at');
+
     if (!hasOrderCode || !orderItemsUsesOrderId || !orderItemsUsesProductId) {
       return res.status(500).json({
         success: false,
@@ -972,10 +1350,32 @@ export async function saveCvOrder(req, res) {
     const discount = toNumber(order.discount);
     const total = toNumber(order.total);
 
-    const pointsEarned = toNumber(order.points_earned ?? order.pointsEarned);
+    const itemPointsEarned = items.reduce((sum, item) => {
+      const qty = toNumber(item.qty || item.quantity || 1) || 1;
+      const pointPerItem = toNumber(
+        item.points ??
+          item.poin ??
+          item.cashbackReward ??
+          item.cashback_reward ??
+          item.cashback ??
+          0
+      );
+
+      return sum + pointPerItem * qty;
+    }, 0);
+
+    const inputPointsEarned = toNumber(
+      order.points_earned ?? order.pointsEarned
+    );
+
+    const pointsEarned =
+      inputPointsEarned > 0 ? inputPointsEarned : itemPointsEarned;
+
     const pointsUsed = toNumber(
       order.points_used ?? order.pointsUsed ?? order.point_used
     );
+
+    const pointChange = pointsEarned - pointsUsed;
 
     const orderTypeValue = String(
       order.order_type || order.orderType || 'computervision'
@@ -990,6 +1390,8 @@ export async function saveCvOrder(req, res) {
     if (!userId && memberCode) {
       userId = memberCode;
     }
+
+    const pointUserId = userId || memberCode;
 
     const tipePelanggan = String(
       order.tipe_pelanggan ||
@@ -1177,14 +1579,77 @@ export async function saveCvOrder(req, res) {
         );
       }
 
+      if (pointUserId && (pointsEarned > 0 || pointsUsed > 0)) {
+        const updateSet = [
+          'total_points = GREATEST(COALESCE(total_points, 0) + ?, 0)',
+          'cashback_points = GREATEST(COALESCE(cashback_points, 0) + ?, 0)',
+        ];
+
+        const updateValues = [pointChange, pointChange];
+
+        if (userPointsHasUpdatedAt) {
+          updateSet.push('updated_at = NOW()');
+        }
+
+        updateValues.push(pointUserId);
+
+        const [updatePointResult] = await connection.query(
+          `UPDATE user_points
+          SET ${updateSet.join(', ')}
+          WHERE user_id = ?`,
+          updateValues
+        );
+
+        if (!updatePointResult.affectedRows) {
+          const pointColumns = [
+            'user_id',
+            'total_points',
+            'cashback_points',
+          ];
+
+          const pointValues = [
+            pointUserId,
+            Math.max(pointChange, 0),
+            Math.max(pointChange, 0),
+          ];
+
+          if (userPointsHasCreatedAt) {
+            pointColumns.push('created_at');
+            pointValues.push(new Date());
+          }
+
+          if (userPointsHasUpdatedAt) {
+            pointColumns.push('updated_at');
+            pointValues.push(new Date());
+          }
+
+          const pointPlaceholders = pointColumns.map(() => '?').join(', ');
+
+          await connection.query(
+            `INSERT INTO user_points (${pointColumns.join(', ')})
+            VALUES (${pointPlaceholders})`,
+            pointValues
+          );
+        }
+      }
+
       return {
         orderCode,
+        pointsEarned,
+        pointsUsed,
+        pointChange,
       };
     });
 
     return res.json({
       success: true,
       orderCode: result.orderCode,
+      pointsEarned: result.pointsEarned,
+      points_earned: result.pointsEarned,
+      pointsUsed: result.pointsUsed,
+      points_used: result.pointsUsed,
+      pointChange: result.pointChange,
+      point_change: result.pointChange,
     });
   } catch (error) {
     return res.status(500).json({

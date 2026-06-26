@@ -15,88 +15,88 @@ async function getUserGamificationLevel(userId) {
 }
 
 async function getTableColumns(tableName) {
-	if (tableColumnsCache.has(tableName)) return tableColumnsCache.get(tableName);
-	const rows = await query(`SHOW COLUMNS FROM ${tableName}`);
-	const cols = new Set(rows.map((row) => String(row.Field)));
-	tableColumnsCache.set(tableName, cols);
-	return cols;
+  if (tableColumnsCache.has(tableName)) return tableColumnsCache.get(tableName);
+  const rows = await query(`SHOW COLUMNS FROM ${tableName}`);
+  const cols = new Set(rows.map((row) => String(row.Field)));
+  tableColumnsCache.set(tableName, cols);
+  return cols;
 }
 
 async function hasColumn(tableName, columnName) {
-	const cols = await getTableColumns(tableName);
-	return cols.has(columnName);
+  const cols = await getTableColumns(tableName);
+  return cols.has(columnName);
 }
 
 function toNumber(value) {
-	if (value === undefined || value === null || value === '') return 0;
-	if (typeof value === 'number') return value;
-	const cleaned = String(value).replace(/[^0-9.-]/g, '');
-	return Number(cleaned) || 0;
+  if (value === undefined || value === null || value === '') return 0;
+  if (typeof value === 'number') return value;
+  const cleaned = String(value).replace(/[^0-9.-]/g, '');
+  return Number(cleaned) || 0;
 }
 
 
 function parseCart(rawCartData) {
-	if (Array.isArray(rawCartData)) return rawCartData;
-	if (typeof rawCartData === 'string') {
-		try {
-			const parsed = JSON.parse(rawCartData);
-			return Array.isArray(parsed) ? parsed : [];
-		} catch {
-			return [];
-		}
-	}
-	return [];
+  if (Array.isArray(rawCartData)) return rawCartData;
+  if (typeof rawCartData === 'string') {
+    try {
+      const parsed = JSON.parse(rawCartData);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }
 
 function buildOrderCode(rawOrderId) {
-	const input = String(rawOrderId || '').trim();
-	if (!input) return `ORD-${Date.now()}`;
-	return input.startsWith('ORD-') ? input : `ORD-${input}`;
+  const input = String(rawOrderId || '').trim();
+  if (!input) return `ORD-${Date.now()}`;
+  return input.startsWith('ORD-') ? input : `ORD-${input}`;
 }
 
 async function allocateKioskQueueNumber(connection) {
-	await connection.query(
-		`CREATE TABLE IF NOT EXISTS kiosk_queue_counters (
+  await connection.query(
+    `CREATE TABLE IF NOT EXISTS kiosk_queue_counters (
 			counter_date DATE NOT NULL PRIMARY KEY,
 			last_queue_number INT NOT NULL DEFAULT 0,
 			updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 		)`
-	);
+  );
 
-	await connection.query(
-		`INSERT INTO kiosk_queue_counters (counter_date, last_queue_number)
+  await connection.query(
+    `INSERT INTO kiosk_queue_counters (counter_date, last_queue_number)
 		VALUES (CURRENT_DATE(), 0)
 		ON DUPLICATE KEY UPDATE counter_date = counter_date`
-	);
+  );
 
-	const [rows] = await connection.query(
-		`SELECT last_queue_number
+  const [rows] = await connection.query(
+    `SELECT last_queue_number
 		FROM kiosk_queue_counters
 		WHERE counter_date = CURRENT_DATE()
 		FOR UPDATE`
-	);
+  );
 
-	const currentNumber = Number(rows?.[0]?.last_queue_number || 0);
-	const nextNumber = currentNumber + 1;
+  const currentNumber = Number(rows?.[0]?.last_queue_number || 0);
+  const nextNumber = currentNumber + 1;
 
-	await connection.query(
-		`UPDATE kiosk_queue_counters
+  await connection.query(
+    `UPDATE kiosk_queue_counters
 		SET last_queue_number = ?
 		WHERE counter_date = CURRENT_DATE()`,
-		[nextNumber]
-	);
+    [nextNumber]
+  );
 
-	return nextNumber;
+  return nextNumber;
 }
 
 export async function init(req, res) {
-	try {
-		const usesCategoryCode = await hasColumn('products', 'category_code');
-		const hasProductType = await hasColumn('products', 'product_type');
+  try {
+    const usesCategoryCode = await hasColumn('products', 'category_code');
+    const hasProductType = await hasColumn('products', 'product_type');
 
-		let productsQuery;
-		if (usesCategoryCode) {
-			productsQuery = `SELECT
+    let productsQuery;
+    if (usesCategoryCode) {
+      productsQuery = `SELECT
 						p.code AS id,
 						p.code,
 						p.name,
@@ -110,8 +110,8 @@ export async function init(req, res) {
 					FROM products p
 					WHERE p.is_active = 1 ${hasProductType ? "AND (p.product_type = 'kiosk' OR p.product_type IS NULL OR p.product_type = '')" : ''}
 					ORDER BY p.created_at DESC`;
-		} else {
-			productsQuery = `SELECT
+    } else {
+      productsQuery = `SELECT
 						p.code AS id,
 						p.code,
 						p.name,
@@ -126,45 +126,45 @@ export async function init(req, res) {
 					LEFT JOIN categories c ON p.category_id = c.id
 					WHERE p.is_active = 1 ${hasProductType ? "AND (p.product_type = 'kiosk' OR p.product_type IS NULL)" : ''}
 					ORDER BY p.created_at DESC`;
-		}
+    }
 
-		const products = await query(productsQuery);
+    const products = await query(productsQuery);
 
-		let categoriesQuery = `SELECT
+    let categoriesQuery = `SELECT
 				code AS id,
 				name,
 				is_active AS isActive
 			FROM categories
 			WHERE is_active = 1`;
 
-		if (hasProductType) {
-			categoriesQuery += ` AND product_type = 'kiosk'`;
-		}
+    if (hasProductType) {
+      categoriesQuery += ` AND product_type = 'kiosk'`;
+    }
 
-		categoriesQuery += ` ORDER BY created_at ASC`;
+    categoriesQuery += ` ORDER BY created_at ASC`;
 
-		const categories = await query(categoriesQuery);
+    const categories = await query(categoriesQuery);
 
-		return res.json({ success: true, products, categories, vouchers: [] });
-	} catch (error) {
-		return res.status(500).json({ success: false, error: error.message });
-	}
+    return res.json({ success: true, products, categories, vouchers: [] });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
 }
 
 export async function getKioskProducts(req, res) {
-	try {
-		const usesCategoryCode = await hasColumn('products', 'category_code');
-		const hasProductType = await hasColumn('products', 'product_type');
+  try {
+    const usesCategoryCode = await hasColumn('products', 'category_code');
+    const hasProductType = await hasColumn('products', 'product_type');
 
-		if (!hasProductType) {
-			return res.status(500).json({
-				success: false,
-				error: 'Kolom product_type belum tersedia.',
-			});
-		}
+    if (!hasProductType) {
+      return res.status(500).json({
+        success: false,
+        error: 'Kolom product_type belum tersedia.',
+      });
+    }
 
-		const productsQuery = usesCategoryCode
-			? `SELECT
+    const productsQuery = usesCategoryCode
+      ? `SELECT
           p.code AS id,
           p.code,
           p.name,
@@ -180,7 +180,7 @@ export async function getKioskProducts(req, res) {
         WHERE p.product_type = 'kiosk'
           AND p.is_active = 1
         ORDER BY p.created_at DESC`
-			: `SELECT
+      : `SELECT
           p.code AS id,
           p.code,
           p.name,
@@ -198,18 +198,18 @@ export async function getKioskProducts(req, res) {
           AND p.is_active = 1
         ORDER BY p.created_at DESC`;
 
-		const products = await query(productsQuery);
+    const products = await query(productsQuery);
 
-		return res.json({
-			success: true,
-			products,
-		});
-	} catch (error) {
-		return res.status(500).json({
-			success: false,
-			error: error.message,
-		});
-	}
+    return res.json({
+      success: true,
+      products,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
 }
 
 export async function getMember(req, res) {
@@ -261,8 +261,8 @@ export async function getMember(req, res) {
       membership_level: gamificationLevel,
       memberLevel: gamificationLevel,
       profile_picture: user.profile_picture || null,
-      total_points: toNumber(affiliateRows[0]?.total_points || pointsRows?.[0]?.total_points || 0),
-      cashbackPoints: toNumber(pointsRows?.[0]?.cashback_points || 0),
+      total_points: toNumber(pointsRows?.[0]?.total_points ?? affiliateRows[0]?.total_points ?? 0),
+      cashbackPoints: toNumber(pointsRows?.[0]?.cashback_points ?? 0),
       commission_points: toNumber(affiliateRows[0]?.commission_points || 0),
       affiliate_tier: affiliateRows[0]?.affiliate_tier || null,
       level: affiliateRows[0]?.level || null,
@@ -322,8 +322,8 @@ export async function getMemberByUserId(req, res) {
       memberLevel: gamificationLevel,
       phone_number: user.phone_number || null,
       profile_picture: user.profile_picture || null,
-      total_points: toNumber(affiliateRows[0]?.total_points || pointsRows?.[0]?.total_points || 0),
-      cashback_points: toNumber(pointsRows?.[0]?.cashback_points || 0),
+      total_points: toNumber(pointsRows?.[0]?.total_points ?? affiliateRows[0]?.total_points ?? 0),
+cashback_points: toNumber(pointsRows?.[0]?.cashback_points ?? 0),
       commission_points: toNumber(affiliateRows[0]?.commission_points || 0),
       affiliate_tier: affiliateRows[0]?.affiliate_tier || null,
       level: affiliateRows[0]?.level || null,
@@ -410,8 +410,8 @@ export async function lookupMemberByQr(req, res) {
       memberLevel: gamificationLevel,
       phone_number: user.phone_number || null,
       profile_picture: user.profile_picture || null,
-      total_points: toNumber(affiliateRows[0]?.total_points || pointsRows?.[0]?.total_points || 0),
-      cashback_points: toNumber(pointsRows?.[0]?.cashback_points || 0),
+      total_points: toNumber(pointsRows?.[0]?.total_points ?? affiliateRows[0]?.total_points ?? 0),
+cashback_points: toNumber(pointsRows?.[0]?.cashback_points ?? 0),
       commission_points: toNumber(affiliateRows[0]?.commission_points || 0),
       affiliate_tier: affiliateRows[0]?.affiliate_tier || null,
       level: affiliateRows[0]?.level || null,
@@ -485,11 +485,11 @@ export async function getMemberVouchers(req, res) {
 }
 
 export const getOrderHistoryByUserId = async (req, res) => {
-	try {
-		const { user_id } = req.params;
+  try {
+    const { user_id } = req.params;
 
-		const rows = await query(
-			`
+    const rows = await query(
+      `
       SELECT 
         o.id AS order_id,
         o.order_code,
@@ -519,230 +519,234 @@ export const getOrderHistoryByUserId = async (req, res) => {
       WHERE o.user_id = ?
       ORDER BY o.created_at DESC
       `,
-			[user_id]
-		);
+      [user_id]
+    );
 
-		res.json({
-			success: true,
-			data: rows,
-		});
-	} catch (error) {
-		console.error('Gagal mengambil riwayat transaksi:', error);
-		res.status(500).json({
-			success: false,
-			message: 'Gagal mengambil riwayat transaksi',
-		});
-	}
+    res.json({
+      success: true,
+      data: rows,
+    });
+  } catch (error) {
+    console.error('Gagal mengambil riwayat transaksi:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Gagal mengambil riwayat transaksi',
+    });
+  }
 };
 
 export async function saveOrder(req, res) {
-	try {
-		const body = req.body || {};
-		const order = body.order || {};
-		const cart = parseCart(body.rawCartData ?? body.cart ?? []);
+  try {
+    const body = req.body || {};
+    const order = body.order || {};
+    const cart = parseCart(body.rawCartData ?? body.cart ?? []);
 
-		if (!cart.length) {
-			return res.status(400).json({ success: false, error: 'Cart kosong, transaksi tidak bisa disimpan.' });
-		}
+    if (!cart.length) {
+      return res.status(400).json({ success: false, error: 'Cart kosong, transaksi tidak bisa disimpan.' });
+    }
 
-		const orderCode = buildOrderCode(order.orderId || order.order_code);
-		const serviceType = String(order.service || order.serviceType || 'Dine In');
-		const paymentMethod = String(order.payment || order.paymentMethod || 'CASH');
-		const subtotal = toNumber(order.subtotal);
-		const discount = toNumber(order.discount);
-		const total = toNumber(order.total);
-		let calculatedPointsEarned = 0;
-		const pointsUsed = toNumber(order.pointsUsed);
-		const orderType = String(order.order_type || order.orderType || 'kiosk').toLowerCase();
+    const orderCode = buildOrderCode(order.orderId || order.order_code);
+    const serviceType = String(order.service || order.serviceType || 'Dine In');
+    const paymentMethod = String(order.payment || order.paymentMethod || 'CASH');
+    const subtotal = toNumber(order.subtotal);
+    const discount = toNumber(order.discount);
+    const total = toNumber(order.total);
+    let calculatedPointsEarned = 0;
+    const pointsUsed = toNumber(order.pointsUsed);
+    const orderType = String(order.order_type || order.orderType || 'kiosk').toLowerCase();
 
-		const userId = String(order.user_id || order.userId || '').trim();
-		let finalTipePelanggan = 'guest';
-		let finalNamaPelanggan = null;
-		let resolvedMemberCode = '';
+    const userId = String(order.user_id || order.userId || '').trim();
+    let finalTipePelanggan = 'guest';
+    let finalNamaPelanggan = null;
+    let resolvedMemberCode = '';
 
-		if (userId) {
-			finalTipePelanggan = 'member';
-			const userRows = await query(
-				`SELECT user_id, username FROM users WHERE user_id = ? LIMIT 1`,
-				[userId]
-			);
-			if (userRows.length) {
-				finalNamaPelanggan = String(userRows[0].username);
-				resolvedMemberCode = String(userRows[0].user_id);
-			} else {
-				return res.status(404).json({ success: false, error: `Member dengan user_id ${userId} tidak ditemukan.` });
-			}
-		}
+    if (userId) {
+      finalTipePelanggan = 'member';
+      const userRows = await query(
+        `SELECT user_id, username FROM users WHERE user_id = ? LIMIT 1`,
+        [userId]
+      );
+      if (userRows.length) {
+        finalNamaPelanggan = String(userRows[0].username);
+        resolvedMemberCode = String(userRows[0].user_id);
+      } else {
+        return res.status(404).json({ success: false, error: `Member dengan user_id ${userId} tidak ditemukan.` });
+      }
+    }
 
-		const memberCode = String(order.memberCode || order.member_code || resolvedMemberCode).trim();
-		const isMember = memberCode && memberCode !== '-';
+    const memberCode = String(order.memberCode || order.member_code || resolvedMemberCode).trim();
+    const isMember = memberCode && memberCode !== '-';
 
-		const hasTipePelanggan = await hasColumn('orders', 'tipe_pelanggan');
-		const hasNamaPelanggan = await hasColumn('orders', 'nama_pelanggan');
-		const hasOrderType = await hasColumn('orders', 'order_type');
-		const hasQueueNumber = await hasColumn('orders', 'queue_number');
-		const hasMemberCode = await hasColumn('orders', 'member_code');
-		const hasUserId = await hasColumn('orders', 'user_id');
-		const orderItemsUsesOrderCode = await hasColumn('order_items', 'order_code');
-		const orderItemsUsesProductCode = await hasColumn('order_items', 'product_code');
-		const orderItemsUsesOrderId = await hasColumn('order_items', 'order_id');
-		const orderItemsUsesProductId = await hasColumn('order_items', 'product_id');
+    const hasTipePelanggan = await hasColumn('orders', 'tipe_pelanggan');
+    const hasNamaPelanggan = await hasColumn('orders', 'nama_pelanggan');
+    const hasOrderType = await hasColumn('orders', 'order_type');
+    const hasQueueNumber = await hasColumn('orders', 'queue_number');
+    const hasMemberCode = await hasColumn('orders', 'member_code');
+    const hasUserId = await hasColumn('orders', 'user_id');
+    const orderItemsUsesOrderCode = await hasColumn('order_items', 'order_code');
+    const orderItemsUsesProductCode = await hasColumn('order_items', 'product_code');
+    const orderItemsUsesOrderId = await hasColumn('order_items', 'order_id');
+    const orderItemsUsesProductId = await hasColumn('order_items', 'product_id');
 
-		const result = await withTransaction(async (connection) => {
-			const queueNumber = await allocateKioskQueueNumber(connection);
-			const orderColumns = ['order_code', 'service_type', 'subtotal', 'discount', 'total', 'payment_method', 'points_earned', 'points_used'];
-			const orderValues = [orderCode, serviceType, subtotal, discount, total, paymentMethod, 0, pointsUsed];
+    const result = await withTransaction(async (connection) => {
+      const queueNumber = await allocateKioskQueueNumber(connection);
+      const orderColumns = ['order_code', 'service_type', 'subtotal', 'discount', 'total', 'payment_method', 'points_earned', 'points_used'];
+      const orderValues = [orderCode, serviceType, subtotal, discount, total, paymentMethod, 0, pointsUsed];
 
-			if (hasUserId) {
-				orderColumns.push('user_id');
-				orderValues.push(userId || null);
-			}
+      if (hasUserId) {
+        orderColumns.push('user_id');
+        orderValues.push(userId || null);
+      }
 
-			if (hasMemberCode && isMember) {
-				orderColumns.push('member_code');
-				orderValues.push(memberCode);
-			}
+      if (hasMemberCode && isMember) {
+        orderColumns.push('member_code');
+        orderValues.push(memberCode);
+      }
 
-			if (hasQueueNumber) {
-				orderColumns.push('queue_number');
-				orderValues.push(queueNumber);
-			}
+      if (hasQueueNumber) {
+        orderColumns.push('queue_number');
+        orderValues.push(queueNumber);
+      }
 
-			if (hasTipePelanggan) {
-				orderColumns.push('tipe_pelanggan');
-				orderValues.push(finalTipePelanggan);
-			}
+      if (hasTipePelanggan) {
+        orderColumns.push('tipe_pelanggan');
+        orderValues.push(finalTipePelanggan);
+      }
 
-			if (hasNamaPelanggan) {
-				orderColumns.push('nama_pelanggan');
-				orderValues.push(finalNamaPelanggan);
-			}
+      if (hasNamaPelanggan) {
+        orderColumns.push('nama_pelanggan');
+        orderValues.push(finalNamaPelanggan);
+      }
 
-			if (hasOrderType) {
-				orderColumns.push('order_type');
-				orderValues.push(orderType);
-			}
+      if (hasOrderType) {
+        orderColumns.push('order_type');
+        orderValues.push(orderType);
+      }
 
-			const placeholders = orderColumns.map(() => '?').join(', ');
-			await connection.query(
-				`INSERT INTO orders (${orderColumns.join(', ')}) VALUES (${placeholders})`,
-				orderValues
-			);
+      const placeholders = orderColumns.map(() => '?').join(', ');
+      await connection.query(
+        `INSERT INTO orders (${orderColumns.join(', ')}) VALUES (${placeholders})`,
+        orderValues
+      );
 
-			const [[savedOrder]] = await connection.query('SELECT id FROM orders WHERE order_code = ? LIMIT 1', [orderCode]);
-			const orderId = savedOrder?.id;
+      const [[savedOrder]] = await connection.query('SELECT id FROM orders WHERE order_code = ? LIMIT 1', [orderCode]);
+      const orderId = savedOrder?.id;
 
-			for (const item of cart) {
-				const qty = toNumber(item.quantity || item.qty || 1) || 1;
-				const price = toNumber(item.price);
-				const itemSubtotal = toNumber(item.subtotal) || price * qty;
-				const productCode = String(item.id || item.code || '').trim();
-				const [productRows] = await connection.query(
-  `SELECT id, cashback_reward FROM products 
-   WHERE code = ? 
-      AND (product_type = 'kiosk' OR product_type IS NULL OR product_type = '')
-   LIMIT 1`,
-  [productCode]
-);
-				const productId = productRows[0]?.id ?? null;
+      for (const item of cart) {
+        const qty = toNumber(item.quantity || item.qty || 1) || 1;
+        const price = toNumber(item.price);
+        const itemSubtotal = toNumber(item.subtotal) || price * qty;
+        const productCode = String(item.id || item.code || '').trim();
+        const [productRows] = await connection.query(
+          `SELECT id, cashback_reward FROM products
+					 WHERE code = ?
+						AND (product_type = 'kiosk' OR product_type IS NULL OR product_type = '')
+					 LIMIT 1`,
+          [productCode]
+        );
+        const productId = productRows[0]?.id ?? null;
         if (userId) {
-  calculatedPointsEarned += toNumber(productRows[0]?.cashback_reward) * qty;
-}
+          calculatedPointsEarned += toNumber(productRows[0]?.cashback_reward) * qty;
+        }
 
-				if (!productId) {
-					throw new Error(`Produk kiosk dengan kode ${productCode} tidak ditemukan atau bukan produk kiosk.`);
-				}
+        if (!productId) {
+          throw new Error(`Produk kiosk dengan kode ${productCode} tidak ditemukan atau bukan produk kiosk.`);
+        }
 
-				const itemColumns = ['product_name_snapshot', 'price_snapshot', 'qty', 'subtotal', 'order_item_type'];
-				const itemValues = [
-					String(item.name || item.productName || 'Unknown Product'),
-					price,
-					qty,
-					itemSubtotal,
-					'kiosk',
-				];
+        const itemColumns = ['product_name_snapshot', 'price_snapshot', 'qty', 'subtotal', 'order_item_type'];
+        const itemValues = [
+          String(item.name || item.productName || 'Unknown Product'),
+          price,
+          qty,
+          itemSubtotal,
+          'kiosk',
+        ];
 
-				if (orderItemsUsesOrderCode) {
-					itemColumns.push('order_code');
-					itemValues.push(orderCode);
-				} else if (orderItemsUsesOrderId) {
-					itemColumns.push('order_id');
-					itemValues.push(orderId);
-				}
+        if (orderItemsUsesOrderCode) {
+          itemColumns.push('order_code');
+          itemValues.push(orderCode);
+        } else if (orderItemsUsesOrderId) {
+          itemColumns.push('order_id');
+          itemValues.push(orderId);
+        }
 
-				if (orderItemsUsesProductCode) {
-					itemColumns.push('product_code');
-					itemValues.push(productCode);
-				} else if (orderItemsUsesProductId) {
-					itemColumns.push('product_id');
-					itemValues.push(productId);
-				}
+        if (orderItemsUsesProductCode) {
+          itemColumns.push('product_code');
+          itemValues.push(productCode);
+        } else if (orderItemsUsesProductId) {
+          itemColumns.push('product_id');
+          itemValues.push(productId);
+        }
 
-				await connection.query(
-					`INSERT INTO order_items (${itemColumns.join(', ')}) VALUES (${itemColumns.map(() => '?').join(', ')})`,
-					itemValues
-				);
-			} 
-			await connection.query(
-  `UPDATE orders SET points_earned = ? WHERE id = ?`,
-  [calculatedPointsEarned, orderId]
-);
-			if (userId && calculatedPointsEarned > 0) {
-  const { UserGamificationService } = await import('../services/UserGamificationService.js');
+        await connection.query(
+          `INSERT INTO order_items (${itemColumns.join(', ')}) VALUES (${itemColumns.map(() => '?').join(', ')})`,
+          itemValues
+        );
+      }
 
-  await UserGamificationService.addPoints(
-    userId,
-    calculatedPointsEarned,
-    'Cashback transaksi kiosk'
-  );
+      await connection.query(
+        `UPDATE orders SET points_earned = ? WHERE id = ?`,
+        [calculatedPointsEarned, orderId]
+      );
+      if (userId && calculatedPointsEarned > 0) {
+        const { UserGamificationService } = await import('../services/UserGamificationService.js');
+        await UserGamificationService.addPoints(
+          userId,
+          calculatedPointsEarned,
+          'Point transaksi kiosk',
+          'cashback'
+        );
+      }
 
+      const voucherCode = String(order.voucher_code || order.voucherCode || '').trim();
+
+      if (userId && voucherCode) {
+        await connection.query(
+          `UPDATE user_voucher
+					SET status = 'USED'
+					WHERE user_id = ?
+					AND voucher_code = ?
+					AND status = 'ACTIVE'`,
+          [userId, voucherCode]
+        );
+      }
+
+if (userId && pointsUsed > 0) {
   await connection.query(
-    `INSERT INTO user_points (user_id, total_points, cashback_points)
-     VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE
-       total_points = total_points + VALUES(total_points),
-       cashback_points = cashback_points + VALUES(cashback_points)`,
-    [userId, calculatedPointsEarned, calculatedPointsEarned]
+    `UPDATE user_points
+     SET 
+       total_points = GREATEST(total_points - ?, 0),
+       cashback_points = GREATEST(cashback_points - ?, 0)
+     WHERE user_id = ?`,
+    [pointsUsed, pointsUsed, userId]
   );
 }
 
-const voucherCode = String(order.voucher_code || order.voucherCode || '').trim();
+      return { orderCode, queueNumber };
+    });
+    if (userId) {
+      try {
+        (async () => {
+          try {
+            console.log('[AI] Menunggu transaksi commit selesai sebelum mulai AI...');
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            console.log('[AI] Menjalankan generateAiRecommendation untuk user:', userId);
+            const { generateAiRecommendation } = await import('../services/geminiService.js');
+            const aiResult = await generateAiRecommendation(userId);
+            console.log('[AI] Hasil generateAiRecommendation:', aiResult);
+          } catch (aiError) {
+            console.error('[AI] Error pada fire-and-forget AI recommendation:', aiError);
+          }
+        })();
+      } catch (importError) {
+        console.error('Gagal memuat modul AI recommendation:', importError.message);
+      }
+    }
 
-if (userId && voucherCode) {
-  await connection.query(
-    `UPDATE user_voucher
-     SET status = 'USED'
-     WHERE user_id = ?
-       AND voucher_code = ?
-       AND status = 'ACTIVE'`,
-    [userId, voucherCode]
-  );
-}
-			return { orderCode, queueNumber };
-		});
-		if (userId) {
-			try {
-				(async () => {
-					try {
-						console.log('[AI] Menunggu transaksi commit selesai sebelum mulai AI...');
-						await new Promise((resolve) => setTimeout(resolve, 500));
-						console.log('[AI] Menjalankan generateAiRecommendation untuk user:', userId);
-						const { generateAiRecommendation } = await import('../services/geminiService.js');
-						const aiResult = await generateAiRecommendation(userId);
-						console.log('[AI] Hasil generateAiRecommendation:', aiResult);
-					} catch (aiError) {
-						console.error('[AI] Error pada fire-and-forget AI recommendation:', aiError);
-					}
-				})();
-			} catch (importError) {
-				console.error('Gagal memuat modul AI recommendation:', importError.message);
-			}
-		}
-
-		return res.json({ success: true, orderCode: result.orderCode, queueNumber: result.queueNumber });
-	} catch (error) {
-		return res.status(500).json({ success: false, error: error.message });
-	}
+    return res.json({ success: true, orderCode: result.orderCode, queueNumber: result.queueNumber });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
 
 }
 export async function getAdminDashboard(req, res) {

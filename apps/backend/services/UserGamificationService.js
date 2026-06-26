@@ -88,7 +88,7 @@ export class UserGamificationService {
             );
 
             const [pointRows] = await connection.query(
-                `SELECT user_id, total_points, mission_points, voucher_points, cashback_points, commission_points
+                `SELECT user_id, total_points, poin_gamification, cashback_points, commission_points
                  FROM user_points
                  WHERE user_id = ?`,
                 [user_id]
@@ -107,44 +107,41 @@ export class UserGamificationService {
                 }
 
                 await connection.query(
-                    `INSERT INTO user_points (user_id, total_points, mission_points, voucher_points, cashback_points, commission_points)
-                     VALUES (?, ?, ?, 0, 0, 0)`,
+                    `INSERT INTO user_points (user_id, total_points, poin_gamification, cashback_points, commission_points)
+                     VALUES (?, ?, ?, 0, 0)`,
                     [user_id, existingGamificationPoints, existingGamificationPoints]
                 );
             }
 
             const current = pointRows[0] || {};
-            const currentMission = Number(current.mission_points || 0);
-            const currentVoucher = Number(current.voucher_points || 0);
+            const currentGamification = Number(current.poin_gamification || 0);
             const currentCashback = Number(current.cashback_points || 0);
             const currentCommission = Number(current.commission_points || 0);
 
-            let nextMission = currentMission;
-            let nextVoucher = currentVoucher;
+            let nextGamification = currentGamification;
             let nextCashback = currentCashback;
             let nextCommission = currentCommission;
 
             if (category === 'mission') {
-                nextMission = currentMission + points;
+                nextGamification = currentGamification + points;
             } else if (category === 'voucher') {
-                nextVoucher = currentVoucher + points;
+                nextGamification = currentGamification + points;
             } else if (category === 'cashback') {
                 nextCashback = currentCashback + points;
             } else if (category === 'commission') {
                 nextCommission = currentCommission + points;
             }
 
-            const nextTotal = nextMission + nextVoucher + nextCashback + nextCommission;
+            const nextTotal = nextGamification + nextCashback + nextCommission;
 
             await connection.query(
                 `UPDATE user_points
                  SET total_points = ?,
-                     mission_points = ?,
-                     voucher_points = ?,
+                     poin_gamification = ?,
                      cashback_points = ?,
                      commission_points = ?
                  WHERE user_id = ?`,
-                [nextTotal, nextMission, nextVoucher, nextCashback, nextCommission, user_id]
+                [nextTotal, nextGamification, nextCashback, nextCommission, user_id]
             );
 
             await connection.query(
@@ -252,7 +249,7 @@ export class UserGamificationService {
             );
 
             const [pointRows] = await connection.query(
-                `SELECT user_id, total_points, mission_points, voucher_points, cashback_points, commission_points
+                `SELECT user_id, total_points, poin_gamification, cashback_points, commission_points
                  FROM user_points
                  WHERE user_id = ?`,
                 [user_id]
@@ -271,33 +268,30 @@ export class UserGamificationService {
                 }
 
                 await connection.query(
-                    `INSERT INTO user_points (user_id, total_points, mission_points, voucher_points, cashback_points, commission_points)
-                     VALUES (?, ?, ?, 0, 0, 0)`,
+                    `INSERT INTO user_points (user_id, total_points, poin_gamification, cashback_points, commission_points)
+                     VALUES (?, ?, ?, 0, 0)`,
                     [user_id, existingGamificationPoints, existingGamificationPoints]
                 );
             }
 
             const current = pointRows[0] || {};
-            const currentMission = Number(current.mission_points || 0);
-            const currentVoucher = Number(current.voucher_points || 0);
+            const currentGamification = Number(current.poin_gamification || 0);
             const currentCashback = Number(current.cashback_points || 0);
             const currentCommission = Number(current.commission_points || 0);
 
-            const nextMission = currentMission + checkinPoints;
-            const nextVoucher = currentVoucher;
+            const nextGamification = currentGamification + checkinPoints;
             const nextCashback = currentCashback;
             const nextCommission = currentCommission;
-            const nextTotal = nextMission + nextVoucher + nextCashback + nextCommission;
+            const nextTotal = nextGamification + nextCashback + nextCommission;
 
             await connection.query(
                 `UPDATE user_points
                  SET total_points = ?,
-                     mission_points = ?,
-                     voucher_points = ?,
+                     poin_gamification = ?,
                      cashback_points = ?,
                      commission_points = ?
                  WHERE user_id = ?`,
-                [nextTotal, nextMission, nextVoucher, nextCashback, nextCommission, user_id]
+                [nextTotal, nextGamification, nextCashback, nextCommission, user_id]
             );
 
             await connection.query(
@@ -388,7 +382,7 @@ export class UserGamificationService {
                 );
                 
                 const [pointRows] = await connection.query(
-                    `SELECT user_id, total_points, mission_points, voucher_points, cashback_points, commission_points
+                    `SELECT user_id, total_points, poin_gamification, cashback_points, commission_points
                      FROM user_points
                      WHERE user_id = ?`,
                     [user_id]
@@ -396,33 +390,30 @@ export class UserGamificationService {
 
                 if (!pointRows || pointRows.length === 0) {
                     await connection.query(
-                        `INSERT INTO user_points (user_id, total_points, mission_points, voucher_points, cashback_points, commission_points)
-                         VALUES (?, ?, ?, 0, 0, 0)`,
+                        `INSERT INTO user_points (user_id, total_points, poin_gamification, cashback_points, commission_points)
+                         VALUES (?, ?, ?, 0, 0)`,
                         [user_id, newTotalPoints, newTotalPoints]
                     );
                 }
 
                 const current = pointRows[0] || {};
-                const currentMission = Number(current.mission_points || 0);
-                const currentVoucher = Number(current.voucher_points || 0);
+                const currentGamification = Number(current.poin_gamification || 0);
                 const currentCashback = Number(current.cashback_points || 0);
                 const currentCommission = Number(current.commission_points || 0);
 
-                const nextMission = currentMission;
-                const nextVoucher = currentVoucher;
+                const nextGamification = currentGamification;
                 const nextCashback = currentCashback + points;
                 const nextCommission = currentCommission;
-                const nextTotal = nextMission + nextVoucher + nextCashback + nextCommission;
+                const nextTotal = nextGamification + nextCashback + nextCommission;
 
                 await connection.query(
                     `UPDATE user_points
                      SET total_points = ?,
-                         mission_points = ?,
-                         voucher_points = ?,
+                         poin_gamification = ?,
                          cashback_points = ?,
                          commission_points = ?
                      WHERE user_id = ?`,
-                    [nextTotal, nextMission, nextVoucher, nextCashback, nextCommission, user_id]
+                    [nextTotal, nextGamification, nextCashback, nextCommission, user_id]
                 );
 
                 await connection.query(

@@ -154,7 +154,7 @@ export class VoucherService {
 
             if (!existingUserPoints || existingUserPoints.length === 0) {
                 await queryWithConn(
-                    'INSERT INTO user_points (user_id, total_points, mission_points, voucher_points, cashback_points, commission_points) VALUES (?, ?, ?, 0, 0, 0)',
+                    'INSERT INTO user_points (user_id, total_points, poin_gamification, cashback_points, commission_points) VALUES (?, ?, ?, 0, 0)',
                     [userId, currentPoints, currentPoints]
                 );
             }
@@ -166,15 +166,14 @@ export class VoucherService {
 
             if (pointsCost > 0) {
                 const [pointRows] = await connection.query(
-                    `SELECT total_points, mission_points, voucher_points, cashback_points, commission_points
+                    `SELECT total_points, poin_gamification, cashback_points, commission_points
                      FROM user_points
                      WHERE user_id = ?`,
                     [userId]
                 );
 
                 const current = pointRows[0] || {};
-                const nextMission = Number(current.mission_points || 0);
-                const nextVoucher = Number(current.voucher_points || 0);
+                const nextGamification = Number(current.poin_gamification || 0) - pointsCost;
                 const nextCashback = Number(current.cashback_points || 0);
                 const nextCommission = Number(current.commission_points || 0);
                 const nextTotalPoints = Number(current.total_points || 0) - pointsCost;
@@ -182,12 +181,11 @@ export class VoucherService {
                 await connection.query(
                     `UPDATE user_points
                      SET total_points = ?,
-                         mission_points = ?,
-                         voucher_points = ?,
+                         poin_gamification = ?,
                          cashback_points = ?,
                          commission_points = ?
                      WHERE user_id = ?`,
-                    [nextTotalPoints, nextMission, nextVoucher, nextCashback, nextCommission, userId]
+                    [nextTotalPoints, nextGamification, nextCashback, nextCommission, userId]
                 );
 
                 await connection.query(
