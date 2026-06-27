@@ -3,7 +3,8 @@ export type ViewType =
   | 'DASHBOARD'
   | 'CATEGORIES'
   | 'PRODUCTS'
-  | 'TRANSACTIONS';
+  | 'TRANSACTIONS'
+  | 'AFFILIATE';
 
 export interface Category {
   id: string;

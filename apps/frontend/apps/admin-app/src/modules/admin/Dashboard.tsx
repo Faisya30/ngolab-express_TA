@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Dashboard from './components/Dashboard';
 import Header from './components/Header';
+import AffiliateDashboard from './components/AffiliateDashboard';
 import Sidebar from './components/Sidebar';
 import Auth from './components/Auth';
 import ProductManagement from './components/ProductManagement';
@@ -21,6 +22,7 @@ const AdminDashboard: React.FC = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [period, setPeriod] = useState<'day' | 'week' | 'month' | 'all'>('day');
+  const [hubData, setHubData] = useState<any>(null);
   const adminProductType = getProductTypeFromRole(user?.role);
 
   useEffect(() => {
@@ -72,15 +74,34 @@ const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-
     loadDashboardData();
-
     const interval = setInterval(() => {
       loadDashboardData();
     }, 5000);
-
     return () => clearInterval(interval);
   }, [isAuthenticated, loadDashboardData]);
+
+  const loadHubData = useCallback(async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/membership/admin/hub-data`);
+      const data = await res.json();
+      if (data.success) {
+        setHubData(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to load hub data:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    loadHubData();
+    const interval = setInterval(() => {
+      loadHubData();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, loadHubData]);
+
   const handleLogin = (userData: any) => {
     setUser(userData);
     setIsAuthenticated(true);
@@ -155,15 +176,19 @@ const AdminDashboard: React.FC = () => {
             />
           )}
 
-          {currentView === 'TRANSACTIONS' && (
-            <TransactionList
-              orders={orders}
-              orderDetails={orderDetails}
-              onRefresh={handleRefresh}
-            />
-          )}
+{currentView === 'TRANSACTIONS' && (
+             <TransactionList
+               orders={orders}
+               orderDetails={orderDetails}
+               onRefresh={handleRefresh}
+             />
+           )}
 
-        </div>
+           {currentView === 'AFFILIATE' && (
+             <AffiliateDashboard onRefresh={loadHubData} hubData={hubData} />
+           )}
+
+         </div>
       </div>
     </div>
   );

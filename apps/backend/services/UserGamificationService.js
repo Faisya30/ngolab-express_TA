@@ -136,12 +136,13 @@ export class UserGamificationService {
 
             await connection.query(
                 `UPDATE user_points
-                 SET total_points = ?,
-                     poin_gamification = ?,
+                 SET poin_gamification = ?,
                      cashback_points = ?,
-                     commission_points = ?
+                     commission_points = ?,
+                     total_points = ?,
+                     updated_at = CURRENT_TIMESTAMP
                  WHERE user_id = ?`,
-                [nextTotal, nextGamification, nextCashback, nextCommission, user_id]
+                [nextGamification, nextCashback, nextCommission, nextTotal, user_id]
             );
 
             await connection.query(
@@ -286,12 +287,11 @@ export class UserGamificationService {
 
             await connection.query(
                 `UPDATE user_points
-                 SET total_points = ?,
-                     poin_gamification = ?,
-                     cashback_points = ?,
-                     commission_points = ?
+                 SET poin_gamification = ?,
+                     total_points = ?,
+                     updated_at = CURRENT_TIMESTAMP
                  WHERE user_id = ?`,
-                [nextTotal, nextGamification, nextCashback, nextCommission, user_id]
+                [nextGamification, nextTotal, user_id]
             );
 
             await connection.query(
@@ -408,12 +408,11 @@ export class UserGamificationService {
 
                 await connection.query(
                     `UPDATE user_points
-                     SET total_points = ?,
-                         poin_gamification = ?,
-                         cashback_points = ?,
-                         commission_points = ?
+                     SET cashback_points = ?,
+                         total_points = ?,
+                         updated_at = CURRENT_TIMESTAMP
                      WHERE user_id = ?`,
-                    [nextTotal, nextGamification, nextCashback, nextCommission, user_id]
+                    [nextCashback, nextTotal, user_id]
                 );
 
                 await connection.query(

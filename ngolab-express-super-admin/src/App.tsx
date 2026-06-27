@@ -4,34 +4,34 @@
  */
 
 import { useState, useMemo } from 'react';
-import { 
-  LayoutDashboard, 
-  ShoppingBag, 
-  Scan, 
-  Users, 
-  Gamepad2, 
-  Package, 
-  LogOut, 
-  Menu, 
-  X, 
-  Plus, 
-  TrendingUp, 
-  Users2, 
+import {
+  LayoutDashboard,
+  ShoppingBag,
+  Scan,
+  Users,
+  Gamepad2,
+  Package,
+  LogOut,
+  Menu,
+  X,
+  Plus,
+  TrendingUp,
+  Users2,
   CreditCard,
   ChevronRight,
   Search,
   Bell,
   UserPlus
 } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip as RechartsTooltip, 
-  ResponsiveContainer, 
-  LineChart, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  LineChart,
   Line,
   AreaChart,
   Area
@@ -49,10 +49,38 @@ function cn(...inputs: ClassValue[]) {
 // --- Mock Data ---
 
 const APP_TYPES = [
-  { id: 'kiosk', label: 'Kiosk', icon: ShoppingBag, color: 'text-emerald-600', bg: 'bg-emerald-100', adminUrl: 'http://localhost:3002' },
-  { id: 'cv', label: 'Computer Vision', icon: Scan, color: 'text-blue-600', bg: 'bg-blue-100', adminUrl: 'http://10.216.154.31:3001' },
-  { id: 'affiliate', label: 'Member & Afiliasi', icon: Users, color: 'text-purple-600', bg: 'bg-purple-100', adminUrl: 'http://localhost:3002/affiliate' },
-  { id: 'game', label: 'Gamefication', icon: Gamepad2, color: 'text-orange-600', bg: 'bg-orange-100', adminUrl: 'http://localhost:3002/game' },
+  {
+    id: 'kiosk',
+    label: 'Kiosk',
+    icon: ShoppingBag,
+    color: 'text-emerald-600',
+    bg: 'bg-emerald-100',
+    adminUrl: 'http://localhost:3002',
+  },
+  {
+    id: 'cv',
+    label: 'Computer Vision',
+    icon: Scan,
+    color: 'text-blue-600',
+    bg: 'bg-blue-100',
+    adminUrl: 'http://192.168.110.165:3001',
+  },
+  {
+  id: 'affiliate',
+  label: 'Member & Afiliasi',
+  icon: Users,
+  color: 'text-purple-600',
+  bg: 'bg-purple-100',
+  adminUrl: 'http://192.168.110.181:3000'
+},
+{
+  id: 'game',
+  label: 'Gamefication',
+  icon: Gamepad2,
+  color: 'text-orange-600',
+  bg: 'bg-orange-100',
+  adminUrl: 'http://192.168.110.200:3003'
+},
 ];
 
 const ANALYTICS_DATA = [
@@ -119,17 +147,17 @@ export default function App() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const backendUrl = window.location.hostname === 'localhost' 
-        ? 'http://localhost:4000' 
+      const backendUrl = window.location.hostname === 'localhost'
+        ? 'http://localhost:4000'
         : `http://${window.location.hostname}:4000`;
-      
+
       const response = await fetch(`${backendUrl}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
       const data = await response.json();
-      
+
       // Cek apakah login berhasil DAN role super_admin
       if (data.success && data.user && normalizeRole(data.user.role) === 'super_admin') {
         setIsLoggedIn(true);
@@ -162,15 +190,15 @@ export default function App() {
                   {error}
                 </div>
               )}
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">Username</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
                     <Users size={16} />
                   </span>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
@@ -186,8 +214,8 @@ export default function App() {
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
                     <CreditCard size={16} />
                   </span>
-                  <input 
-                    type="password" 
+                  <input
+                    type="password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -205,7 +233,7 @@ export default function App() {
                 </div>
               </div>
 
-              <button 
+              <button
                 type="submit"
                 className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all transform active:scale-[0.98]"
               >
@@ -290,9 +318,9 @@ export default function App() {
             </div>
             <span className="text-xl font-bold text-white tracking-tight text-nowrap">Ngolab Express</span>
           </div>
-          
+
           <div className="h-6 w-px bg-slate-700 hidden sm:block" />
-          
+
           <h1 className="text-sm font-medium text-slate-400 hidden lg:block">
             Super Admin Dashboard
           </h1>
@@ -301,13 +329,13 @@ export default function App() {
         <div className="flex items-center gap-6">
           <div className="relative hidden md:block">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder="Search resources..."
               className="pl-10 pr-4 py-1.5 bg-slate-800 border-transparent text-white placeholder:text-slate-500 focus:bg-slate-700 focus:ring-2 focus:ring-emerald-500 rounded-full text-sm w-64 transition-all outline-none"
             />
           </div>
-          
+
           <div className="flex items-center gap-3 px-3">
             <button className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full relative transition-colors">
               <Bell size={20} />
@@ -318,7 +346,7 @@ export default function App() {
                 <span className="text-xs font-bold text-white uppercase">{username}</span>
                 <span className="text-[10px] text-slate-500">Super Admin</span>
               </div>
-              <button 
+              <button
                 onClick={() => {
                   setIsLoggedIn(false);
                   setHasEnteredDashboard(false);
@@ -340,7 +368,7 @@ export default function App() {
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 pb-12">
-          
+
           {/* Welcome & App Switcher (Mobile Toggle) */}
           <section className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
             <div>
@@ -348,7 +376,7 @@ export default function App() {
               <h2 className="text-3xl font-bold text-zinc-900">Welcome Back, Admin</h2>
               <p className="text-zinc-500 text-sm mt-1">Hari ini ekosistem <span className="font-semibold text-zinc-700">Ngolab Express</span> terpantau stabil.</p>
             </div>
-            
+
             {/* Quick App Context Switcher */}
             <div className="flex bg-white p-1 rounded-xl border border-zinc-200 shadow-sm w-fit">
               {APP_TYPES.slice(0, 4).map(app => (
@@ -356,23 +384,23 @@ export default function App() {
                   <button
                     onClick={() => {
                       setActiveApp(app.id);
-                      if (app.id === 'cv') {
+                      if (app.adminUrl) {
                         window.location.href = app.adminUrl;
                       }
                     }}
                     className={cn(
                       "px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2",
-                      activeApp === app.id 
-                        ? "bg-zinc-900 text-white shadow-md" 
+                      activeApp === app.id
+                        ? "bg-zinc-900 text-white shadow-md"
                         : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50"
                     )}
                   >
                     <app.icon size={16} />
                     <span className="hidden sm:inline">{app.label}</span>
-                    
+
                     {/* Explicit link to Admin Page when active */}
                     {activeApp === app.id && (
-                      <a 
+                      <a
                         href={app.adminUrl}
                         onClick={(e) => e.stopPropagation()}
                         className="ml-2 p-1 bg-emerald-500 hover:bg-emerald-400 text-white rounded-md transition-colors flex items-center gap-1 text-[10px] animate-in fade-in slide-in-from-left-1"
@@ -496,38 +524,38 @@ export default function App() {
                       <option>Last 30 Days</option>
                     </select>
                   </div>
-                  
+
                   <div className="h-75 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={ANALYTICS_DATA}>
                         <defs>
                           <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                        <XAxis 
-                          dataKey="name" 
-                          axisLine={false} 
-                          tickLine={false} 
-                          tick={{fill: '#71717a', fontSize: 12}} 
+                        <XAxis
+                          dataKey="name"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#71717a', fontSize: 12 }}
                         />
-                        <YAxis 
-                          axisLine={false} 
-                          tickLine={false} 
-                          tick={{fill: '#71717a', fontSize: 12}}
+                        <YAxis
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#71717a', fontSize: 12 }}
                         />
-                        <RechartsTooltip 
+                        <RechartsTooltip
                           contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
                         />
-                        <Area 
-                          type="monotone" 
-                          dataKey="sales" 
-                          stroke="#10b981" 
-                          strokeWidth={3} 
-                          fillOpacity={1} 
-                          fill="url(#colorSales)" 
+                        <Area
+                          type="monotone"
+                          dataKey="sales"
+                          stroke="#10b981"
+                          strokeWidth={3}
+                          fillOpacity={1}
+                          fill="url(#colorSales)"
                         />
                       </AreaChart>
                     </ResponsiveContainer>
@@ -537,109 +565,109 @@ export default function App() {
 
               {/* Data Tables Grid */}
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-            
-            {/* Global Inventory Table */}
-            <Card className="flex flex-col">
-              <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold">Global Inventory</h3>
-                  <p className="text-sm text-zinc-500">Katalog produk lintas aplikasi</p>
-                </div>
-                <button className="text-xs font-semibold text-emerald-600 hover:underline flex items-center gap-1">
-                  View Full Catalog <ChevronRight size={14} />
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-zinc-50 text-zinc-500 font-semibold uppercase text-[10px] tracking-wider">
-                    <tr>
-                      <th className="px-6 py-3">ID</th>
-                      <th className="px-6 py-3">Produk</th>
-                      <th className="px-6 py-3">Stok</th>
-                      <th className="px-6 py-3">Harga</th>
-                      <th className="px-6 py-3">Tag</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100">
-                    {filteredInventory.map((item) => (
-                      <tr key={item.id} className="hover:bg-zinc-50/50 transition-colors">
-                        <td className="px-6 py-4 font-medium text-zinc-400">{item.id}</td>
-                        <td className="px-6 py-4 font-semibold text-zinc-900">{item.name}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col gap-1">
-                            <span className={item.stock === 0 ? 'text-rose-600' : 'text-zinc-700'}>
-                              {item.stock} Units
-                            </span>
-                            <div className="w-20 h-1 bg-zinc-100 rounded-full overflow-hidden">
-                              <div 
-                                className={cn("h-full rounded-full", item.stock === 0 ? 'bg-rose-500' : 'bg-emerald-500')} 
-                                style={{ width: `${Math.min(item.stock, 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-zinc-700">Rp {item.price.toLocaleString()}</td>
-                        <td className="px-6 py-4">
-                          <Badge label={item.tag} variant={item.tag as any} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
 
-            {/* User Management Table */}
-            <Card className="flex flex-col">
-              <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold">User Management</h3>
-                  <p className="text-sm text-zinc-500">Kelola admin dan hak akses</p>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-zinc-50 text-zinc-500 font-semibold uppercase text-[10px] tracking-wider">
-                    <tr>
-                      <th className="px-6 py-3">ID</th>
-                      <th className="px-6 py-3">Username</th>
-                      <th className="px-6 py-3">Role</th>
-                      <th className="px-6 py-3">Created At</th>
-                      <th className="px-6 py-3"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100">
-                    {ADMINS.map((admin) => (
-                      <tr key={admin.id} className="hover:bg-zinc-50/50 transition-colors">
-                        <td className="px-6 py-4 font-medium text-zinc-400">#{admin.id}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-500 font-bold border border-zinc-200 uppercase">
-                              {admin.username.charAt(0)}
-                            </div>
-                            <span className="font-semibold text-zinc-900">{admin.username}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <Badge label={admin.role} variant="system" />
-                        </td>
-                        <td className="px-6 py-4 text-zinc-500">{admin.created_at}</td>
-                        <td className="px-6 py-4 text-right">
-                          <button className="p-1 px-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors font-medium">
-                            Edit
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="p-4 mt-auto border-t border-zinc-100 text-center">
-                <button className="text-zinc-500 hover:text-zinc-900 text-xs font-medium">
-                  Lihat Semua Log Aktivitas
-                </button>
-              </div>
-            </Card>
+                {/* Global Inventory Table */}
+                <Card className="flex flex-col">
+                  <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold">Global Inventory</h3>
+                      <p className="text-sm text-zinc-500">Katalog produk lintas aplikasi</p>
+                    </div>
+                    <button className="text-xs font-semibold text-emerald-600 hover:underline flex items-center gap-1">
+                      View Full Catalog <ChevronRight size={14} />
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-zinc-50 text-zinc-500 font-semibold uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="px-6 py-3">ID</th>
+                          <th className="px-6 py-3">Produk</th>
+                          <th className="px-6 py-3">Stok</th>
+                          <th className="px-6 py-3">Harga</th>
+                          <th className="px-6 py-3">Tag</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100">
+                        {filteredInventory.map((item) => (
+                          <tr key={item.id} className="hover:bg-zinc-50/50 transition-colors">
+                            <td className="px-6 py-4 font-medium text-zinc-400">{item.id}</td>
+                            <td className="px-6 py-4 font-semibold text-zinc-900">{item.name}</td>
+                            <td className="px-6 py-4">
+                              <div className="flex flex-col gap-1">
+                                <span className={item.stock === 0 ? 'text-rose-600' : 'text-zinc-700'}>
+                                  {item.stock} Units
+                                </span>
+                                <div className="w-20 h-1 bg-zinc-100 rounded-full overflow-hidden">
+                                  <div
+                                    className={cn("h-full rounded-full", item.stock === 0 ? 'bg-rose-500' : 'bg-emerald-500')}
+                                    style={{ width: `${Math.min(item.stock, 100)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-zinc-700">Rp {item.price.toLocaleString()}</td>
+                            <td className="px-6 py-4">
+                              <Badge label={item.tag} variant={item.tag as any} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+
+                {/* User Management Table */}
+                <Card className="flex flex-col">
+                  <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold">User Management</h3>
+                      <p className="text-sm text-zinc-500">Kelola admin dan hak akses</p>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-zinc-50 text-zinc-500 font-semibold uppercase text-[10px] tracking-wider">
+                        <tr>
+                          <th className="px-6 py-3">ID</th>
+                          <th className="px-6 py-3">Username</th>
+                          <th className="px-6 py-3">Role</th>
+                          <th className="px-6 py-3">Created At</th>
+                          <th className="px-6 py-3"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100">
+                        {ADMINS.map((admin) => (
+                          <tr key={admin.id} className="hover:bg-zinc-50/50 transition-colors">
+                            <td className="px-6 py-4 font-medium text-zinc-400">#{admin.id}</td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-500 font-bold border border-zinc-200 uppercase">
+                                  {admin.username.charAt(0)}
+                                </div>
+                                <span className="font-semibold text-zinc-900">{admin.username}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <Badge label={admin.role} variant="system" />
+                            </td>
+                            <td className="px-6 py-4 text-zinc-500">{admin.created_at}</td>
+                            <td className="px-6 py-4 text-right">
+                              <button className="p-1 px-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors font-medium">
+                                Edit
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="p-4 mt-auto border-t border-zinc-100 text-center">
+                    <button className="text-zinc-500 hover:text-zinc-900 text-xs font-medium">
+                      Lihat Semua Log Aktivitas
+                    </button>
+                  </div>
+                </Card>
 
               </div>
             </>

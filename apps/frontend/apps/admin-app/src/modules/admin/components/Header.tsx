@@ -11,6 +11,7 @@ const Header: React.FC<HeaderProps> = ({ currentView, user }) => {
   const getTitle = () => {
     switch (currentView) {
       case 'DASHBOARD': return 'DASHBOARD';
+      case 'AFFILIATE': return 'MEMBER & AFFILIATE';
       case 'CATEGORIES': return 'CATEGORIES';
       case 'PRODUCTS': return 'INVENTORY';
       case 'TRANSACTIONS': return 'ORDER HISTORY';

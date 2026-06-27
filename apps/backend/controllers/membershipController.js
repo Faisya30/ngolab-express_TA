@@ -293,78 +293,86 @@ async function fetchVoucherPoints(userId) {
    return toNumber(rows[0]?.poin_gamification, 0);
  }
 
-    async function updateUserPointsCategory(userId, pointType, points, connection = null) {
-      const useConnection = connection || query;
-      const category = pointType === 'voucher' || pointType === 'mission' ? 'gamification' : pointType;
+async function updateUserPointsCategory(userId, pointType, points, connection = null) {
+       const useConnection = connection || query;
+       const category = pointType === 'voucher' || pointType === 'mission' ? 'gamification' : pointType;
 
-      const [pointRows] = await useConnection(
-        `SELECT user_id, total_points, poin_gamification, cashback_points, commission_points
-         FROM user_points
-         WHERE user_id = ?`,
-        [userId]
-      );
+       const [pointRows] = await useConnection(
+         `SELECT user_id, total_points, poin_gamification, cashback_points, commission_points
+          FROM user_points
+          WHERE user_id = ?`,
+         [userId]
+       );
 
-      if (!pointRows || pointRows.length === 0) {
-        let existingGamificationPoints = 0;
-        try {
-          const userGamificationRows = await useConnection(
-            `SELECT points FROM UserGamification WHERE user_id = ? LIMIT 1`,
-            [userId]
-          );
-          existingGamificationPoints = Number(userGamificationRows[0]?.points || 0);
-        } catch {
-          existingGamificationPoints = 0;
-        }
+       if (!pointRows || pointRows.length === 0) {
+         await useConnection(
+           `INSERT INTO user_points (user_id, total_points, poin_gamification, cashback_points, commission_points)
+            VALUES (?, 0, 0, 0, 0)`,
+           [userId]
+         );
+       }
 
-        await useConnection(
-          `INSERT INTO user_points (user_id, total_points, poin_gamification, cashback_points, commission_points)
-           VALUES (?, ?, ?, 0, 0)`,
-          [userId, existingGamificationPoints, existingGamificationPoints]
-        );
-      }
+       const current = pointRows[0] || {};
+       const currentGamification = Number(current.poin_gamification || 0);
+       const currentCashback = Number(current.cashback_points || 0);
+       const currentCommission = Number(current.commission_points || 0);
 
-      const current = pointRows[0] || {};
-      const currentGamification = Number(current.poin_gamification || 0);
-      const currentCashback = Number(current.cashback_points || 0);
-      const currentCommission = Number(current.commission_points || 0);
+       let nextGamification = currentGamification;
+       let nextCashback = currentCashback;
+       let nextCommission = currentCommission;
 
-      let nextGamification = currentGamification;
-      let nextCashback = currentCashback;
-      let nextCommission = currentCommission;
+       if (category === 'gamification') {
+         nextGamification = currentGamification + points;
+       } else if (category === 'cashback') {
+         nextCashback = currentCashback + points;
+       } else if (category === 'commission') {
+         nextCommission = currentCommission + points;
+       }
 
-      if (category === 'gamification') {
-        nextGamification = currentGamification + points;
-      } else if (category === 'cashback') {
-        nextCashback = currentCashback + points;
-      } else if (category === 'commission') {
-        nextCommission = currentCommission + points;
-      }
+       const nextTotal = nextGamification + nextCashback + nextCommission;
 
-      const nextTotal = nextGamification + nextCashback + nextCommission;
+       if (category === 'commission') {
+         await useConnection(
+           `UPDATE user_points
+            SET commission_points = ?,
+                total_points = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = ?`,
+           [nextCommission, nextTotal, userId]
+         );
+       } else if (category === 'cashback') {
+         await useConnection(
+           `UPDATE user_points
+            SET cashback_points = ?,
+                total_points = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = ?`,
+           [nextCashback, nextTotal, userId]
+         );
+       } else if (category === 'gamification') {
+         await useConnection(
+           `UPDATE user_points
+            SET poin_gamification = ?,
+                total_points = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = ?`,
+           [nextGamification, nextTotal, userId]
+         );
+       }
 
-      await useConnection(
-        `UPDATE user_points
-         SET total_points = ?,
-             poin_gamification = ?,
-             cashback_points = ?,
-             commission_points = ?
-         WHERE user_id = ?`,
-        [nextTotal, nextGamification, nextCashback, nextCommission, userId]
-      );
+       const level = calculateMemberLevel(nextTotal);
+       await useConnection(
+         `UPDATE users SET membership_level = ? WHERE user_id = ?`,
+         [level, userId]
+       );
 
-      const level = calculateMemberLevel(nextTotal);
-      await useConnection(
-        `UPDATE users SET membership_level = ? WHERE user_id = ?`,
-        [level, userId]
-      );
+       await useConnection(
+         `UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?`,
+         [level, userId]
+       );
 
-      await useConnection(
-        `UPDATE UserGamification SET memberLevel = ? WHERE user_id = ?`,
-        [level, userId]
-      );
-
-      return { total_points: nextTotal, memberLevel: level };
-    }
+       return { total_points: nextTotal, memberLevel: level };
+     }
 
   async function fetchUserGamificationLevel(userId) {
   const rows = await query(
@@ -403,7 +411,7 @@ async function fetchCommissionPoints(userId) {
 
 async function buildPointsPayload(userId) {
     const pointRows = await query(
-      `SELECT poin_gamification, cashback_points, commission_points
+      `SELECT total_points, commission_points, cashback_points, poin_gamification
        FROM user_points
        WHERE user_id = ?
        LIMIT 1`,
@@ -414,8 +422,9 @@ async function buildPointsPayload(userId) {
     const gamificationPoints = toNumber(row.poin_gamification || 0, 0);
     const cashbackPoints = toNumber(row.cashback_points || 0, 0);
     const commissionPoints = toNumber(row.commission_points || 0, 0);
-    const totalPoints = gamificationPoints + cashbackPoints + commissionPoints;
-    const memberLevel = calculateMemberLevel(totalPoints);
+    const totalPoints = toNumber(row.total_points || 0, 0);
+
+    const memberLevel = await fetchUserGamificationLevel(userId);
 
     return {
       total_points: totalPoints,
@@ -428,7 +437,7 @@ async function buildPointsPayload(userId) {
     };
   }
 
-  async function upsertUserPoints(userId) {
+async function upsertUserPoints(userId) {
     const pointRows = await query(
       `SELECT poin_gamification, cashback_points, commission_points
        FROM user_points
@@ -437,22 +446,27 @@ async function buildPointsPayload(userId) {
       [userId]
     );
 
-    const row = pointRows[0] || {};
+    if (!pointRows || pointRows.length === 0) {
+      await query(
+        `INSERT INTO user_points (user_id, total_points, poin_gamification, cashback_points, commission_points)
+         VALUES (?, 0, 0, 0, 0)`,
+        [userId]
+      );
+      return { totalPoints: 0, gamificationPoints: 0, cashbackPoints: 0, commissionPoints: 0 };
+    }
+
+    const row = pointRows[0];
     const gamificationPoints = toNumber(row.poin_gamification || 0, 0);
     const cashbackPoints = toNumber(row.cashback_points || 0, 0);
     const commissionPoints = toNumber(row.commission_points || 0, 0);
     const totalPoints = gamificationPoints + cashbackPoints + commissionPoints;
 
     await query(
-      `INSERT INTO user_points (user_id, total_points, poin_gamification, cashback_points, commission_points)
-      VALUES (?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        total_points = VALUES(total_points),
-        poin_gamification = VALUES(poin_gamification),
-        cashback_points = VALUES(cashback_points),
-        commission_points = VALUES(commission_points),
-        updated_at = CURRENT_TIMESTAMP`,
-      [userId, totalPoints, gamificationPoints, cashbackPoints, commissionPoints]
+      `UPDATE user_points
+       SET total_points = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = ?`,
+      [totalPoints, userId]
     );
 
     return { totalPoints, gamificationPoints, cashbackPoints, commissionPoints };
@@ -641,50 +655,75 @@ console.log('[REGISTER] QUERY -> insert user_points');
           [referredBy]
         );
 
-        if (referrerRows.length) {
-          const referrer = referrerRows[0];
-          const nextTotalReferrals = Number(referrer.total_referrals || 0) + 1;
-          const nextTotalDownlines = Number(referrer.total_downlines || 0) + 1;
-          const nextTier = resolveAffiliateTierByReferrals(nextTotalReferrals);
-          const referralBonus = nextTier.referral_bonus;
+if (referrerRows.length) {
+           const referrer = referrerRows[0];
+           const nextTotalReferrals = Number(referrer.total_referrals || 0) + 1;
+           const nextTotalDownlines = Number(referrer.total_downlines || 0) + 1;
+           const nextTier = resolveAffiliateTierByReferrals(nextTotalReferrals);
+           const referralBonus = nextTier.referral_bonus;
 
-          console.log('[REGISTER] QUERY -> update affiliate_networks for referrer', { referredBy, nextTotalReferrals, nextTotalDownlines, nextTier });
-          await connection.query(
-            `UPDATE affiliate_networks
-            SET total_referrals = ?,
-                total_downlines = ?,
-                affiliate_tier = ?,
-                level = ?,
-                commission_points = commission_points + ?,
-                total_points = total_points + ?,
-                commission_rate = ?
-            WHERE user_id = ?`,
-            [
-              nextTotalReferrals,
-              nextTotalDownlines,
-              nextTier.affiliate_tier,
-              nextTier.level,
-              referralBonus,
-              referralBonus,
-              nextTier.commission_rate,
-              referredBy,
-            ]
-          );
-          console.log('[REGISTER] UPDATED referrer affiliate_networks', { referredBy });
+           console.log('[REGISTER] QUERY -> update affiliate_networks for referrer', { referredBy, nextTotalReferrals, nextTotalDownlines, nextTier });
+           await connection.query(
+             `UPDATE affiliate_networks
+             SET total_referrals = ?,
+                 total_downlines = ?,
+                 affiliate_tier = ?,
+                 level = ?,
+                 commission_rate = ?
+             WHERE user_id = ?`,
+             [
+               nextTotalReferrals,
+               nextTotalDownlines,
+               nextTier.affiliate_tier,
+               nextTier.level,
+               nextTier.commission_rate,
+               referredBy,
+             ]
+           );
+           console.log('[REGISTER] UPDATED referrer affiliate_networks', { referredBy });
 
-          console.log('[REGISTER] QUERY -> insert affiliate_commission_logs');
-          await connection.query(
-            `INSERT INTO affiliate_commission_logs (
-              affiliate_id,
-              member_id,
-              transaction_code,
-              transaction_amount,
-              commission_earned
-            ) VALUES (?, ?, ?, ?, ?)` ,
-            [referrer.affiliate_id || `AFF-${referredBy}`, userId, null, 0, referralBonus]
-          );
-          console.log('[REGISTER] INSERTED affiliate_commission_log for', { member: userId, referrer: referredBy, bonus: referralBonus });
-        } else {
+           console.log('[REGISTER] QUERY -> insert affiliate_commission_logs');
+           await connection.query(
+             `INSERT INTO affiliate_commission_logs (
+               affiliate_id,
+               member_id,
+               transaction_code,
+               transaction_amount,
+               commission_earned
+             ) VALUES (?, ?, ?, ?, ?)` ,
+             [referrer.affiliate_id || `AFF-${referredBy}`, userId, null, 0, referralBonus]
+           );
+           console.log('[REGISTER] INSERTED affiliate_commission_log for', { member: userId, referrer: referredBy, bonus: referralBonus });
+
+const [existingUserPoints] = await connection.query(
+              `SELECT user_id, commission_points, cashback_points, poin_gamification
+               FROM user_points
+               WHERE user_id = ?
+               LIMIT 1
+               FOR UPDATE`,
+              [referredBy]
+            );
+
+            if (!existingUserPoints || existingUserPoints.length === 0) {
+              await connection.query(
+                `INSERT INTO user_points (user_id, total_points, poin_gamification, cashback_points, commission_points)
+                 VALUES (?, ?, 0, 0, ?)`,
+                [referredBy, referralBonus, referralBonus]
+              );
+            } else {
+              const current = existingUserPoints[0];
+              const nextCommission = Number(current.commission_points || 0) + referralBonus;
+              const nextTotal = nextCommission + Number(current.cashback_points || 0) + Number(current.poin_gamification || 0);
+              await connection.query(
+                `UPDATE user_points
+                 SET commission_points = ?,
+                     total_points = ?,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE user_id = ?`,
+                [nextCommission, nextTotal, referredBy]
+              );
+            }
+         } else {
           console.log('[REGISTER] referredBy provided but referrer not found', { referredBy });
         }
 
@@ -1298,26 +1337,29 @@ const rows = await query(
 
 export async function getHubDataAdmin(_req, res) {
   try {
-    const [memberCountRows] = await Promise.all([
-      query(`SELECT COUNT(*) AS total_members FROM users`),
+    const [totalUsersRows] = await Promise.all([
+      query(`SELECT COUNT(*) AS total FROM users`),
     ]);
 
-    const [affiliateCountRows] = await Promise.all([
-      query(`SELECT COUNT(*) AS total_affiliates FROM affiliate_networks`),
+    const [activeMembersRows] = await Promise.all([
+      query(`SELECT COUNT(*) AS total FROM users WHERE (role = 'MEMBER' OR role = 'MEMBER_AFFILIATE') AND status = 'ACTIVE'`),
     ]);
 
-    const settingsRows = await query(
-      `SELECT setting_key, setting_value
-      FROM global_settings
-      ORDER BY setting_key ASC`
-    );
+    const [activeAffiliatesRows] = await Promise.all([
+      query(`SELECT COUNT(*) AS total FROM affiliate_networks an INNER JOIN users u ON u.user_id = an.user_id WHERE u.role = 'MEMBER_AFFILIATE' AND u.status = 'ACTIVE'`),
+    ]);
+
+    const [totalCommissionRows] = await Promise.all([
+      query(`SELECT COALESCE(SUM(commission_earned), 0) AS total FROM affiliate_commission_logs`),
+    ]);
 
     return res.json({
       success: true,
       data: {
-        total_members: Number(memberCountRows?.[0]?.total_members || 0),
-        total_affiliates: Number(affiliateCountRows?.[0]?.total_affiliates || 0),
-        global_settings: settingsRows,
+        total_users: Number(totalUsersRows?.[0]?.total || 0),
+        active_members: Number(activeMembersRows?.[0]?.total || 0),
+        active_affiliates: Number(activeAffiliatesRows?.[0]?.total || 0),
+        total_commission: Number(totalCommissionRows?.[0]?.total || 0),
       },
     });
   } catch (error) {
@@ -1558,8 +1600,6 @@ export async function getAllAffiliates(_req, res) {
         an.total_downlines,
         an.level,
         an.commission_rate,
-        an.commission_points,
-        an.total_points,
         an.created_at,
         u.username,
         u.email,
@@ -1573,39 +1613,56 @@ export async function getAllAffiliates(_req, res) {
     );
 
     let gamificationMap = new Map();
+    let pointsMap = new Map();
+    
     if (rows.length > 0) {
       const gamificationRows = await query(
         `SELECT user_id, memberLevel FROM usergamification WHERE user_id IN (${rows.map(() => '?').join(',')})`,
         rows.map(r => r.user_id)
       );
       gamificationMap = new Map(gamificationRows.map(r => [r.user_id, r.memberLevel || 'Silver']));
+      
+      const pointsRows = await query(
+        `SELECT user_id, total_points, commission_points, cashback_points, poin_gamification
+         FROM user_points WHERE user_id IN (${rows.map(() => '?').join(',')})`,
+        rows.map(r => r.user_id)
+      );
+      pointsMap = new Map(pointsRows.map(r => [r.user_id, {
+        total_points: Number(r.total_points || 0),
+        commission_points: Number(r.commission_points || 0),
+        cashback_points: Number(r.cashback_points || 0),
+        poin_gamification: Number(r.poin_gamification || 0),
+      }]));
     }
 
     return res.json({
       success: true,
-      data: rows.map((row) => ({
-        user_id: row.user_id,
-        affiliate_id: row.affiliate_id || null,
-        nim: row.nim || null,
-        username: row.username,
-        email: row.email,
-        role: row.role,
-        status: row.status,
-        membership_level: gamificationMap.get(row.user_id) || 'Silver',
-        memberLevel: gamificationMap.get(row.user_id) || 'Silver',
-        phone_number: row.phone_number,
-        profile_picture: row.profile_picture,
-        referral_code: row.referral_code,
-        affiliate_tier: row.affiliate_tier,
-        total_referrals: Number(row.total_referrals || 0),
-        total_downlines: Number(row.total_downlines || 0),
-        level: row.level || 'Starter',
-        commission_rate: Number(row.commission_rate ?? AFFILIATE_COMMISSION_RATE_BASIC),
-        commission_points: Number(row.commission_points || 0),
-        total_points: Number(row.total_points || 0),
-        created_at: row.created_at,
-        affiliate_network: buildAffiliateNetwork(row),
-      })),
+      data: rows.map((row) => {
+        const points = pointsMap.get(row.user_id) || { total_points: 0, commission_points: 0, cashback_points: 0, poin_gamification: 0 };
+        return {
+          user_id: row.user_id,
+          affiliate_id: row.affiliate_id || null,
+          nim: row.nim || null,
+          username: row.username,
+          email: row.email,
+          role: row.role,
+          status: row.status,
+          membership_level: gamificationMap.get(row.user_id) || 'Silver',
+          memberLevel: gamificationMap.get(row.user_id) || 'Silver',
+          phone_number: row.phone_number,
+          profile_picture: row.profile_picture,
+          referral_code: row.referral_code,
+          affiliate_tier: row.affiliate_tier,
+          total_referrals: Number(row.total_referrals || 0),
+          total_downlines: Number(row.total_downlines || 0),
+          level: row.level || 'Starter',
+          commission_rate: Number(row.commission_rate ?? AFFILIATE_COMMISSION_RATE_BASIC),
+          commission_points: points.commission_points,
+          total_points: points.total_points,
+          created_at: row.created_at,
+          affiliate_network: buildAffiliateNetwork(row),
+        };
+      }),
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
@@ -1888,16 +1945,15 @@ const result = await withTransaction(async (connection) => {
       const nextGamification = Number(current.poin_gamification || 0) - pointsUsed;
       const nextCashback = Number(current.cashback_points || 0);
       const nextCommission = Number(current.commission_points || 0);
-      const nextTotalPoints = Number(current.total_points || 0) - pointsUsed;
+      const nextTotalPoints = nextGamification + nextCashback + nextCommission;
 
       await connection.query(
         `UPDATE user_points
-         SET total_points = ?,
-             poin_gamification = ?,
-             cashback_points = ?,
-             commission_points = ?
+         SET poin_gamification = ?,
+             total_points = ?,
+             updated_at = CURRENT_TIMESTAMP
          WHERE user_id = ?`,
-        [nextTotalPoints, nextGamification, nextCashback, nextCommission, userId]
+        [nextGamification, nextTotalPoints, userId]
       );
 
       const level = calculateMemberLevel(nextTotalPoints);
@@ -2116,55 +2172,77 @@ if (userId && pointsEarned > 0) {
 
         const affiliateUpline = normalizeText(memberRows[0]?.affiliate_upline || '');
 
-        if (affiliateUpline) {
-          const [uplineRows] = await connection.query(
-            `SELECT affiliate_id, affiliate_tier, level, commission_rate, total_referrals, total_downlines
-            FROM affiliate_networks
-            WHERE affiliate_id = ?
-            LIMIT 1
-            FOR UPDATE`,
-            [affiliateUpline]
-          );
-
-          if (uplineRows.length) {
-            const upline = uplineRows[0];
-            const nextTier = resolveAffiliateTierByReferrals(upline.total_downlines || 0);
-            const commissionRate = Number(upline.commission_rate || nextTier.commission_rate);
-            const commissionEarned = Number((total * commissionRate).toFixed(2));
-            const totalDownlines = Number(upline.total_downlines || 0);
-
-            const tierSnapshot = resolveAffiliateTierByReferrals(totalDownlines);
-
-            await connection.query(
-              `UPDATE affiliate_networks
-              SET commission_points = commission_points + ?,
-                  total_points = total_points + ?,
-                  affiliate_tier = ?,
-                  level = ?,
-                  commission_rate = ?
-              WHERE affiliate_id = ?`,
-              [
-                commissionEarned,
-                commissionEarned,
-                tierSnapshot.affiliate_tier,
-                tierSnapshot.level,
-                tierSnapshot.commission_rate,
-                affiliateUpline,
-              ]
+if (affiliateUpline) {
+const [uplineRows] = await connection.query(
+              `SELECT an.user_id, an.affiliate_id, an.affiliate_tier, an.level, an.commission_rate, an.total_referrals, an.total_downlines
+              FROM affiliate_networks an
+              WHERE an.affiliate_id = ?
+              LIMIT 1
+              FOR UPDATE`,
+              [affiliateUpline]
             );
 
-            await connection.query(
-              `INSERT INTO affiliate_commission_logs (
-                affiliate_id,
-                member_id,
-                transaction_code,
-                transaction_amount,
-                commission_earned
-              ) VALUES (?, ?, ?, ?, ?)`,
-              [affiliateUpline, userId, transactionCode, total, commissionEarned]
-            );
-          }
-        }
+           if (uplineRows.length) {
+             const upline = uplineRows[0];
+             const nextTier = resolveAffiliateTierByReferrals(upline.total_downlines || 0);
+             const commissionRate = Number(upline.commission_rate || nextTier.commission_rate);
+             const commissionEarned = Number((total * commissionRate).toFixed(2));
+
+             const tierSnapshot = resolveAffiliateTierByReferrals(upline.total_downlines || 0);
+
+             await connection.query(
+               `UPDATE affiliate_networks
+               SET total_referrals = total_referrals + 1,
+                   total_downlines = total_downlines + 1,
+                   affiliate_tier = ?,
+                   level = ?,
+                   commission_rate = ?
+               WHERE affiliate_id = ?`,
+               [tierSnapshot.affiliate_tier, tierSnapshot.level, tierSnapshot.commission_rate, affiliateUpline]
+             );
+
+             await connection.query(
+               `INSERT INTO affiliate_commission_logs (
+                 affiliate_id,
+                 member_id,
+                 transaction_code,
+                 transaction_amount,
+                 commission_earned
+               ) VALUES (?, ?, ?, ?, ?)`,
+               [affiliateUpline, userId, transactionCode, total, commissionEarned]
+             );
+
+const [existingUserPoints] = await connection.query(
+                `SELECT user_id, commission_points, cashback_points, poin_gamification
+                 FROM user_points
+                 WHERE user_id = ?
+                 LIMIT 1
+                 FOR UPDATE`,
+                [upline.user_id]
+              );
+
+              if (!existingUserPoints || existingUserPoints.length === 0) {
+                const nextTotal = commissionEarned;
+                await connection.query(
+                  `INSERT INTO user_points (user_id, total_points, poin_gamification, cashback_points, commission_points)
+                   VALUES (?, ?, 0, 0, ?)`,
+                  [upline.user_id, nextTotal, commissionEarned]
+                );
+              } else {
+                const current = existingUserPoints[0];
+                const nextCommission = Number(current.commission_points || 0) + commissionEarned;
+                const nextTotal = nextCommission + Number(current.cashback_points || 0) + Number(current.poin_gamification || 0);
+                await connection.query(
+                  `UPDATE user_points
+                   SET commission_points = ?,
+                       total_points = ?,
+                       updated_at = CURRENT_TIMESTAMP
+                   WHERE user_id = ?`,
+                  [nextCommission, nextTotal, upline.user_id]
+                );
+              }
+           }
+         }
       }
 
       return { transactionCode };
@@ -2269,7 +2347,7 @@ export async function earnPoints(_req, res) {
 
     const result = await withTransaction(async (connection) => {
       const [pointRows] = await connection.query(
-        `SELECT total_points, commission_points, cashback_points
+        `SELECT total_points, poin_gamification, cashback_points, commission_points
          FROM user_points
          WHERE user_id = ?
          LIMIT 1
@@ -2284,15 +2362,17 @@ export async function earnPoints(_req, res) {
       const current = pointRows[0];
       const nextCommission = Number(current.commission_points || 0) + (pointType === 'commission' ? points : 0);
       const nextCashback = Number(current.cashback_points || 0) + (pointType === 'cashback' ? points : 0);
-      const nextTotal = Number(current.total_points || 0) + points;
+      const nextGamification = Number(current.poin_gamification || 0);
+      const nextTotal = nextCommission + nextCashback + nextGamification;
 
       await connection.query(
         `UPDATE user_points
-         SET total_points = ?,
-             commission_points = ?,
-             cashback_points = ?
+         SET commission_points = ?,
+             cashback_points = ?,
+             total_points = ?,
+             updated_at = CURRENT_TIMESTAMP
          WHERE user_id = ?`,
-        [nextTotal, nextCommission, nextCashback, userId]
+        [nextCommission, nextCashback, nextTotal, userId]
       );
 
       const level = calculateMemberLevel(nextTotal);

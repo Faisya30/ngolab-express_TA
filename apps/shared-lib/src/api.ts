@@ -65,10 +65,12 @@ function mapActionToBackendRequest(action: string, data?: any): BackendRequest |
       return { method: 'POST', path: '/api/kiosk/members/qr-lookup', body: { code: data?.code || data?.user_id } };
 case 'submitOrder':
        return { method: 'POST', path: '/api/kiosk/orders', body: data };
-    case 'getRecommendedProducts':
-       return { method: 'GET', path: '/api/membership/recommended-products' };
+case 'getRecommendedProducts':
+      return { method: 'GET', path: '/api/membership/recommended-products' };
     case 'getAdminAiInsights':
-       return { method: 'GET', path: '/api/membership/admin/ai-insights' };
+      return { method: 'GET', path: '/api/membership/admin/ai-insights' };
+    case 'getMembershipHubData':
+      return { method: 'GET', path: '/api/membership/admin/hub-data' };
     default:
        return null;
   }

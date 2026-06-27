@@ -21,6 +21,15 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, onLogout }) => 
       ),
     },
     {
+      id: 'AFFILIATE' as ViewType,
+      label: 'Member & Affiliate',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1h2a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3a1 1 0 011-1z" />
+        </svg>
+      ),
+    },
+    {
       id: 'CATEGORIES' as ViewType,
       label: 'Categories',
       icon: (
